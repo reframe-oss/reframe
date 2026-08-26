@@ -57,39 +57,40 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     }
   }, [xToSeconds, duration, recipe.trimStart, recipe.trimEnd, onChange]);
 
- useEffect(() => {
-  const onMove = (e: MouseEvent | TouchEvent) => {
-    let clientX: number;
+  useEffect(() => {
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      let clientX: number;
 
-    if ("touches" in e) {
-      const touch = e.touches[0];
+      if ("touches" in e) {
+        const touch = e.touches[0];
 
-      if (!touch) return;
+        if (!touch) return;
 
-      clientX = touch.clientX;
-    } else {
-      clientX = e.clientX;
-    }
+        clientX = touch.clientX;
+      } else {
+        clientX = e.clientX;
+      }
 
-    applyDrag(clientX);
-  };
+      applyDrag(clientX);
+    };
 
-  const onUp = () => {
-    dragging.current = null;
-  };
+    const onUp = () => {
+      dragging.current = null;
+    };
 
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove);
-  document.addEventListener("touchend", onUp);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("touchmove", onMove);
+    document.addEventListener("touchend", onUp);
 
-  return () => {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.removeEventListener("touchmove", onMove);
-    document.removeEventListener("touchend", onUp);
-  };
-}, [applyDrag]);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+    };
+  }, [applyDrag]);
+
   const handleStart = (val: string) => {
     setStartInput(val);
 
@@ -173,7 +174,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
   };
 
   const inputClass =
-    "w-full text-sm px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--bg)] font-heading focus:outline-none focus:ring-2 focus:ring-film-400 text-[var(--text)] transition-shadow [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+    "w-full text-sm px-3 py-2 border rounded-md bg-[var(--bg)] font-heading focus:outline-none focus:ring-2 focus:ring-film-400 text-[var(--text)] transition-shadow [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
   return (
     <div id="trim-control" className="space-y-3">
@@ -258,9 +259,10 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             aria-label="Trim start time in seconds"
             aria-invalid={invalidStart}
             aria-describedby={invalidStart ? "trim-start-error" : undefined}
-            className={`${inputClass} ${
-              invalidStart ? "border-[var(--error)]" : "border-[var(--border)]"
-            }`}
+            className={`${inputClass} ${invalidStart
+                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                : "border-[var(--border)]"
+              }`}
             placeholder="0"
           />
           {invalidStart && (
@@ -296,9 +298,10 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             aria-label="Trim end time in seconds"
             aria-invalid={invalidEnd}
             aria-describedby={invalidEnd ? "trim-end-error" : undefined}
-            className={`${inputClass} ${
-              invalidEnd ? "border-[var(--error)]" : "border-[var(--border)]"
-            }`}
+            className={`${inputClass} ${invalidEnd
+                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                : "border-[var(--border)]"
+              }`}
             placeholder={duration > 0 ? `${duration.toFixed(1)}` : "full length"}
           />
           {invalidEnd && (
@@ -324,9 +327,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
           <p className="text-[10px] text-[var(--error)] font-heading">
             Clip must be at least 0.1 seconds long.
           </p>
-      )}
+        )}
     </div>
   );
 }
-
-
