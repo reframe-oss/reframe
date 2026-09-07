@@ -55,13 +55,24 @@ interface Rect {
 }
 
 function getTooltipStyle(
-  rect: Rect,
+  rect: Rect | null,
   position: TourStep["position"],
   tooltipRef: React.RefObject<HTMLDivElement | null>,
 ): React.CSSProperties {
   const tooltip = tooltipRef.current;
   const tw = tooltip?.offsetWidth ?? 320;
   const th = tooltip?.offsetHeight ?? 140;
+
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1000;
+  const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 1000;
+
+  if (!rect) {
+    // Elegant fallback: Center the tooltip in the viewport
+    return {
+      top: Math.max(12, (viewportHeight - th) / 2),
+      left: Math.max(12, (viewportWidth - tw) / 2),
+    };
+  }
 
   const sr = {
     top: rect.top - PADDING,
@@ -70,36 +81,62 @@ function getTooltipStyle(
     height: rect.height + PADDING * 2,
   };
 
+  let left = 0;
+  let top = 0;
+
   switch (position) {
     case "top":
-      return {
-        top: sr.top - th - TOOLTIP_OFFSET,
-        left: sr.left + sr.width / 2 - tw / 2,
-      };
+      top = sr.top - th - TOOLTIP_OFFSET;
+      left = sr.left + sr.width / 2 - tw / 2;
+      break;
     case "left":
-      return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left - tw - TOOLTIP_OFFSET,
-      };
+      top = sr.top + sr.height / 2 - th / 2;
+      left = sr.left - tw - TOOLTIP_OFFSET;
+      break;
     case "right":
-      return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left + sr.width + TOOLTIP_OFFSET,
-      };
+      top = sr.top + sr.height / 2 - th / 2;
+      left = sr.left + sr.width + TOOLTIP_OFFSET;
+      break;
     case "bottom":
     default:
-      return {
-        top: sr.top + sr.height + TOOLTIP_OFFSET,
-        left: sr.left + sr.width / 2 - tw / 2,
-      };
+      top = sr.top + sr.height + TOOLTIP_OFFSET;
+      left = sr.left + sr.width / 2 - tw / 2;
+      break;
   }
+
+  // Constrain tooltip to viewport boundaries with a safe margin
+  const margin = 12;
+
+  if (left < margin) {
+    left = margin;
+  } else if (left + tw > viewportWidth - margin) {
+    left = Math.max(margin, viewportWidth - tw - margin);
+  }
+
+  if (top < margin) {
+    top = margin;
+  } else if (top + th > viewportHeight - margin) {
+    top = Math.max(margin, viewportHeight - th - margin);
+  }
+
+  return { top, left };
 }
 
 interface SpotlightProps {
-  rect: Rect;
+  rect: Rect | null;
 }
 
 function Spotlight({ rect }: SpotlightProps) {
+  if (!rect) {
+    return (
+      <div
+        className="fixed inset-0 bg-black/65 pointer-events-none"
+        style={{ zIndex: 9998 }}
+        aria-hidden="true"
+      />
+    );
+  }
+
   const r = {
     top: rect.top - PADDING,
     left: rect.left - PADDING,
@@ -151,7 +188,7 @@ interface TooltipProps {
   step: TourStep;
   stepIndex: number;
   totalSteps: number;
-  rect: Rect;
+  rect: Rect | null;
   onNext: () => void;
   onSkip: () => void;
   tooltipRef: React.RefObject<HTMLDivElement | null>;
@@ -175,7 +212,7 @@ function Tooltip({
       role="dialog"
       aria-modal="true"
       aria-label={`Onboarding step ${stepIndex + 1} of ${totalSteps}: ${step.title}`}
-      className="fixed z-[9999] w-80 rounded-xl shadow-2xl border
+      className="fixed z-[9999] w-80 max-w-[calc(100vw-24px)] rounded-xl shadow-2xl border
         bg-[var(--surface)]
         border-[var(--border)]
         text-[var(--text)]
@@ -240,28 +277,34 @@ export default function OnboardingTour() {
     setVisible(false);
   }, []);
 
-  const measureTarget = useCallback((id: string): Promise<Rect | null> => {
+  const measureTarget = useCallback((id: string): Rect | null => {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      top: r.top,
+      left: r.left,
+      width: r.width,
+      height: r.height,
+    };
+  }, []);
+
+  const scrollToTarget = useCallback((id: string): Promise<boolean> => {
     return new Promise((resolve) => {
       const attempt = (tries: number) => {
         const el = document.getElementById(id);
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
           setTimeout(() => {
-            const r = el.getBoundingClientRect();
-            resolve({
-              top: r.top,
-              left: r.left,
-              width: r.width,
-              height: r.height,
-            });
+            resolve(true);
           }, 400); // wait for scroll to finish
           return;
         }
         if (tries <= 0) {
-          resolve(null);
+          resolve(false);
           return;
         }
-        setTimeout(() => attempt(tries - 1), 300);
+        setTimeout(() => attempt(tries - 1), 200);
       };
       attempt(5);
     });
@@ -271,14 +314,14 @@ export default function OnboardingTour() {
   useEffect(() => {
     if (localStorage.getItem(TOUR_KEY)) return;
     const t = setTimeout(async () => {
-      const rect = await measureTarget(TOUR_STEPS[0]?.targetId ?? "");
-      if (rect) {
-        setTargetRect(rect);
-        setVisible(true);
-      }
+      const firstTarget = TOUR_STEPS[0]?.targetId ?? "";
+      await scrollToTarget(firstTarget);
+      const rect = measureTarget(firstTarget);
+      setTargetRect(rect);
+      setVisible(true);
     }, 600);
     return () => clearTimeout(t);
-  }, [measureTarget]);
+  }, [measureTarget, scrollToTarget]);
 
   // Measure target whenever step changes (skip on first render — init effect handles that)
   useEffect(() => {
@@ -293,60 +336,87 @@ export default function OnboardingTour() {
     }
 
     let retryCount = 0;
-    const maxRetries = 10; // Retry up to ~5s with 500ms delays
+    const maxRetries = 3;
     let retryTimer: number | null = null;
     let cancelled = false;
 
-    const tryMeasure = () => {
-      measureTarget(currentStep.targetId)
-        .then((rect) => {
-          if (cancelled) return;
-          if (rect) {
-            setTargetRect(rect);
-            setTimeout(() => tooltipRef.current?.focus(), 50);
-            retryCount = 0;
-          } else if (retryCount < maxRetries) {
-            retryCount++;
-            retryTimer = window.setTimeout(tryMeasure, 500);
-          } else {
-            // If we've retried enough, fallback to advancing or dismissing
-            if (stepIndex < TOUR_STEPS.length - 1) setStepIndex((i) => i + 1);
-            else dismiss();
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to measure tour target:", error);
-          dismiss();
-        });
+    // Reset rect to null while loading the new step's element
+    setTargetRect(null);
+
+    const tryScrollAndMeasure = () => {
+      scrollToTarget(currentStep.targetId).then((scrolled) => {
+        if (cancelled) return;
+        const rect = measureTarget(currentStep.targetId);
+        if (rect) {
+          setTargetRect(rect);
+          setTimeout(() => tooltipRef.current?.focus(), 50);
+        } else if (retryCount < maxRetries) {
+          retryCount++;
+          retryTimer = window.setTimeout(tryScrollAndMeasure, 300);
+        } else {
+          // If element not found after retries, fallback to centered tooltip
+          setTargetRect(null);
+          setTimeout(() => tooltipRef.current?.focus(), 50);
+        }
+      }).catch((err) => {
+        console.error("Failed to scroll to target:", err);
+        setTargetRect(null);
+      });
     };
 
-    tryMeasure();
+    tryScrollAndMeasure();
 
     return () => {
       cancelled = true;
       if (retryTimer !== null) clearTimeout(retryTimer);
     };
-  }, [stepIndex, visible, measureTarget, dismiss, currentStep]);
+  }, [stepIndex, visible, measureTarget, scrollToTarget, dismiss, currentStep]);
 
   // Re-measure on resize or scroll so spotlight stays anchored to target.
-  // requestAnimationFrame prevents layout thrashing on rapid scroll/resize events.
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !currentStep) return;
     let rafId: number;
     const remeasure = () => {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        measureTarget(TOUR_STEPS[stepIndex]?.targetId ?? "").then(setTargetRect);
+        const rect = measureTarget(currentStep.targetId);
+        setTargetRect(rect);
       });
     };
     window.addEventListener("resize", remeasure);
-    window.addEventListener("scroll", remeasure, true);
+    window.addEventListener("scroll", remeasure, { passive: true, capture: true });
     return () => {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", remeasure);
       window.removeEventListener("scroll", remeasure, true);
     };
-  }, [visible, stepIndex, measureTarget]);
+  }, [visible, currentStep, measureTarget]);
+
+  // Lock scroll when tour is visible by preventing scroll wheel/touch/keys
+  useEffect(() => {
+    if (!visible) return;
+
+    const preventScroll = (e: Event) => {
+      e.preventDefault();
+    };
+
+    const preventScrollKeys = (e: KeyboardEvent) => {
+      const keys = ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Space", "Home", "End"];
+      if (keys.includes(e.key)) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("wheel", preventScroll, { passive: false });
+    window.addEventListener("touchmove", preventScroll, { passive: false });
+    window.addEventListener("keydown", preventScrollKeys, { passive: false });
+
+    return () => {
+      window.removeEventListener("wheel", preventScroll);
+      window.removeEventListener("touchmove", preventScroll);
+      window.removeEventListener("keydown", preventScrollKeys);
+    };
+  }, [visible]);
 
   // Keyboard support
   useEffect(() => {
