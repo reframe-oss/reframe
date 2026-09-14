@@ -480,6 +480,8 @@ export default function VideoEditor() {
                     />
                   </AccordionSection>
 
+                  <hr className="border-white/10 my-2" />
+
                   <AccordionSection
                     id="rotation"
                     icon={<RotateCw size={12} />}
@@ -490,6 +492,8 @@ export default function VideoEditor() {
                   >
                     <RotateControl recipe={recipe} onChange={updateRecipe} />
                   </AccordionSection>
+
+                  <hr className="border-white/10 my-2" />
 
                   <AccordionSection
                     id="text"
@@ -518,6 +522,9 @@ export default function VideoEditor() {
                   >
                     <AudioSpeedControl recipe={recipe} onChange={updateRecipe} />
                   </AccordionSection>
+
+                  <hr className="border-white/10 my-2" />
+
                   <Section
                     icon={<SlidersHorizontal size={12} />}
                     title="Adjustments"
