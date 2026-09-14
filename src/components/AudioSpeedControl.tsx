@@ -107,6 +107,7 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
         </div>
         <input
           id="speed-control"
+          data-testid="speed-slider"
           type="range"
           min={0}
           max={SPEED_STEPS.length - 1}

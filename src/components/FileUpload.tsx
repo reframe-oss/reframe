@@ -188,6 +188,7 @@ export default function FileUpload({
   const DropZone = () => (
     <div
       id="upload-zone"
+      data-testid="file-upload-zone"
       role="button"
       tabIndex={0}
       aria-label="Video upload area. Drag and drop a video file or press Enter to browse."

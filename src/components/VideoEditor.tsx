@@ -763,6 +763,7 @@ export default function VideoEditor() {
 
             <button
               id="export-button"
+              data-testid="export-button"
               type="button"
               onClick={handleExport}
                 disabled={!file || isProcessing}

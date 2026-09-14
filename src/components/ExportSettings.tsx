@@ -72,6 +72,7 @@ export default function ExportSettings({
 
         <input
           id="quality-control"
+          data-testid="quality-slider"
           type="range"
           min={18}
           max={30}
