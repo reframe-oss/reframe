@@ -15,6 +15,34 @@ export interface TextOverlay {
   fontPath?: string; // Path/URL to custom font file for export
 }
 
+function isTextOverlay(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const overlay = value as Record<string, unknown>;
+
+  return (
+    typeof overlay.id === "string" &&
+    typeof overlay.text === "string" &&
+    typeof overlay.x === "number" &&
+    Number.isFinite(overlay.x) &&
+    typeof overlay.y === "number" &&
+    Number.isFinite(overlay.y) &&
+    typeof overlay.fontSize === "number" &&
+    Number.isFinite(overlay.fontSize) &&
+    typeof overlay.color === "string" &&
+    (
+      overlay.fontFamily === undefined ||
+      typeof overlay.fontFamily === "string"
+    ) &&
+    (
+      overlay.fontPath === undefined ||
+      typeof overlay.fontPath === "string"
+    )
+  );
+}
+
 export interface EditRecipe {
   preset: string;
   customWidth: number;
@@ -147,6 +175,8 @@ export function isValidRecipe(value: unknown): value is EditRecipe {
   if (typeof v.saturation !== "number" || !isFinite(v.saturation)) return false;
   if (typeof v.soundOnCompletion !== "boolean") return false;
   if (!Array.isArray(v.textOverlays)) return false;
+
+  if (!v.textOverlays.every(isTextOverlay)) return false;
 
   return true;
 }
