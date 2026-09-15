@@ -90,11 +90,27 @@
 }
 
 /* ── Base styles ── */
+html {
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
 body {
+  margin: 0;
+  min-height: 100vh;
   background-color: var(--bg);
   color: var(--text);
   line-height: 1.6;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
 }
 
 h1,
@@ -145,4 +161,11 @@ textarea:focus {
   outline: 0;
   box-shadow: 0 0 0 3px var(--accent-muted);
   border-radius: var(--radius);
+}
+
+detail > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
 }

@@ -36,6 +36,8 @@ export default function ImageOverlayPanel({
 
   useEffect(() => {
     if (!overlayFile) {
+      // Part of the same object-URL lifecycle below, not a derivable value.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setThumbUrl("");
       return;
     }

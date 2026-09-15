@@ -105,8 +105,9 @@ const VideoCompressor: React.FC<VideoCompressorProps> = ({ videoFile }) => {
 
       {showSettings && (
         <div className="mb-4 bg-gray-800 p-3 rounded-lg text-sm">
-          <label className="block mb-2 text-gray-400">Choose Preset</label>
+          <label htmlFor="compression-preset" className="block mb-2 text-gray-400">Choose Preset</label>
           <select
+            id="compression-preset"
             value={preset}
             onChange={(e) => setPreset(e.target.value as 'balanced' | 'small')}
             className="w-full bg-gray-900 border border-gray-700 rounded p-2"

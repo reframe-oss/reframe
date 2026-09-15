@@ -38,7 +38,7 @@ When a PR has merge conflicts, resolve them automatically **before** doing anyth
 
 2. **Clone and resolve locally:**
    ```bash
-   git clone https://github.com/magic-peach/reframe.git
+   git clone https://github.com/reframe-oss/reframe.git
    cd reframe
    git fetch origin
    git checkout <pr-branch>

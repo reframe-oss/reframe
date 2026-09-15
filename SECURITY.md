@@ -12,7 +12,7 @@ If you discover a security vulnerability in Reframe, please **do not** open a pu
 
 Instead, report it using one of the following methods:
 
-- **GitHub Issue (labeled `security`):** Open a [new issue](https://github.com/magic-peach/reframe/issues/new) and apply the `security` label. For sensitive details, use a private channel below.
+- **GitHub Issue (labeled `security`):** Open a [new issue](https://github.com/reframe-oss/reframe/issues/new) and apply the `security` label. For sensitive details, use a private channel below.
 - **Email:** Contact the maintainer directly at [maintainer email] with the subject line `[SECURITY] Reframe Vulnerability Report`.
 
 ### What to Include in Your Report

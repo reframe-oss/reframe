@@ -149,11 +149,12 @@ export default function ExportSettings({
 
  <div className="mt-6 pt-6 border-t border-gray-700">
   <div className="flex items-center justify-between mb-4">
-    <label className="text-sm font-heading font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center gap-2">
+    <label htmlFor="compress-video-toggle" className="text-sm font-heading font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center gap-2">
       <Zap size={14} className="text-yellow-400" />
       Compress Video
     </label>
     <input
+      id="compress-video-toggle"
       type="checkbox"
       checked={isCompressEnabled}
       onChange={(e) => setIsCompressEnabled(e.target.checked)}

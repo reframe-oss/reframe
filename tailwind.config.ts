@@ -10,6 +10,9 @@ const config: Config = {
     "./src/hooks/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/context/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/lib/**/*.{js,ts,jsx,tsx,mdx}",
+    // Storybook decorators use Tailwind utilities too; without this the
+    // preview wrapper renders unstyled while the app looks fine.
+    "./.storybook/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {

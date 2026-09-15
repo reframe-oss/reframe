@@ -7,14 +7,14 @@
 ### No login. No uploads. No ads. 100% private.
 
 <p align="center">
-  <a href="https://github.com/magic-peach/reframe/stargazers">
-    <img src="https://img.shields.io/github/stars/magic-peach/reframe?style=flat-square&logo=github&label=Stars&color=yellow&logoColor=white">
+  <a href="https://github.com/reframe-oss/reframe/stargazers">
+    <img src="https://img.shields.io/github/stars/reframe-oss/reframe?style=flat-square&logo=github&label=Stars&color=yellow&logoColor=white">
   </a>
-  <a href="https://github.com/magic-peach/reframe/network/members">
-    <img src="https://img.shields.io/github/forks/magic-peach/reframe?style=flat-square&logo=github">
+  <a href="https://github.com/reframe-oss/reframe/network/members">
+    <img src="https://img.shields.io/github/forks/reframe-oss/reframe?style=flat-square&logo=github">
   </a>
-  <a href="https://github.com/magic-peach/reframe/issues">
-    <img src="https://img.shields.io/github/issues/magic-peach/reframe?style=flat-square&logo=github&label=Issues&color=E53E3E&logoColor=white">
+  <a href="https://github.com/reframe-oss/reframe/issues">
+    <img src="https://img.shields.io/github/issues/reframe-oss/reframe?style=flat-square&logo=github&label=Issues&color=E53E3E&logoColor=white">
   </a>
 </p>
 
@@ -37,8 +37,17 @@
   <a href="https://gssoc.girlscript.tech">
     <img src="https://img.shields.io/badge/GSSoC-2026-FF6B35?style=flat-square">
   </a>
-  <a href="https://github.com/Sneha079-codes/reframe/actions/workflows/main.yml">
-    <img src="https://github.com/Sneha079-codes/reframe/actions/workflows/main.yml/badge.svg">
+  <a href="https://github.com/magic-peach/reframe/actions/workflows/main.yml">
+    <img src="https://github.com/magic-peach/reframe/actions/workflows/main.yml/badge.svg">
+  </a>
+  <a href="CODE_OF_CONDUCT.md">
+    <img src="https://img.shields.io/badge/Code%20of%20Conduct-v2.1-purple?style=flat-square">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.netlify.com">
+    <img src="https://www.netlify.com/assets/badges/netlify-badge-color-accent.svg" alt="Deploys by Netlify" width="114" height="50">
   </a>
 </p>
 
@@ -101,7 +110,7 @@ Everything stays on your device. No servers. No tracking. No login.
 ### Installation
 
 ```bash
-git clone https://github.com/magic-peach/reframe.git
+git clone https://github.com/reframe-oss/reframe.git
 cd reframe
 bun install
 ```
@@ -149,7 +158,7 @@ Reframe uses static export (`output: 'export'`) and can be deployed easily on Ve
 4. Configure:
    - Framework Preset: Next.js
    - Build Command: `bun run build`
-   - Output Directory: `out`
+   - Output Directory: leave blank (Vercel auto-detects `out` for static exports)
 5. Click **Deploy**
 
 Vercel will automatically build and host the static output.
@@ -214,7 +223,7 @@ The quickest way to get Reframe live:
 3. Vercel auto-detects Next.js settings:
    - **Framework Preset:** Next.js
    - **Build Command:** `bun run build`
-   - **Output Directory:** `out`
+   - **Output Directory:** leave blank (Vercel auto-detects `out` for static exports)
 4. Click **Deploy** — your site will be live in ~2 minutes
 
 **Option 2 — Vercel CLI**
@@ -404,19 +413,19 @@ Reframe is an **official project in GirlScript Summer of Code (GSSoC) 2026**! We
 
 | Level               | Label                                                                                                          | Description                                                                        |
 | ------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| 🟢 **Beginner**     | [`good first issue`](https://github.com/magic-peach/reframe/issues?q=is%3Aopen+label%3A%22good+first+issue%22) | Small, well-defined tasks — perfect if this is your first open source contribution |
-| 🟡 **Intermediate** | [`enhancement`](https://github.com/magic-peach/reframe/issues?q=is%3Aopen+label%3Aenhancement)                 | Feature improvements and UX enhancements                                           |
-| 🔴 **Advanced**     | [`feature`](https://github.com/magic-peach/reframe/issues?q=is%3Aopen+label%3Afeature)                         | New features requiring deeper understanding of FFmpeg/WASM                         |
-| 🔵 **Any Level**    | [`documentation`](https://github.com/magic-peach/reframe/issues?q=is%3Aopen+label%3Adocumentation)             | Docs, guides, and README improvements                                              |
-| ♿ **Any Level**    | [`accessibility`](https://github.com/magic-peach/reframe/issues?q=is%3Aopen+label%3Aaccessibility)             | Making Reframe usable for everyone                                                 |
+| 🟢 **Beginner**     | [`good first issue`](https://github.com/reframe-oss/reframe/issues?q=is%3Aopen+label%3A%22good+first+issue%22) | Small, well-defined tasks — perfect if this is your first open source contribution |
+| 🟡 **Intermediate** | [`enhancement`](https://github.com/reframe-oss/reframe/issues?q=is%3Aopen+label%3Aenhancement)                 | Feature improvements and UX enhancements                                           |
+| 🔴 **Advanced**     | [`feature`](https://github.com/reframe-oss/reframe/issues?q=is%3Aopen+label%3Afeature)                         | New features requiring deeper understanding of FFmpeg/WASM                         |
+| 🔵 **Any Level**    | [`documentation`](https://github.com/reframe-oss/reframe/issues?q=is%3Aopen+label%3Adocumentation)             | Docs, guides, and README improvements                                              |
+| ♿ **Any Level**    | [`accessibility`](https://github.com/reframe-oss/reframe/issues?q=is%3Aopen+label%3Aaccessibility)             | Making Reframe usable for everyone                                                 |
 
-**[→ Browse all GSSoC'26 issues](https://github.com/magic-peach/reframe/issues?q=is%3Aopen+label%3A%22gssoc%2726%22)**
+**[→ Browse all GSSoC'26 issues](https://github.com/reframe-oss/reframe/issues?q=is%3Aopen+label%3A%22gssoc%2726%22)**
 
 ---
 
 ### How to Contribute
 
-1. **Find an issue** — Browse [open issues](https://github.com/magic-peach/reframe/issues) or pick one from the table above
+1. **Find an issue** — Browse [open issues](https://github.com/reframe-oss/reframe/issues) or pick one from the table above
 2. **Comment on the issue** — Say you'd like to work on it so we don't duplicate effort
 3. **Fork the repo** — Click the Fork button at the top right
 4. **Create a branch** — `git checkout -b feat/your-feature-name`
@@ -426,15 +435,7 @@ Reframe is an **official project in GirlScript Summer of Code (GSSoC) 2026**! We
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide including development setup, code style, and PR checklist.
 
----
 
-## Contributors
-
-Thank you to everyone who has contributed to Reframe! 🎉
-
-[![Contributors](https://contrib.rocks/image?repo=magic-peach/reframe)](https://github.com/magic-peach/reframe/graphs/contributors)
-
----
 
 ## Privacy
 
@@ -445,9 +446,17 @@ Reframe processes all videos **100% client-side**. Your video files are never up
 
 Thanks to all the amazing people who have contributed to Reframe!
 
-[![Contributors](https://contrib.rocks/image?repo=magic-peach/reframe)](https://github.com/magic-peach/reframe/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=reframe-oss/reframe)](https://github.com/reframe-oss/reframe/graphs/contributors)
 
 We welcome contributions of all kinds — code, documentation, design, and feedback. Check out our [Contributing Guide](CONTRIBUTING.md) to get started.
+
+---
+
+## Thanks
+
+<a href="https://www.chromatic.com/"><img src="https://user-images.githubusercontent.com/321738/84662277-e3db4f80-af1b-11ea-88f5-91d67a5e59f6.png" width="153" height="30" alt="Chromatic" /></a>
+
+Thanks to [Chromatic](https://www.chromatic.com/) for providing the visual testing platform that helps us review UI changes and catch visual regressions.
 
 ---
 
@@ -459,10 +468,35 @@ MIT License — See [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-**If Reframe saved you time, please [⭐ star the repo](https://github.com/magic-peach/reframe) — it helps others discover it!**
+**If Reframe saved you time, please [⭐ star the repo](https://github.com/reframe-oss/reframe) — it helps others discover it!**
 
 Made with ❤️ for everyone who just wants to edit a video without the hassle.
 
 </div>
 
 ---
+
+## Troubleshooting
+
+### Installation fails
+- Ensure you're on [Bun](https://bun.sh) (this project uses `bun.lock`, not npm/yarn) with Node.js 20.9+.
+- Run `bun install`.
+- Delete `node_modules` and `bun.lock`, then reinstall if issues persist.
+
+### Environment variables not loading
+- Verify that a `.env.local` file exists (see `.env.example` for the required keys).
+- Restart the development server after making changes — env vars are only read at startup.
+
+## FAQ
+
+### How do I start the project?
+Run:
+
+```bash
+bun install
+bun run dev
+```
+
+### How do I report a bug?
+Please open a GitHub issue with reproduction steps and relevant logs.
+

@@ -61,6 +61,9 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
 
   useEffect(() => {
     if (status !== "exporting" || !exportStartedAt) {
+      // Part of the same timer-subscription lifecycle below, not a
+      // derivable value — elapsedMs tracks wall-clock time via setInterval.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setElapsedMs(0);
       return;
     }
@@ -92,7 +95,7 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
         role="dialog"
         aria-modal="true"
         tabIndex={-1}
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--bg)] backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--bg)]/95 backdrop-blur-sm"
       >
         <div
           className="text-center space-y-6 max-w-xs px-6 animate-fade-in"
@@ -154,7 +157,7 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
                 <button
                   type="button"
                   onClick={() => onCancel?.()}
-                  className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition-colors hover:opacity-95 active:scale-[0.98]"
+                  className="inline-flex items-center justify-center rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-4 py-2 text-sm font-semibold text-[var(--error)] transition-colors hover:bg-[var(--error-hover)] active:scale-[0.98]"
                 >
                   Cancel Export
                 </button>

@@ -1,0 +1,70 @@
+name: 🔒 Snyk
+
+# Dependency vulnerability scanning.
+#
+# Runs as its own workflow rather than a job inside CI, matching how this repo
+# already separates concerns (lint.yml, typecheck.yml, main.yml, chromatic.yml
+# are each one file). Concretely it needs a different trigger gate, a different
+# secret, and has different failure semantics from a build — folding it into
+# main.yml would mean a security finding reads as "the build broke".
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snyk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    name: Dependency scan
+    runs-on: ubuntu-latest
+
+    # GitHub does not expose secrets to pull_request runs from forks, and
+    # almost every contribution here comes from one. Without this gate SNYK_TOKEN
+    # would be empty on those runs and the job would fail red on contributor PRs
+    # through no fault of theirs — the same trap the Vercel check falls into.
+    # main still gets scanned on every push.
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # ── Why this step exists ────────────────────────────────────────────────
+      # This project uses bun, and its lockfile is the newer text-format
+      # `bun.lock`. Snyk's Node scanner resolves dependency trees from
+      # package-lock.json, yarn.lock or pnpm-lock.yaml — bun.lock is not a
+      # supported target file, so `snyk test` would either scan nothing useful
+      # or fall back to package.json ranges, which cannot pin transitive
+      # versions and therefore misses most real vulnerabilities.
+      #
+      # `--package-lock-only` writes a lockfile from package.json without
+      # installing anything or running scripts. It is generated fresh here and
+      # never committed — package-lock.json is in .gitignore, and CLAUDE.md
+      # forbids committing it, since bun.lock remains the source of truth.
+      - name: Generate a lockfile Snyk can parse
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Run Snyk
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          # High and critical only, so the first run is actionable rather than
+          # a wall of low-severity transitive noise. Lower it once the backlog
+          # is clean.
+          args: --severity-threshold=high --file=package-lock.json

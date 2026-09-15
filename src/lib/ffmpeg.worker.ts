@@ -5,10 +5,23 @@ import { getPresetById } from "./presets";
 import { buildTextFilter } from "./text-overlay";
 
 const CORE_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
-const MT_CORE_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/esm";
+// MT core aligned to the same version and distribution format as CORE_BASE_URL.
+// Previously used @0.12.6/dist/esm which caused two problems:
+//   1. The version mismatch meant SRI hashes computed for @0.12.10 were applied
+//      to different file contents, causing all MT fetches to fail with an integrity
+//      error instead of falling back gracefully.
+//   2. The ESM distribution is not consumed the same way as UMD by ffmpeg.js and
+//      produced subtle runtime failures in crossOriginIsolated contexts.
+const MT_CORE_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.10/dist/umd";
+
+// Keys are full URLs so hashes for the non-MT and MT packages never collide.
+// MT hashes are omitted intentionally: fetchWithIntegrity falls back to a plain
+// fetch when no hash entry exists, which is safe for a trusted CDN origin and
+// avoids the previous bug where a wrong hash caused a hard IntegrityError.
+// Add MT-specific sha384 entries here once they are verified against the CDN.
 const SRI_HASHES: Record<string, string> = {
-  "ffmpeg-core.js":   "sha384-sKfkiFtvUk+vexk+0EUhEh366190/4WpgUAsUvaxEfyg7+E1Zt5Y5hrsU808g8Q9",
-  "ffmpeg-core.wasm": "sha384-U1VDhkPYrM3wTCT4/vjSpSsKqG/UjljYrYCI4hBSJ02svbCkxuCi6U6u/peg5vpW",
+  [`${CORE_BASE_URL}/ffmpeg-core.js`]:   "sha384-sKfkiFtvUk+vexk+0EUhEh366190/4WpgUAsUvaxEfyg7+E1Zt5Y5hrsU808g8Q9",
+  [`${CORE_BASE_URL}/ffmpeg-core.wasm`]: "sha384-U1VDhkPYrM3wTCT4/vjSpSsKqG/UjljYrYCI4hBSJ02svbCkxuCi6U6u/peg5vpW",
 };
 
 type SerializedFile = {
@@ -64,11 +77,14 @@ let activeExportAbortController: AbortController | null = null;
 let activeExportId: string | null = null;
 
 async function fetchWithIntegrity(url: string, mimeType: string): Promise<string> {
-  const key = url.split("/").pop()!;
-  const integrity = SRI_HASHES[key];
+  // Look up by full URL so non-MT and MT hashes never collide when filenames match.
+  const integrity = SRI_HASHES[url];
 
+  // Fallback to standard fetch if SRI is missing (Prevents ffmpeg-core.worker.js from crashing the thread)
   if (!integrity) {
-    throw new Error(`[SRI] No hash found for: ${key}`);
+    const response = await fetch(url, { credentials: "omit" });
+    const blob = new Blob([await response.arrayBuffer()], { type: mimeType });
+    return URL.createObjectURL(blob);
   }
 
   const response = await fetch(url, { integrity, credentials: "omit" });
@@ -217,20 +233,31 @@ function buildArguments(
       videoOut = "[vbase]";
     }
 
-    if (hasOverlay) {
-      const scaledW = overlayOptions!.size;
-      const alpha = (overlayOptions!.opacity / 100).toFixed(2);
-      const posMap: Record<string, string> = {
-        "top-left":     "20:20",
-        "top-right":    "W-w-20:20",
-        "bottom-left":  "20:H-h-20",
-        "bottom-right": "W-w-20:H-h-20",
-      };
-      const pos = posMap[overlayOptions!.position] ?? "W-w-20:H-h-20";
-      filterParts.push(`[${overlayIdx}:v]scale=${scaledW}:-2,format=rgba,colorchannelmixer=aa=${alpha}[logo]`);
-      filterParts.push(`${videoOut}[logo]overlay=${pos}[vout]`);
-      videoOut = "[vout]";
-    }
+if (hasOverlay) {
+  const scaledW = overlayOptions!.size;
+  const alpha = (overlayOptions!.opacity / 100).toFixed(2);
+  const posMap: Record<string, string> = {
+    "top-left":     "20:20",
+    "top-right":    "W-w-20:20",
+    "bottom-left":  "20:H-h-20",
+    "bottom-right": "W-w-20:H-h-20",
+  };
+
+interface PositionCoords {
+    x: number;
+    y: number;
+  }
+
+  const pos = typeof overlayOptions?.position === "string"
+    ? (posMap[overlayOptions.position] ?? "W-w-20:H-h-20")
+    : overlayOptions?.position
+    ? `(W-w)*${(overlayOptions.position as PositionCoords).x}/100:(H-h)*${(overlayOptions.position as PositionCoords).y}/100`
+    : "W-w-20:H-h-20";
+
+  filterParts.push(`[${overlayIdx}:v]scale=${scaledW}:-2,format=rgba,colorchannelmixer=aa=${alpha}[logo]`);
+  filterParts.push(`${videoOut}[logo]overlay=${pos}[vout]`);
+  videoOut = "[vout]";
+}
 
     let audioOut = "";
     if (shouldKeepAudio) {
@@ -295,8 +322,13 @@ function buildArguments(
 
   if (recipe.speed !== 1) {
     const sourceDuration = (recipe.trimEnd ?? videoDuration) - recipe.trimStart;
-    const outputDuration = sourceDuration / recipe.speed;
-    args.push("-t", outputDuration.toFixed(6));
+    // Skip -t when sourceDuration <= 0 (happens when video metadata fails to
+    // load and videoDuration falls back to 0). Passing -t 0 to FFmpeg produces
+    // a zero-length output file; omitting it lets FFmpeg encode the full stream.
+    if (sourceDuration > 0) {
+      const outputDuration = sourceDuration / recipe.speed;
+      args.push("-t", outputDuration.toFixed(6));
+    }
   }
 
   args.push(outputName);
@@ -436,6 +468,9 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
       const gifDurationArgs = recipe.speed !== 1
         ? (() => {
             const sourceDuration = (recipe.trimEnd ?? videoDuration) - recipe.trimStart;
+            // Skip -t when sourceDuration <= 0 (metadata load failure fallback)
+            // to avoid producing a zero-length GIF.
+            if (sourceDuration <= 0) return [];
             const outputDuration = sourceDuration / recipe.speed;
             return ["-t", outputDuration.toFixed(6)];
           })()

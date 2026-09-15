@@ -38,7 +38,7 @@ jobs:
           allowed_non_write_users: "*"
           trigger_phrase: ""
           direct_prompt: |
-            You are the automated manager for magic-peach/reframe, a GSSoC'26 open-source project.
+            You are the automated manager for reframe-oss/reframe, a GSSoC'26 open-source project.
             Follow the rules in CLAUDE.md exactly.
 
             Current PR: #${{ github.event.pull_request.number }}
@@ -78,7 +78,7 @@ jobs:
           allowed_non_write_users: "*"
           trigger_phrase: ""
           direct_prompt: |
-            You are the automated manager for magic-peach/reframe, a GSSoC'26 open-source project.
+            You are the automated manager for reframe-oss/reframe, a GSSoC'26 open-source project.
             Follow the rules in CLAUDE.md exactly.
 
             A new issue was opened: #${{ github.event.issue.number }}
@@ -127,7 +127,7 @@ jobs:
           allowed_non_write_users: "*"
           trigger_phrase: ""
           direct_prompt: |
-            You are the automated manager for magic-peach/reframe, a GSSoC'26 open-source project.
+            You are the automated manager for reframe-oss/reframe, a GSSoC'26 open-source project.
             Follow the rules in CLAUDE.md exactly.
 
             A comment was posted on issue #${{ github.event.issue.number }} by @${{ github.event.comment.user.login }}.

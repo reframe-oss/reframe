@@ -76,7 +76,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                             </button>
 
                             <a
-                                href="https://github.com/magic-peach/reframe/issues"
+                                href="https://github.com/reframe-oss/reframe/issues"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="rounded-lg border px-4 py-2 transition hover:opacity-80"

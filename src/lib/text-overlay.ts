@@ -72,7 +72,8 @@ export function buildTextFilter(
   const escapedText = overlay.text
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'")
-    .replace(/:/g, "\\:");
+    .replace(/:/g, "\\:")
+    .replace(/%/g, "%%");
 
   // Convert percentage position to pixel position
   const pixelX = Math.round((overlay.x / 100) * targetWidth);
@@ -92,10 +93,10 @@ export function buildTextFilter(
   let filter = `drawtext=text='${escapedText}':x=${pixelX}:y=${pixelY}:fontsize=${overlay.fontSize}:fontcolor=${overlay.color}:fontweight=${fontWeightParam}`;
 
   // Add font family if specified
-  if (overlay.fontFamily) {
+  if (overlay.fontFamily && !fontFileParam) {
     // Sanitize font name for FFmpeg
     const safeFontName = overlay.fontFamily.replace(/[^a-zA-Z0-9-]/g, "");
-    filter += `:fontfile='${safeFontName}'`;
+    filter += `:font='${safeFontName}'`;
   }
 
   // Add custom font file path if available
