@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, useCallback, RefObject } from "react";
 import { EditRecipe, TextOverlay, TimelineTrack, MultiTrackEditorState } from "@/lib/types";
 import { getPresetById } from "@/lib/presets";
+import { captureFrameAsPng } from "@/lib/frame-export";
 import { cn } from "@/lib/utils";
 import { Camera } from "lucide-react";
 import ComparisonPreview from "./ComparisonPreview";
@@ -47,39 +48,27 @@ export default function VideoPreview({
   // Phase 1 MVP: Multi-track URL management
   const multiTrackUrlRefs = useRef<Record<string, string | null>>({});
 
-  const handleGrabFrame = useCallback(() => {
+  /** Capture the current video frame and download it as a PNG. */
+  const handleGrabFrame = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || video.readyState < 2) return;
+    if (!video || video.readyState < 2 || !recipe) return;
 
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-
-      const totalSec = Math.floor(video.currentTime);
-      const mins = String(Math.floor(totalSec / 60)).padStart(2, "0");
-      const secs = String(totalSec % 60).padStart(2, "0");
-      const filename = `frame-${mins}m${secs}s.png`;
-
+    try {
+      const { blob, filename } = await captureFrameAsPng(video, recipe);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-    }, "image/png");
-  }, [videoRef]);
+    } catch (err) {
+      console.error("Failed to capture frame:", err);
+    }
+  }, [videoRef, recipe]);
 
   useEffect(() => {
     if (!file) return;
 
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
     setIsLoading(true);
     const id = ++lastId.current;
     const url = URL.createObjectURL(file);
