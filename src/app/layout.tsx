@@ -9,6 +9,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import BrandLogo from "@/components/BrandLogo";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://reframe-lilac.vercel.app"),
   title: "Reframe — Resize, trim, and export videos in your browser",
   description: "Free, open-source video editor that runs entirely in your browser. No login, no uploads, no ads. Resize for any platform, trim, rotate, adjust speed, and export.",
    keywords: [
@@ -28,6 +29,15 @@ export const metadata: Metadata = {
     description:
       "Free, open-source browser-based video editor. Resize, trim, rotate, and export videos directly in your browser.",
     type: "website",
+  
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Reframe Open Graph Image",
+      },
+    ],
   },
 
   twitter: {
@@ -35,6 +45,8 @@ export const metadata: Metadata = {
     title: "Reframe",
     description:
       "Free, open-source browser-based video editor. Resize, trim, rotate, and export videos directly in your browser.",
+  
+    images: ["/og-image.png"],
   },
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
