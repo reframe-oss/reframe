@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Camera } from "lucide-react";
 import ComparisonPreview from "./ComparisonPreview";
 import DraggableTextOverlays from "./DraggableTextOverlays";
+import SubtitlesOverlay from "./SubtitlesOverlay";
 
 interface Props {
   file: File | null;
@@ -378,6 +379,16 @@ export default function VideoPreview({
             selectedTextId={selectedTextId ?? null}
             onSelectText={onSelectText || (() => {})}
             onUpdateText={onUpdateText || (() => {})}
+          />
+        )}
+        
+        {/* Subtitles Overlay */}
+        {recipe && !isLoading && containerDimensions.width > 0 && (
+          <SubtitlesOverlay
+            recipe={recipe}
+            videoRef={videoRef}
+            containerWidth={containerDimensions.width}
+            containerHeight={containerDimensions.height}
           />
         )}
 

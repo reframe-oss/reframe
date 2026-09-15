@@ -430,10 +430,14 @@ export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: n
     );
   }
 
-  // Add text overlays
   const textOverlays = recipe.textOverlays || [];
   textOverlays.forEach((overlay) => {
     filters.push(buildTextFilter(overlay, targetW, targetH));
+  });
+
+  const subtitles = recipe.subtitles || [];
+  subtitles.forEach((sub) => {
+    filters.push(buildTextFilter(sub, targetW, targetH));
   });
 
   return filters.join(",");
