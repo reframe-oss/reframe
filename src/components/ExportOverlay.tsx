@@ -61,6 +61,9 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
 
   useEffect(() => {
     if (status !== "exporting" || !exportStartedAt) {
+      // Part of the same timer-subscription lifecycle below, not a
+      // derivable value — elapsedMs tracks wall-clock time via setInterval.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setElapsedMs(0);
       return;
     }

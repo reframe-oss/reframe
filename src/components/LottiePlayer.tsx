@@ -57,7 +57,6 @@ export default function LottiePlayer({
       cancelled = true;
       anim?.destroy();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animationData, loop, shouldAutoplay]);
 
   return (

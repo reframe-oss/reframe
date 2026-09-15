@@ -157,6 +157,9 @@ export default function ThumbnailStrip({
 
   useEffect(() => {
     if (videoSrc && duration > 0) {
+      // Genuinely needs an effect: triggers async canvas/video capture work
+      // (seeking, drawing frames, Blob creation), not a derivable value.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       generateThumbnails();
     }
     return () => {

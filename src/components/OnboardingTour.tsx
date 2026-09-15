@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 
 const TOUR_KEY = "reframe_onboarding_complete";
@@ -54,15 +54,19 @@ interface Rect {
   height: number;
 }
 
+const DEFAULT_TOOLTIP_WIDTH = 320;
+const DEFAULT_TOOLTIP_HEIGHT = 140;
+
+// Takes plain dimensions rather than reading a ref itself, so it stays a
+// pure function callable during render (initial/fallback size) and from
+// useLayoutEffect (actual measured size) alike — reading ref.current
+// directly during render isn't safe (react-hooks/refs).
 function getTooltipStyle(
   rect: Rect,
   position: TourStep["position"],
-  tooltipRef: React.RefObject<HTMLDivElement | null>,
+  tw: number,
+  th: number,
 ): React.CSSProperties {
-  const tooltip = tooltipRef.current;
-  const tw = tooltip?.offsetWidth ?? 320;
-  const th = tooltip?.offsetHeight ?? 140;
-
   const sr = {
     top: rect.top - PADDING,
     left: rect.left - PADDING,
@@ -166,7 +170,25 @@ function Tooltip({
   onSkip,
   tooltipRef,
 }: TooltipProps) {
-  const style = getTooltipStyle(rect, step.position, tooltipRef);
+  const [style, setStyle] = useState<React.CSSProperties>(() =>
+    getTooltipStyle(rect, step.position, DEFAULT_TOOLTIP_WIDTH, DEFAULT_TOOLTIP_HEIGHT),
+  );
+
+  // Re-measure the tooltip's actual rendered size after paint (ref reads
+  // belong in an effect, not render) so positioning uses real dimensions
+  // instead of the DEFAULT_TOOLTIP_* fallback used for the first render.
+  useLayoutEffect(() => {
+    const tooltip = tooltipRef.current;
+    setStyle(
+      getTooltipStyle(
+        rect,
+        step.position,
+        tooltip?.offsetWidth ?? DEFAULT_TOOLTIP_WIDTH,
+        tooltip?.offsetHeight ?? DEFAULT_TOOLTIP_HEIGHT,
+      ),
+    );
+  }, [rect, step.position, tooltipRef]);
+
   const isLast = stepIndex === totalSteps - 1;
 
   return (
@@ -288,6 +310,9 @@ export default function OnboardingTour() {
       return;
     }
     if (!currentStep) {
+      // dismiss() also persists to localStorage, a real side effect beyond
+      // just state, so this branch belongs inside the effect.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       dismiss();
       return;
     }

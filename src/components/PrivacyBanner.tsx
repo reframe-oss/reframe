@@ -19,10 +19,13 @@ export default function PrivacyBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    // Genuinely needs an effect: localStorage is unavailable during SSR, so
+    // this can't be computed as derived state without a hydration mismatch.
     try {
       const raw = localStorage.getItem(DISMISS_KEY);
       const dismissedUntil = raw ? Number(raw) : 0;
       if (!Number.isFinite(dismissedUntil) || Date.now() >= dismissedUntil) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setVisible(true);
       }
     } catch {

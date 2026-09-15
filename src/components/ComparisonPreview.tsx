@@ -1,4 +1,3 @@
-/* eslint-disable jsx-a11y/no-static-element-interactions */
 "use client";
 
 import { useEffect, useRef, useState, useCallback, CSSProperties, RefObject } from "react";
@@ -209,7 +208,6 @@ export default function ComparisonPreview({ file, recipe, videoRef }: Props) {
     >
       {/* Left side: Original, unmodified video — clipped to left of slider */}
       <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPosition}%` }}>
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={leftVideoRef}
           className="absolute inset-0 w-full h-full object-contain"
@@ -232,8 +230,7 @@ export default function ComparisonPreview({ file, recipe, videoRef }: Props) {
               className="relative bg-black border border-white/10 overflow-hidden"
               style={frameStyle}
             >
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video ref={rightVideoRef} style={videoStyle} playsInline muted autoPlay loop>
+                    <video ref={rightVideoRef} style={videoStyle} playsInline muted autoPlay loop>
                 <track kind="captions" />
               </video>
             </div>

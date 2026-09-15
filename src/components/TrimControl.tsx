@@ -24,13 +24,17 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
   const [startInput, setStartInput] = useState(
     recipe.trimStart.toString()
   );
+  // Mirror recipe.trimStart into local editable text without an effect:
+  // adjust state during render when the incoming prop changes (see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  const [prevTrimStart, setPrevTrimStart] = useState(recipe.trimStart);
+  if (recipe.trimStart !== prevTrimStart) {
+    setPrevTrimStart(recipe.trimStart);
+    setStartInput(recipe.trimStart.toString());
+  }
 
   const { waveform, isLoading: waveformLoading } = useAudioWaveform(file);
   const hasAudio = waveform.length > 0;
-
-  useEffect(() => {
-    setStartInput(recipe.trimStart.toString());
-  }, [recipe.trimStart]);
 
   const clipLength =
     (recipe.trimEnd ?? duration) - recipe.trimStart;

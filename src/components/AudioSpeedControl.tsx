@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { EditRecipe } from "@/lib/types";
 import { SPEED_STEPS } from "@/lib/constants";
 import { Volume2, VolumeX, Gauge, AlertTriangle } from "lucide-react";
@@ -16,10 +16,14 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
   const parentSpeedIndex = SPEED_STEPS.indexOf(recipe.speed as (typeof SPEED_STEPS)[number]);
   const safeParentIndex = parentSpeedIndex === -1 ? 3 : parentSpeedIndex;
   const [localSpeedIndex, setLocalSpeedIndex] = useState(safeParentIndex);
-
-  useEffect(() => {
+  // Mirror the parent's speed into local state without an effect: adjust
+  // state during render when the incoming prop changes (see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  const [prevSafeParentIndex, setPrevSafeParentIndex] = useState(safeParentIndex);
+  if (safeParentIndex !== prevSafeParentIndex) {
+    setPrevSafeParentIndex(safeParentIndex);
     setLocalSpeedIndex(safeParentIndex);
-  }, [safeParentIndex]);
+  }
   // ----------------------------------------
 
   const getSpeedDescription = (speed: number) => {

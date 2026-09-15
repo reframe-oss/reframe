@@ -31,8 +31,8 @@ export default function Footer() {
 
           <p className="text-sm opacity-70 leading-relaxed max-w-md">
             Professional video processing directly in your browser using{" "}
-            <span className="font-medium opacity-100">FFmpeg.wasm</span> — fast,
-            private, and open source.
+            <span className="font-medium opacity-100">FFmpeg.wasm</span> — fast, private, and open
+            source.
           </p>
 
           <div className="flex flex-wrap gap-2">
@@ -111,12 +111,10 @@ export default function Footer() {
           {/* Newsletter */}
 
           <div className="space-y-3">
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">
-              Updates
-            </h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">Updates</h3>
 
             <form
-              className="flex items-center w-full sm:w-80 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 focus-within:border-[var(--accent)] transition"
+              className="flex items-center w-full sm:w-80 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)] transition"
               onSubmit={(e) => e.preventDefault()}
               aria-label="Newsletter signup"
             >
@@ -125,13 +123,14 @@ export default function Footer() {
                 required
                 placeholder="Enter your email"
                 aria-label="Email address"
-                className="w-full bg-transparent py-3 text-[11px] font-semibold tracking-widest uppercase placeholder:opacity-30 focus:outline-none"
+                className="w-full bg-transparent py-3 px-1 text-[11px] font-semibold tracking-widest uppercase placeholder:opacity-30 outline-none focus:outline-none focus:ring-0 border-none"
               />
 
               <button
                 type="submit"
                 aria-label="Subscribe to updates"
-                onMouseDown={(e) => e.preventDefault()} className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+                onMouseDown={(e) => e.preventDefault()}
+                className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded ml-1"
               >
                 <ArrowRight size={16} />
               </button>
@@ -146,7 +145,6 @@ export default function Footer() {
             </h3>
 
             <div className="flex items-center gap-3 flex-wrap">
-
               {[
                 {
                   href: "https://github.com/reframe-oss/reframe",
@@ -169,7 +167,6 @@ export default function Footer() {
                   label: "LinkedIn",
                 },
               ].map((social) => (
-
                 <a
                   key={social.label}
                   href={social.href}
@@ -178,10 +175,7 @@ export default function Footer() {
                   aria-label={social.label}
                   className="relative group p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
                 >
-                  <span className="opacity-70 group-hover:opacity-100">
-                    {social.icon}
-
-                  </span>
+                  <span className="opacity-70 group-hover:opacity-100">{social.icon}</span>
                 </a>
               ))}
             </div>

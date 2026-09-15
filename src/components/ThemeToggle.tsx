@@ -7,6 +7,9 @@ export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    // Genuinely needs an effect: "has this mounted on the client" can't be
+    // known during render without a server/client hydration mismatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

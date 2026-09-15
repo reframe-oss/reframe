@@ -148,5 +148,16 @@ export function isValidRecipe(value: unknown): value is EditRecipe {
   if (typeof v.soundOnCompletion !== "boolean") return false;
   if (!Array.isArray(v.textOverlays)) return false;
 
+  for (const overlay of v.textOverlays) {
+    if (!overlay || typeof overlay !== "object") return false;
+    if (typeof overlay.id !== "string") return false;
+    if (typeof overlay.text !== "string") return false;
+    if (typeof overlay.x !== "number" || !isFinite(overlay.x) || overlay.x < 0 || overlay.x > 100) return false;
+    if (typeof overlay.y !== "number" || !isFinite(overlay.y) || overlay.y < 0 || overlay.y > 100) return false;
+    if (typeof overlay.fontSize !== "number" || !isFinite(overlay.fontSize) || overlay.fontSize < 12 || overlay.fontSize > 120) return false;
+    if (typeof overlay.color !== "string") return false;
+    if (!["normal", "bold", "900"].includes(overlay.fontWeight)) return false;
+  }
+
   return true;
 }
