@@ -28,7 +28,8 @@ import {
 import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { loadOverlayState, persistOverlayState } from "@/lib/editorPersistence";
-
+import ToastContainer from "./Toast";
+import { useToast } from "@/hooks/useToast";
 interface SectionProps {
   icon: React.ReactNode;
   title: string;
@@ -235,6 +236,8 @@ export default function VideoEditor() {
     duration,
   });
 
+  const { toasts, addToast, dismissToast, dismissAll } = useToast();
+const prevStatusRef = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const initialOverlayState = useRef({
@@ -295,9 +298,29 @@ export default function VideoEditor() {
     navigator.clipboard.writeText(url.toString()).then(() => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
+      addToast({ type: "success", message: "Settings link copied to clipboard!" });
     });
   };
 
+  useEffect(() => {
+    if (status === prevStatusRef.current) return;
+
+    if (status === "exporting" && prevStatusRef.current !== "exporting") {
+      addToast({ type: "loading", message: "Export started…", duration: Infinity });
+    } else if (status === "done") {
+      dismissAll();
+      addToast({ type: "success", message: "Export complete — ready to download!" });
+    } else if (status === "error" && error) {
+      dismissAll();
+      addToast({ type: "error", message: `Export failed: ${error}` });
+    } else if (status === "idle" && prevStatusRef.current === "exporting") {
+      dismissAll();
+      addToast({ type: "error", message: "Export cancelled." });
+    }
+
+    prevStatusRef.current = status;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, error]);
   useEffect(() => {
     if (status === "done" && downloadRef.current) {
       
@@ -359,6 +382,7 @@ export default function VideoEditor() {
         exportStartedAt={exportStartedAt}
         onCancel={cancelExport}
       />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <OnboardingTour />
 
       <div aria-live="polite" aria-atomic="true" className="sr-only">

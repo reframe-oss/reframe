@@ -169,3 +169,23 @@ detail > summary {
 details > summary::-webkit-details-marker {
   display: none;
 }
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.2s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-toast-in {
+    animation: none;
+  }
+}
