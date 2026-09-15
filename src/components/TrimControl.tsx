@@ -1,11 +1,11 @@
 "use client";
 
 import { EditRecipe } from "@/lib/types";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
 import { formatDuration } from "@/lib/utils";
 import { useAudioWaveform } from "@/hooks/useAudioWaveform";
-import WaveformCanvas from "@/components/WaveformCanvas";
+import AudioWaveform from "@/components/AudioWaveform";
 
 const MIN_CLIP_DURATION = 0.1;
 
@@ -14,9 +14,11 @@ interface Props {
   onChange: (patch: Partial<EditRecipe>) => void;
   duration: number;
   file: File | null;
+  currentTime: number;
+  onSeek: (time: number) => void;
 }
 
-export default function TrimControl({ recipe, onChange, duration, file }: Props) {
+export default function TrimControl({ recipe, onChange, duration, file, currentTime, onSeek }: Props) {
   const [invalidStart, setStart] = useState(false);
   const [invalidEnd, setEnd] = useState(false);
   const [startErrorMsg, setStartErrorMsg] = useState("");
@@ -34,62 +36,6 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
 
   const clipLength =
     (recipe.trimEnd ?? duration) - recipe.trimStart;
-
-  const trackRef = useRef<HTMLDivElement>(null);
-  const dragging = useRef<"start" | "end" | null>(null);
-
-  const xToSeconds = useCallback((clientX: number) => {
-    const track = trackRef.current;
-    if (!track || duration <= 0) return 0;
-    const { left, width } = track.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (clientX - left) / width));
-    return parseFloat((ratio * duration).toFixed(1));
-  }, [duration]);
-
-  const applyDrag = useCallback((clientX: number) => {
-    const seconds = xToSeconds(clientX);
-    if (dragging.current === "start") {
-      const clamped = Math.min(seconds, (recipe.trimEnd ?? duration) - 0.1);
-      onChange({ trimStart: Math.max(0, clamped) });
-    } else if (dragging.current === "end") {
-      const clamped = Math.max(seconds, recipe.trimStart + 0.1);
-      onChange({ trimEnd: Math.min(duration, clamped) });
-    }
-  }, [xToSeconds, duration, recipe.trimStart, recipe.trimEnd, onChange]);
-
- useEffect(() => {
-  const onMove = (e: MouseEvent | TouchEvent) => {
-    let clientX: number;
-
-    if ("touches" in e) {
-      const touch = e.touches[0];
-
-      if (!touch) return;
-
-      clientX = touch.clientX;
-    } else {
-      clientX = e.clientX;
-    }
-
-    applyDrag(clientX);
-  };
-
-  const onUp = () => {
-    dragging.current = null;
-  };
-
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove);
-  document.addEventListener("touchend", onUp);
-
-  return () => {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.removeEventListener("touchmove", onMove);
-    document.removeEventListener("touchend", onUp);
-  };
-}, [applyDrag]);
   const handleStart = (val: string) => {
     setStartInput(val);
 
@@ -172,68 +118,32 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     onChange({ trimEnd: n });
   };
 
+  const handleTrimStartChange = (sec: number) => {
+    onChange({ trimStart: sec });
+  };
+
+  const handleTrimEndChange = (sec: number) => {
+    onChange({ trimEnd: sec });
+  };
+
   const inputClass =
     "w-full text-sm px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--bg)] font-heading focus:outline-none focus:ring-2 focus:ring-film-400 text-[var(--text)] transition-shadow [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
   return (
     <div id="trim-control" className="space-y-3">
       {duration > 0 && (
-        <div
-          role="toolbar"
-          aria-label="Trim timeline"
-          ref={trackRef}
-          className="relative h-6 flex items-center cursor-pointer select-none"
-          onClick={(e) => {
-            if (dragging.current) return;
-            const s = xToSeconds(e.clientX);
-            onChange({ trimStart: s });
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowLeft") onChange({ trimStart: Math.max(0, recipe.trimStart - 0.1) });
-            if (e.key === "ArrowRight") onChange({ trimStart: Math.min((recipe.trimEnd ?? duration) - 0.1, recipe.trimStart + 0.1) });
-          }}
-        >
-          <div className="absolute inset-x-0 h-1.5 rounded-full bg-[var(--border)]" />
-          <div
-            className="absolute h-1.5 rounded-full bg-film-400 opacity-60"
-            style={{
-              left: `${(recipe.trimStart / duration) * 100}%`,
-              right: `${((duration - (recipe.trimEnd ?? duration)) / duration) * 100}%`,
-            }}
-          />
-          <div
-            role="slider"
-            aria-label="Trim start"
-            aria-valuenow={recipe.trimStart}
-            aria-valuemin={0}
-            aria-valuemax={duration}
-            tabIndex={0}
-            className="absolute w-4 h-4 rounded-full bg-white border-2 border-film-400 shadow cursor-grab active:cursor-grabbing -translate-x-1/2 focus:outline-none focus:ring-2 focus:ring-film-400"
-            style={{ left: `${(recipe.trimStart / duration) * 100}%` }}
-            onMouseDown={() => { dragging.current = "start"; }}
-            onTouchStart={() => { dragging.current = "start"; }}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowLeft") onChange({ trimStart: Math.max(0, recipe.trimStart - 0.1) });
-              if (e.key === "ArrowRight") onChange({ trimStart: Math.min((recipe.trimEnd ?? duration) - 0.1, recipe.trimStart + 0.1) });
-            }}
-          />
-          <div
-            role="slider"
-            aria-label="Trim end"
-            aria-valuenow={recipe.trimEnd ?? duration}
-            aria-valuemin={0}
-            aria-valuemax={duration}
-            tabIndex={0}
-            className="absolute w-4 h-4 rounded-full bg-white border-2 border-film-400 shadow cursor-grab active:cursor-grabbing -translate-x-1/2 focus:outline-none focus:ring-2 focus:ring-film-400"
-            style={{ left: `${((recipe.trimEnd ?? duration) / duration) * 100}%` }}
-            onMouseDown={() => { dragging.current = "end"; }}
-            onTouchStart={() => { dragging.current = "end"; }}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowLeft") onChange({ trimEnd: Math.max(recipe.trimStart + 0.1, (recipe.trimEnd ?? duration) - 0.1) });
-              if (e.key === "ArrowRight") onChange({ trimEnd: Math.min(duration, (recipe.trimEnd ?? duration) + 0.1) });
-            }}
-          />
-        </div>
+        <AudioWaveform
+          samples={waveform}
+          duration={duration}
+          currentTime={currentTime}
+          trimStart={recipe.trimStart}
+          trimEnd={recipe.trimEnd}
+          loading={waveformLoading}
+          hasAudio={hasAudio}
+          onTrimStartChange={handleTrimStartChange}
+          onTrimEndChange={handleTrimEndChange}
+          onSeek={onSeek}
+        />
       )}
       <div className="flex gap-3">
         <div className="flex-1">
