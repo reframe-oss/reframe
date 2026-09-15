@@ -237,11 +237,19 @@ export default function VideoEditor() {
 
   const [copied, setCopied] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  // State for dismissing the large file warning
+  const [largeFileWarningDismissed, setLargeFileWarningDismissed] = useState(false);
   const initialOverlayState = useRef({
     overlayPosition,
     overlaySize,
     overlayOpacity,
   });
+
+  // Reset warning dismissal when a new file is selected
+  useEffect(() => {
+    setLargeFileWarningDismissed(false);
+  }, [file]);
+
   useEffect(() => {
     if (!file) return;
 
@@ -453,11 +461,29 @@ export default function VideoEditor() {
               )}
             </div>
 
-            {file && file.size > 100 * 1024 * 1024 && (
-              <p className="text-[var(--warning)] text-sm">
-                ⚠️ Large file - processing may take several minutes
-              </p>
+            {/* ── Large file warning banner (shown for files > 500MB, dismissible) ── */}
+            {file && file.size > 500 * 1024 * 1024 && !largeFileWarningDismissed && (
+              <div
+                role="alert"
+                className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-300 rounded-xl text-yellow-800 text-sm animate-fade-in"
+              >
+                <AlertTriangle size={16} className="shrink-0 mt-0.5 text-yellow-500" />
+                <p className="flex-1">
+                  ⚠️ Large file detected ({(file.size / (1024 * 1024)).toFixed(0)} MB).
+                  Export may be slow or fail due to browser memory limits.
+                  For best results, use files under 500MB.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setLargeFileWarningDismissed(true)}
+                  className="ml-auto text-yellow-700 hover:text-yellow-900 font-bold text-base leading-none shrink-0"
+                  aria-label="Dismiss large file warning"
+                >
+                  ✕
+                </button>
+              </div>
             )}
+
             {file && (
               <div className={cn(
                 "grid grid-cols-1 gap-4",
