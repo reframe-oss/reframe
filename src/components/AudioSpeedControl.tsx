@@ -149,14 +149,25 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
   ))}
 </div>
         <div className="flex justify-between mt-1 overflow-hidden">
-          {SPEED_STEPS.map((s) => (
-            <span
-              key={s}
-              className="text-sm text-[var(--muted)] truncate text-center min-w-0 px-[1px]"
-            >
-              {s}x
-            </span>
-          ))}
+          {SPEED_STEPS.map((s) => {
+            const isActive = recipe.speed === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => onChange({ speed: s })}
+                aria-label={`Set speed to ${s}x`}
+                className={cn(
+                  "text-xs transition-colors duration-150 px-1.5 py-0.5 rounded hover:text-[var(--text)] hover:bg-[var(--accent-muted)]",
+                  isActive 
+                    ? "text-film-600 font-bold bg-[var(--accent-muted)]" 
+                    : "text-[var(--muted)]"
+                )}
+              >
+                {s}x
+              </button>
+            );
+          })}
         </div>
       </div>
 
