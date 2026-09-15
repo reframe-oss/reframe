@@ -70,29 +70,37 @@ function getTooltipStyle(
     height: rect.height + PADDING * 2,
   };
 
+  const MARGIN = 8;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 768;
+
+  let top = 0;
+  let left = 0;
+
   switch (position) {
     case "top":
-      return {
-        top: sr.top - th - TOOLTIP_OFFSET,
-        left: sr.left + sr.width / 2 - tw / 2,
-      };
+      top = sr.top - th - TOOLTIP_OFFSET;
+      left = sr.left + sr.width / 2 - tw / 2;
+      break;
     case "left":
-      return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left - tw - TOOLTIP_OFFSET,
-      };
+      top = sr.top + sr.height / 2 - th / 2;
+      left = sr.left - tw - TOOLTIP_OFFSET;
+      break;
     case "right":
-      return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left + sr.width + TOOLTIP_OFFSET,
-      };
+      top = sr.top + sr.height / 2 - th / 2;
+      left = sr.left + sr.width + TOOLTIP_OFFSET;
+      break;
     case "bottom":
     default:
-      return {
-        top: sr.top + sr.height + TOOLTIP_OFFSET,
-        left: sr.left + sr.width / 2 - tw / 2,
-      };
+      top = sr.top + sr.height + TOOLTIP_OFFSET;
+      left = sr.left + sr.width / 2 - tw / 2;
+      break;
   }
+
+  top = Math.max(MARGIN, Math.min(top, vh - th - MARGIN));
+  left = Math.max(MARGIN, Math.min(left, vw - tw - MARGIN));
+
+  return { top, left };
 }
 
 interface SpotlightProps {
@@ -204,12 +212,15 @@ function Tooltip({
 
         <div className="flex items-center justify-between gap-3">
           <button
+            type="button"
             onClick={onSkip}
+            aria-label="Skip onboarding tour"
             className="text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors underline underline-offset-2"
           >
             Skip tour
           </button>
           <button
+            type="button"
             onClick={onNext}
             ref={(el) => {
               el?.focus();
@@ -314,8 +325,7 @@ export default function OnboardingTour() {
             else dismiss();
           }
         })
-        .catch((error) => {
-          console.error("Failed to measure tour target:", error);
+        .catch(() => {
           dismiss();
         });
     };
