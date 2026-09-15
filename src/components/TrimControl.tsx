@@ -3,7 +3,7 @@
 import { EditRecipe } from "@/lib/types";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AlertCircle } from "lucide-react";
-import { formatDuration } from "@/lib/utils";
+import { formatTrimTime } from "@/lib/utils";
 import { useAudioWaveform } from "@/hooks/useAudioWaveform";
 import WaveformCanvas from "@/components/WaveformCanvas";
 
@@ -34,6 +34,9 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
 
   const clipLength =
     (recipe.trimEnd ?? duration) - recipe.trimStart;
+  const formattedStart = formatTrimTime(recipe.trimStart);
+  const formattedEnd = formatTrimTime(recipe.trimEnd ?? duration);
+  const formattedDuration = formatTrimTime(duration);
 
   const trackRef = useRef<HTMLDivElement>(null);
   const dragging = useRef<"start" | "end" | null>(null);
@@ -116,7 +119,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     if (duration > 0 && n >= duration) {
       setStart(true);
       setStartErrorMsg(
-        `Start time must be less than duration (${duration.toFixed(1)}s).`
+        `Start time must be less than duration (${formattedDuration}).`
       );
       return;
     }
@@ -162,7 +165,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     if (duration > 0 && n > duration + 0.01) {
       setEnd(true);
       setEndErrorMsg(
-        `End time cannot exceed duration (${duration.toFixed(1)}s).`,
+        `End time cannot exceed duration (${formattedDuration}).`,
       );
       return;
     }
@@ -241,7 +244,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             htmlFor="trim-start"
             className="font-heading mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]"
           >
-            Start (sec)
+            Start ({formattedStart})
           </label>
 
           <input
@@ -279,7 +282,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             htmlFor="trim-end"
             className="font-heading mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]"
           >
-            End (sec)
+            End ({formattedEnd})
           </label>
 
           <input
@@ -315,8 +318,8 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
 
       {duration > 0 && (
         <p className="text-sm text-[var(--muted)] font-heading mt-1">
-          Clip: {formatDuration(clipLength)} of{" "}
-          {formatDuration(duration)}
+          Clip: {formatTrimTime(clipLength)} of{" "}
+          {formattedDuration}
         </p>
       )}
       {recipe.trimEnd !== null &&
