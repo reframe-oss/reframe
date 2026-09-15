@@ -474,4 +474,14 @@ Made with ❤️ for everyone who just wants to edit a video without the hassle.
 
 </div>
 
----
+## Quick Project Info
+
+| Field | Details |
+|------|---------|
+| **Project Name** | Reframe |
+| **Project Type** | Browser-based video editor |
+| **Tech Stack** | Next.js, TypeScript, Tailwind CSS, FFmpeg.wasm |
+| **Privacy** | 100% client-side video processing |
+| **Contribution Status** | Open for contributions |
+| **GSSoC 2026** | Official GSSoC’26 project |
+| **License** | MIT |
