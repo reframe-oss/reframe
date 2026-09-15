@@ -429,6 +429,20 @@ export default function VideoEditor() {
 
               {file && (
                 <div className="mt-4 animate-fade-in">
+
+                  {/* NEW CLEAR VIDEO BUTTON */}
+                  <div className="flex justify-end mb-3">
+                    <button
+                      onClick={reset}
+                      type="button"
+                      className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-heading font-bold uppercase tracking-widest text-red-500 hover:text-white bg-red-500/10 hover:bg-red-500 rounded-lg transition-all border border-red-500/20 hover:border-red-500"
+                      aria-label="Clear current video"
+                    >
+                      ✕ Clear Video
+                    </button>
+                  </div>
+                  {/* END NEW CLEAR VIDEO BUTTON */}
+
                   <VideoPreview
                     file={file}
                     recipe={recipe}
