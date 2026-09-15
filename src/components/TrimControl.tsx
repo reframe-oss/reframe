@@ -24,6 +24,9 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
   const [startInput, setStartInput] = useState(
     recipe.trimStart.toString()
   );
+  const [endInput, setEndInput] = useState(
+    recipe.trimEnd !== null ? recipe.trimEnd.toString() : ""
+  );
 
   const { waveform, isLoading: waveformLoading } = useAudioWaveform(file);
   const hasAudio = waveform.length > 0;
@@ -31,6 +34,10 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
   useEffect(() => {
     setStartInput(recipe.trimStart.toString());
   }, [recipe.trimStart]);
+
+  useEffect(() => {
+    setEndInput(recipe.trimEnd !== null ? recipe.trimEnd.toString() : "");
+  }, [recipe.trimEnd]);
 
   const clipLength =
     (recipe.trimEnd ?? duration) - recipe.trimStart;
@@ -133,6 +140,8 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
   };
 
   const handleEnd = (val: string) => {
+    setEndInput(val);
+
     if (val === "") {
       onChange({ trimEnd: null });
       setEnd(false);
@@ -290,7 +299,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             min={0}
             max={duration > 0 ? duration : undefined}
             step={0.1}
-            value={recipe.trimEnd ?? ""}
+            value={endInput}
             spellCheck={false}
             onChange={(e) => handleEnd(e.target.value)}
             aria-label="Trim end time in seconds"
