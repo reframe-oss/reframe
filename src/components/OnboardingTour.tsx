@@ -79,7 +79,7 @@ function getTooltipStyle(
     case "left":
       return {
         top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left - tw - TOOLTIP_OFFSET,
+        left: sr.left - sr.width / 4 + TOOLTIP_OFFSET,
       };
     case "right":
       return {
