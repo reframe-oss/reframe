@@ -26,6 +26,7 @@ import {
   SlidersHorizontal, Zap, AlertTriangle, Github, Copy
 } from "lucide-react";
 import OnboardingTour from "./OnboardingTour";
+import ProgressSteps from "./ProgressSteps";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { loadOverlayState, persistOverlayState } from "@/lib/editorPersistence";
 
@@ -413,6 +414,11 @@ export default function VideoEditor() {
     No login. No ads. 100% private - your video never leaves your device.
   </div>
     </header>
+
+        <div className="mb-8 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 animate-fade-in">
+          <ProgressSteps file={file} status={status} />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
 
           <div className="space-y-4 min-w-0">
