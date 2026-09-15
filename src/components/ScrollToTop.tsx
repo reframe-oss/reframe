@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ArrowUp } from "lucide-react";
 
 export default function ScrollToTop() {
   const [isVisible, setIsVisible] = useState(false);
@@ -36,10 +37,12 @@ export default function ScrollToTop() {
         h-12 w-12 rounded-full
         bg-[var(--accent)] text-white shadow-[var(--shadow)]
         flex items-center justify-center
-        md:hidden
+        transition-[background-color,transform] duration-200
+        hover:bg-[var(--accent-hover)] hover:scale-110 active:scale-95
+        focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg)]
       "
     >
-      ↑
+      <ArrowUp size={20} aria-hidden="true" />
     </button>
   );
 }
