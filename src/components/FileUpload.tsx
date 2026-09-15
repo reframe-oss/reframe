@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { Film, FolderOpen } from "lucide-react";
 import LottiePlayer from "./LottiePlayer";
-import uploadAnim from "@/lib/lottie/upload.json";
+import { useLottieAnimation } from "@/hooks/useLottieAnimation";
 import { cn, formatBytes, formatDuration } from "@/lib/utils";
 import { MAX_FILE_SIZE, WARNING_FILE_SIZE } from "@/lib/types";
 
@@ -215,9 +215,17 @@ export default function FileUpload({
         <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-film-500/20 to-transparent pointer-events-none" />
       )}
 
+      const { animationData: uploadAnim } = useLottieAnimation("@/lib/lottie/upload.json");
+
       <div className="w-20 h-20 opacity-80 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200">
-        <LottiePlayer animationData={uploadAnim} loop autoplay />
-      </div>
+            {uploadAnim ? (
+              <LottiePlayer animationData={uploadAnim} loop autoplay />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-film-50 rounded-lg">
+                <svg className="w-8 h-8 text-film-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 5 17 10"/><line x1="12" y1="5" x2="12" y2="19"/></svg>
+              </div>
+            )}
+          </div>
 
       <div className="text-center">
         <p className="font-heading font-semibold text-[var(--text)] text-base">

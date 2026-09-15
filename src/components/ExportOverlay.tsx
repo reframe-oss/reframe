@@ -4,7 +4,7 @@ import FocusTrap from "focus-trap-react";
 import { useEffect, useRef, useCallback, useState } from "react";
 import { ExportStatus } from "@/lib/types";
 import LottiePlayer from "./LottiePlayer";
-import spinnerAnim from "@/lib/lottie/spinner.json";
+import { useLottieAnimation } from "@/hooks/useLottieAnimation";
 import TipCarousel from "./TipCarousel";
 
 interface Props {
@@ -26,6 +26,9 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const focusAnchorRef = useRef<HTMLDivElement | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const { animationData: spinnerAnim, isLoading: animLoading } = useLottieAnimation(
+    "@/lib/lottie/spinner.json"
+  );
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -105,12 +108,18 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
             aria-hidden="true"
           />
           <div className="mx-auto w-20 h-20">
-            <LottiePlayer
-              animationData={spinnerAnim}
-              loop
-              autoplay
-              aria-hidden="true"
-            />
+            {spinnerAnim ? (
+              <LottiePlayer
+                animationData={spinnerAnim}
+                loop
+                autoplay
+                aria-hidden="true"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-film-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
           </div>
           <div className="export-text">
             <h2 className="font-heading font-bold text-xl tracking-tight text-[var(--text)]">

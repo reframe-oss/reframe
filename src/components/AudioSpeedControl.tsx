@@ -62,6 +62,7 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
         className={cn(
           "w-full flex items-center gap-3 p-3 rounded-lg border transition-all duration-150",
           "hover:scale-[1.01] active:scale-[0.99]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-film-500 focus-visible:ring-offset-2",
           recipe.keepAudio
             ? "border-film-300 bg-film-50 text-film-700"
             : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
@@ -200,6 +201,7 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
           className={cn(
             "w-full flex items-center gap-3 p-3 rounded-lg border transition-all duration-150",
             "hover:scale-[1.01] active:scale-[0.99]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-film-500 focus-visible:ring-offset-2",
             recipe.normalizeAudio
               ? "border-film-300 bg-film-50 text-film-700"
               : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"

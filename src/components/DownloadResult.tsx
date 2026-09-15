@@ -6,7 +6,7 @@ import { formatBytes } from "@/lib/utils";
 import { Download, RotateCcw, Share2, AlertCircle, Volume2, VolumeX } from "lucide-react";
 import LottiePlayer from "./LottiePlayer";
 import { NativeShareButton } from "./NativeShareButton";
-import successAnim from "@/lib/lottie/success.json";
+import { useLottieAnimation } from "@/hooks/useLottieAnimation";
 import { cn } from "@/lib/utils";
 
 const SHARE_TWEET_TEXT =
@@ -32,6 +32,9 @@ interface Props {
 export default function DownloadResult({ result, onReset, soundOnCompletion, onToggleSound }: Props) {
   const defaultName = `reframe_${result.width}x${result.height}`;
   const [name, setName] = useState(defaultName);
+  const { animationData: successAnim } = useLottieAnimation(
+    "@/lib/lottie/success.json"
+  );
 
   const invalidCharRegex = /[<>:"/\\|?*]/;
   const isValid = !invalidCharRegex.test(name) && name.trim().length > 0;
@@ -61,7 +64,13 @@ export default function DownloadResult({ result, onReset, soundOnCompletion, onT
       <div className="flex items-center justify-between">
   <div className="flex items-center gap-4">
     <div className="w-12 h-12 shrink-0">
-      <LottiePlayer animationData={successAnim} loop={false} autoplay />
+      {successAnim ? (
+        <LottiePlayer animationData={successAnim} loop={false} autoplay />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-film-50 rounded-lg">
+          <span className="text-film-600 font-bold text-lg">✓</span>
+        </div>
+      )}
     </div>
     <div>
       <p className="font-heading font-bold text-base text-[var(--text)]">Export complete</p>
