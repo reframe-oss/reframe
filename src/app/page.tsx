@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <>
       <a
-        href="https://github.com/magic-peach/reframe"
+        href="https://github.com/reframe-oss/reframe"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="View Reframe on GitHub"

@@ -10,7 +10,7 @@ import successAnim from "@/lib/lottie/success.json";
 import { cn } from "@/lib/utils";
 
 const SHARE_TWEET_TEXT =
-  "I just edited my video with @reframevideo — free browser-based video editor! Check it out: https://github.com/magic-peach/reframe";
+  "I just edited my video with @reframevideo — free browser-based video editor! Check it out: https://github.com/reframe-oss/reframe";
 
 function formatExportDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));

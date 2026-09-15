@@ -1,4 +1,4 @@
-import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions } from "./types";
+import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, MAX_FILE_SIZE } from "./types";
 import { getPresetById } from "./presets";
 import { buildTextFilter } from "./text-overlay";
 
@@ -109,13 +109,19 @@ function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
   if (data.type === "result") {
     if (pendingExport?.id !== data.id) return;
     const blob = new Blob([data.data], { type: data.mimeType });
+    const blobUrl = URL.createObjectURL(blob);
     pendingExport.resolve({
-      blobUrl: URL.createObjectURL(blob),
+      blobUrl,
       blob,
       size: data.size,
       width: data.width,
       height: data.height,
       format: data.format,
+      // Dispose method allows cleanup of blob URLs to prevent memory leaks
+      // Call this when the exported video is no longer needed by the application
+      dispose: () => {
+        URL.revokeObjectURL(blobUrl);
+      },
     });
     pendingExport = null;
     pendingProgress = null;
@@ -221,6 +227,10 @@ export async function exportVideo(
     throw new Error("FFmpeg worker is not available.");
   }
 
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`Video file exceeds maximum size of ${MAX_FILE_SIZE / (1024 * 1024 * 1024)}GB`);
+  }
+
   const sessionId = buildSessionId();
   const arrayBuffer = await file.arrayBuffer();
   const filePayload: SerializedFile = {
@@ -229,6 +239,10 @@ export async function exportVideo(
     data: arrayBuffer,
   };
 
+  if (musicOptions?.file && musicOptions.file.size > MAX_FILE_SIZE) {
+    throw new Error(`Music file exceeds maximum size of ${MAX_FILE_SIZE / (1024 * 1024 * 1024)}GB`);
+  }
+
   const musicFilePayload = musicOptions?.file
     ? {
         name: musicOptions.file.name,
@@ -236,6 +250,10 @@ export async function exportVideo(
         data: await musicOptions.file.arrayBuffer(),
       }
     : undefined;
+
+  if (overlayOptions?.file && overlayOptions.file.size > MAX_FILE_SIZE) {
+    throw new Error(`Overlay file exceeds maximum size of ${MAX_FILE_SIZE / (1024 * 1024 * 1024)}GB`);
+  }
 
   const overlayFilePayload = overlayOptions?.file
     ? {
@@ -322,15 +340,41 @@ function buildSessionId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  // Fallback: use crypto.getRandomValues for cryptographically secure random bytes
+  // converted to hex string, ensuring uniqueness even in concurrent scenarios
+  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+    try {
+      const randomBytes = new Uint8Array(16);
+      (crypto as Crypto).getRandomValues(randomBytes);
+      return Array.from(randomBytes)
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+    } catch {
+      // Silently fall through to next fallback if getRandomValues fails
+    }
+  }
+
+  // Final fallback: if crypto methods are unavailable,
+  // use a combination of timestamp and high-precision counter to reduce collisions
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).substring(2, 15);
+  const counterPart = (Math.random() * 10000000).toString(36);
+  return `${timestamp}-${randomPart}${counterPart}`;
 }
 
 export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: number): string {
   const filters: string[] = [];
 
   if (recipe.trimStart > 0 || recipe.trimEnd !== null) {
-    const end = recipe.trimEnd !== null ? recipe.trimEnd : 999999;
-    filters.push(`trim=start=${recipe.trimStart}:end=${end}`);
+    // Only use trim filter with precise bounds to avoid scanning entire file
+    // If trimEnd is null, use duration parameter instead of large placeholder value
+    if (recipe.trimEnd !== null) {
+      filters.push(`trim=start=${recipe.trimStart}:end=${recipe.trimEnd}`);
+    } else if (recipe.trimStart > 0) {
+      // When only trimStart is set, let FFmpeg infer end (don't use 999999 placeholder)
+      filters.push(`trim=start=${recipe.trimStart}`);
+    }
   }
 
   if (recipe.stabilization) {
@@ -355,6 +399,9 @@ export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: n
       `scale=${targetW}:${targetH}:force_original_aspect_ratio=increase`,
       `crop=${targetW}:${targetH}`
     );
+  }
+  if (recipe.sharpness !== 0) {
+    filters.push(`unsharp=5:5:${recipe.sharpness}:5:5:0.0`);
   }
 
   // Normalize timestamps only when needed — trim or speed change both
@@ -392,11 +439,11 @@ export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: n
   return filters.join(",");
 }
 
-export function buildAudioFilter(speed: number, normalizeAudio: boolean): string {
-  if (speed <= 0) return "";
+export function buildAudioFilter(recipe: EditRecipe): string {
+  if (recipe.speed <= 0) return "";
   const filters: string[] = [];
 
-  let remaining = speed;
+  let remaining = recipe.speed;
   while (remaining < 0.5) {
     filters.push("atempo=0.5");
     remaining /= 0.5;
@@ -411,15 +458,26 @@ export function buildAudioFilter(speed: number, normalizeAudio: boolean): string
     filters.push(`atempo=${Number(remaining.toFixed(4))}`);
   }
 
-  if (normalizeAudio) filters.push("loudnorm=I=-14:TP=-1.5:LRA=11");
+  if (recipe.volume !== undefined && recipe.volume !== 100) {
+    filters.push(`volume=${(recipe.volume / 100).toFixed(2)}`);
+  }
+
+  if (recipe.normalizeAudio) filters.push("loudnorm=I=-14:TP=-1.5:LRA=11");
 
   return filters.join(",");
 }
 
 function buildAudioTrimFilter(recipe: EditRecipe): string {
   if (recipe.trimStart === 0 && recipe.trimEnd === null) return "";
-  const end = recipe.trimEnd !== null ? recipe.trimEnd : 999999;
-  return `atrim=start=${recipe.trimStart}:end=${end},asetpts=PTS-STARTPTS`;
+
+  // Avoid scanning entire audio with large placeholder values
+  // Use precise trim bounds when available
+  let trimFilter = `atrim=start=${recipe.trimStart}`;
+  if (recipe.trimEnd !== null) {
+    trimFilter += `:end=${recipe.trimEnd}`;
+  }
+  // asetpts normalizes timestamps after trim for correct stream positioning
+  return `${trimFilter},asetpts=PTS-STARTPTS`;
 }
 
 function buildArguments(
@@ -440,7 +498,7 @@ function buildArguments(
 ): string[] {
   const vf = buildVideoFilter(recipe, targetW, targetH);
   const audioTrim = hasOriginalAudio ? buildAudioTrimFilter(recipe) : "";
-  const audioSpeed = hasOriginalAudio ? buildAudioFilter(recipe.speed, recipe.normalizeAudio ?? false) : "";
+  const audioSpeed = hasOriginalAudio ? buildAudioFilter(recipe) : "";
   const afParts = [audioTrim, audioSpeed].filter(Boolean);
   const af = afParts.join(",");
 

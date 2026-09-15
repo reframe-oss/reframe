@@ -21,4 +21,10 @@ describe('getPresetById', () => {
       expect(p.platform).toBeTruthy();
     });
   });
+
+  it('returns custom preset correctly', () => {
+    const preset = getPresetById('custom');
+    expect(preset?.id).toBe('custom');
+    expect(preset?.label).toBe('Custom');
+  });
 });

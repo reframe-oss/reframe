@@ -1,0 +1,54 @@
+# Netlify configuration for Reframe
+#
+# Reframe is a statically exported Next.js app (`output: "export"` in
+# next.config.ts), so Netlify serves the prerendered `out/` directory. There is
+# no server runtime and no Next.js Runtime plugin involved.
+
+[build]
+  # Bun is pre-installed in Netlify's build image, but Netlify's automatic
+  # package-manager detection keys off `bun.lockb`, and this repo uses the newer
+  # text-format `bun.lock`. Rather than depend on detection, install explicitly.
+  command = "bun install && bun run build"
+
+  # `output: "export"` writes the static site here.
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Matches the version used in local development. Remove this line to track
+  # whatever Bun ships in Netlify's build image.
+  BUN_VERSION = "1.4.0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Security headers
+#
+# These mirror vercel.json exactly, so the site behaves identically on both
+# hosts. If you change one file, change the other.
+#
+# The last two are load-bearing, not hygiene:
+#
+#   Cross-Origin-Opener-Policy: same-origin
+#   Cross-Origin-Embedder-Policy: require-corp
+#
+# Together these make the page cross-origin isolated, which is what enables
+# SharedArrayBuffer. src/lib/ffmpeg.worker.ts branches on `self.crossOriginIsolated`
+# and loads @ffmpeg/core-mt (multi-threaded) when it is true, falling back to the
+# single-threaded @ffmpeg/core when it is false. Without these headers the app
+# still works, but every export runs single-threaded and is markedly slower —
+# a silent performance regression, not a visible error.
+#
+# COEP require-corp does not break FFmpeg core loading: the worker fetches the
+# core from cdn.jsdelivr.net using an explicit CORS `fetch()`, which jsdelivr
+# serves with permissive CORS headers.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"

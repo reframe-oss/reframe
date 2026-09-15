@@ -1,4 +1,4 @@
-/* eslint-disable jsx-a11y/no-static-element-interactions, jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions */
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions */
 "use client";
 
 import { useEffect, useRef, useState, useCallback, RefObject } from "react";
@@ -80,6 +80,9 @@ export default function VideoPreview({
     if (!file) return;
 
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+    // Part of the same object-URL/video-element imperative lifecycle below
+    // (video.src, video.load()), not a derivable value.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     const id = ++lastId.current;
     const url = URL.createObjectURL(file);
@@ -271,11 +274,15 @@ export default function VideoPreview({
             aria-label="Loading video preview"
           />
         )}
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={videoRef}
           controls
           className={cn("w-full h-full object-contain transition-opacity duration-300", isLoading ? "opacity-0" : "opacity-100")}
+          style={{
+            filter: recipe
+              ? `brightness(${1 + (recipe.brightness ?? 0)}) contrast(${recipe.contrast ?? 1}) saturate(${recipe.saturation ?? 1})`
+              : undefined,
+          }}
           onLoadedData={() => setIsLoading(false)}
           playsInline
           muted={!recipe?.keepAudio}

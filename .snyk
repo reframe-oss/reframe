@@ -1,0 +1,18 @@
+# Snyk policy file — https://docs.snyk.io/snyk-cli/commands/policy
+#
+# Controls how Snyk treats specific vulnerabilities in this project.
+#
+# Deliberately empty of ignores. Every finding surfaces until someone decides
+# otherwise, and each exception should be added here explicitly, with a reason
+# and an expiry, so it can be reviewed rather than forgotten:
+#
+#   ignore:
+#     SNYK-JS-EXAMPLE-123456:
+#       - '*':
+#           reason: Not reachable — dev-only transitive dep, no runtime path
+#           expires: 2026-12-31T00:00:00.000Z
+#
+# `patch` is unused: this project has no Snyk-patchable dependencies.
+version: v1.25.0
+ignore: {}
+patch: {}

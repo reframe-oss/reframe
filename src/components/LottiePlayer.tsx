@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import isChromatic from "chromatic/isChromatic";
 
 interface Props {
   animationData: object;
@@ -21,6 +22,16 @@ export default function LottiePlayer({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // lottie-web plays through requestAnimationFrame, which no amount of CSS can
+  // freeze. Chromatic screenshots at an arbitrary moment, so a playing
+  // animation reports a visual change on every build that has nothing to do
+  // with the code. Rendering the first frame statically keeps snapshots
+  // deterministic while still exercising the component.
+  //
+  // isChromatic() is false everywhere except inside Chromatic's renderer, so
+  // this has no effect on the app or on local Storybook.
+  const shouldAutoplay = autoplay && !isChromatic();
+
   useEffect(() => {
     if (!containerRef.current) return;
     let cancelled = false;
@@ -33,7 +44,7 @@ export default function LottiePlayer({
         container: containerRef.current,
         renderer: "svg",
         loop,
-        autoplay,
+        autoplay: shouldAutoplay,
         animationData,
       });
     }).catch((error) => {
@@ -46,8 +57,7 @@ export default function LottiePlayer({
       cancelled = true;
       anim?.destroy();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animationData, loop, autoplay]);
+  }, [animationData, loop, shouldAutoplay]);
 
   return (
     <>

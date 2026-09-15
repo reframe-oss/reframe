@@ -1,0 +1,28 @@
+/*
+ * Snapshot stability for Chromatic.
+ *
+ * src/app/globals.css applies a 200ms transition to *every* element
+ * (`*, *::before, *::after`) and several components animate on mount. A visual
+ * regression service screenshots at an arbitrary moment, so those in-flight
+ * transitions produce diffs that have nothing to do with a real change.
+ *
+ * Freezing them here makes every story render at its settled end state. This
+ * only affects the Storybook preview iframe — the app itself still animates.
+ */
+*,
+*::before,
+*::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+/* Give every story a themed ground so light/dark snapshots are readable
+   instead of rendering dark text on Storybook's default white iframe. */
+body {
+  background-color: var(--bg);
+  color: var(--text);
+}

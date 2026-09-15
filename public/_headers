@@ -1,3 +1,23 @@
+# Netlify headers file.
+#
+# `output: "export"` copies everything in public/ into out/, which is Netlify's
+# publish directory — so this file ships as out/_headers and Netlify applies it.
+#
+# These values are intentionally IDENTICAL to the [[headers]] block in
+# netlify.toml. Netlify's docs do not state which source wins when both define
+# the same header, so keeping them in agreement means precedence never matters.
+# If you edit one, edit the other (and vercel.json, which mirrors both).
+#
+# Cross-Origin-Opener-Policy + Cross-Origin-Embedder-Policy are load-bearing:
+# they make the page cross-origin isolated, which enables SharedArrayBuffer and
+# lets src/lib/ffmpeg.worker.ts load the multi-threaded FFmpeg core. Without
+# them exports silently fall back to single-threaded and get much slower.
+
 /*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp

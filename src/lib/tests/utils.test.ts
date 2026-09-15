@@ -38,6 +38,10 @@ describe("formatBytes", () => {
   it("clamps negative decimals to zero", () => {
     expect(formatBytes(1536, -1)).toBe("2 KB");
   });
+
+  it("formats large terabyte values correctly", () => {
+    expect(formatBytes(562949953421312)).toBe("512 TB");
+  });
 });
 
 describe("formatDuration", () => {

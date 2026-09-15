@@ -87,8 +87,20 @@ export default function PrivacyPage() {
                 derived content ever leaves your browser.
               </p>
               <p className="text-[var(--muted)] mt-4">
-                Reframe does not embed analytics SDKs, advertising scripts, or
-                background data collection mechanisms of any kind.
+                Reframe embeds Datadog Real User Monitoring (RUM) to collect
+                anonymous performance and error metrics — page views, load
+                times, and JavaScript errors. Session replay is disabled.
+                This telemetry never includes your video files, audio,
+                filenames, exported content, or any other media you work
+                with in the app. See{" "}
+                <a
+                  href="#telemetry"
+                  className="text-[var(--accent)] hover:underline"
+                >
+                  Telemetry &amp; Diagnostics
+                </a>{" "}
+                below for details. Reframe does not embed advertising
+                scripts.
               </p>
 
               <h2 className="text-2xl font-semibold mt-12 mb-6 text-[var(--text)]">
@@ -107,13 +119,27 @@ export default function PrivacyPage() {
                 not controlled by Reframe.
               </p>
 
-              <h2 className="text-2xl font-semibold mt-12 mb-6 text-[var(--text)]">
+              <h2
+                id="telemetry"
+                className="text-2xl font-semibold mt-12 mb-6 text-[var(--text)]"
+              >
                 3. Telemetry & Diagnostics
               </h2>
               <p className="text-[var(--muted)]">
-                Reframe does not collect analytics, telemetry, crash reports, or
-                usage tracking of any kind. No diagnostic data is transmitted to
-                developers or third parties.
+                Reframe uses Datadog RUM to collect anonymous, aggregate
+                telemetry: page views, load performance, and JavaScript
+                errors. This helps us catch bugs and performance regressions
+                across browsers we don&apos;t personally test on.
+              </p>
+              <p className="text-[var(--muted)] mt-4">
+                Session replay is explicitly disabled — Datadog never
+                records or reconstructs what the editor looked like during
+                your session. Telemetry is limited to metrics and error
+                events; it does not and cannot include your video or audio
+                files, filenames, export settings, or any content you
+                create or edit in the app, since that data never leaves
+                your browser in the first place (see Data Collection
+                above).
               </p>
 
               <h2 className="text-2xl font-semibold mt-12 mb-6 text-[var(--text)]">
@@ -172,9 +198,9 @@ export default function PrivacyPage() {
               </h2>
               <p className="text-[var(--muted)]">
                 Reframe is open source and publicly verifiable. The entire
-                codebase, including processing logic and dependency usage, can
-                be audited on GitHub to confirm its local-first architecture and
-                absence of telemetry or data collection.
+                codebase, including processing logic, dependency usage, and
+                exactly what telemetry is collected and how, can be audited
+                on GitHub to confirm its local-first architecture.
               </p>
 
               <h2 className="text-2xl font-semibold mt-12 mb-6 text-[var(--text)]">

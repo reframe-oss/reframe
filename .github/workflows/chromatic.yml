@@ -1,0 +1,80 @@
+name: 🎨 Chromatic
+
+# Visual regression testing + UI review.
+#
+# Chromatic builds this repo's Storybook, screenshots every story (in both the
+# light and dark palettes — see .storybook/preview.tsx) and diffs those
+# screenshots against the accepted baseline.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic:
+    name: Visual regression
+    runs-on: ubuntu-latest
+
+    # ── Why this condition exists ────────────────────────────────────────────
+    # GitHub does not expose repository secrets to workflows triggered by a
+    # pull_request from a fork. Almost every contribution to this repo comes
+    # from a fork, so without this guard CHROMATIC_PROJECT_TOKEN would be empty
+    # on those runs and the job would fail red on contributor PRs through no
+    # fault of theirs — the same trap the Vercel check already falls into.
+    #
+    # So: run on every push to main (which keeps baselines current) and on PRs
+    # raised from branches inside this repo. Fork PRs skip the job cleanly
+    # instead of failing.
+    #
+    # If you want visual review on fork PRs too, the supported route is the
+    # `pull_request_target` + `workflow_run` pattern documented at
+    # https://www.chromatic.com/docs/github-actions/#forked-repositories
+    # Do NOT simply switch this to pull_request_target: that runs untrusted
+    # fork code with access to your secrets.
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          # Chromatic walks git history to work out which build is the baseline
+          # for this commit. With the default shallow clone it cannot find one
+          # and treats every build as brand new.
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      # Built explicitly rather than via the action's `buildScriptName` so that
+      # a Storybook compile error fails here, with readable logs, instead of
+      # inside the publish step.
+      - name: Build Storybook
+        run: bun run build-storybook
+
+      - name: Publish to Chromatic
+        uses: chromaui/action@v18
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+
+          # Reuse the build from the previous step.
+          storybookBuildDir: storybook-static
+
+          # Visual changes are for a human to accept or reject in the Chromatic
+          # UI; they should not turn a contributor's PR red. Set this to false
+          # once you want unreviewed visual changes to block merging.
+          exitZeroOnChanges: true
+
+          # A change that lands on main is by definition the new baseline.
+          # Remove this if you would rather approve main's changes by hand.
+          autoAcceptChanges: main

@@ -1,14 +1,14 @@
 blank_issues_enabled: false
 contact_links:
   - name: 💡 Feature Request or Idea
-    url: https://github.com/magic-peach/reframe/discussions/categories/ideas
+    url: https://github.com/reframe-oss/reframe/discussions/categories/ideas
     about: Share your idea in Discussions before opening an issue
   - name: 🙋 Ask a Question
-    url: https://github.com/magic-peach/reframe/discussions/categories/q-a
+    url: https://github.com/reframe-oss/reframe/discussions/categories/q-a
     about: Use Discussions for questions — not Issues
   - name: 🐛 Report a Bug
-    url: https://github.com/magic-peach/reframe/discussions/categories/bug-reports
+    url: https://github.com/reframe-oss/reframe/discussions/categories/bug-reports
     about: Report bugs in Discussions first
   - name: ⭐ Star the repo
-    url: https://github.com/magic-peach/reframe/stargazers
+    url: https://github.com/reframe-oss/reframe/stargazers
     about: If Reframe helped you, please star the repo!

@@ -26,6 +26,7 @@ export interface EditRecipe {
   keepAudio: boolean;
   normalizeAudio: boolean;
   speed: number;
+  volume: number;
   quality: number;
   format: "mp4" | "webm" | "mkv" | "gif";
   stabilization: boolean;
@@ -34,6 +35,7 @@ export interface EditRecipe {
   contrast: number;
   saturation: number;
   soundOnCompletion: boolean;
+  sharpness: number;
   textOverlays: TextOverlay[];
   version: number;
 }
@@ -66,6 +68,7 @@ export interface ExportResult {
   height: number;
   format: "mp4" | "webm" | "mkv" | "gif";
   exportDurationMs?: number;
+  dispose(): void;
 }
 
 export type ExportStatus =
@@ -134,14 +137,27 @@ export function isValidRecipe(value: unknown): value is EditRecipe {
   if (typeof v.keepAudio !== "boolean") return false;
   if (typeof v.normalizeAudio !== "boolean") return false;
   if (typeof v.speed !== "number" || !isFinite(v.speed)) return false;
+  if (typeof v.volume !== "number" || !isFinite(v.volume)) return false;
   if (typeof v.quality !== "number" || !isFinite(v.quality)) return false;
   if (!["mp4", "webm", "mkv", "gif"].includes(v.format)) return false;
   if (typeof v.stabilization !== "boolean") return false;
+  if (typeof v.denoise !== "boolean") return false;
   if (typeof v.brightness !== "number" || !isFinite(v.brightness)) return false;
   if (typeof v.contrast !== "number" || !isFinite(v.contrast)) return false;
   if (typeof v.saturation !== "number" || !isFinite(v.saturation)) return false;
   if (typeof v.soundOnCompletion !== "boolean") return false;
   if (!Array.isArray(v.textOverlays)) return false;
+
+  for (const overlay of v.textOverlays) {
+    if (!overlay || typeof overlay !== "object") return false;
+    if (typeof overlay.id !== "string") return false;
+    if (typeof overlay.text !== "string") return false;
+    if (typeof overlay.x !== "number" || !isFinite(overlay.x) || overlay.x < 0 || overlay.x > 100) return false;
+    if (typeof overlay.y !== "number" || !isFinite(overlay.y) || overlay.y < 0 || overlay.y > 100) return false;
+    if (typeof overlay.fontSize !== "number" || !isFinite(overlay.fontSize) || overlay.fontSize < 12 || overlay.fontSize > 120) return false;
+    if (typeof overlay.color !== "string") return false;
+    if (!["normal", "bold", "900"].includes(overlay.fontWeight)) return false;
+  }
 
   return true;
 }

@@ -1,6 +1,6 @@
 # Multi-Track Timeline: Phase 1 MVP
 
-**Issue**: [#1204 - Multi-Track Non-Linear Timeline Architecture](https://github.com/magic-peach/reframe/issues/1204)
+**Issue**: [#1204 - Multi-Track Non-Linear Timeline Architecture](https://github.com/reframe-oss/reframe/issues/1204)
 
 **Status**: Phase 1 MVP - Foundation architecture complete, ready for integration
 

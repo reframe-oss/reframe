@@ -54,8 +54,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    setThemeState(getCurrentTheme());
+    // Genuinely needs an effect: getCurrentTheme() reads localStorage and
+    // matchMedia, browser-only APIs unavailable during SSR/render.
     const currentTheme = getCurrentTheme();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     applyTheme(currentTheme, false);
 
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

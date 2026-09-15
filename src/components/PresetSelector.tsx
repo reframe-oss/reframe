@@ -141,7 +141,7 @@ export default function PresetSelector({ recipe, onChange }: Props) {
   return (
     <div className="space-y-3">
       {/* Quick-action row */}
-      <div className="grid grid-cols-5 gap-1.5">
+      <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
         {QUICK_ACTIONS.map(({ preset, label, platform, icon }) => {
           const isActive = recipe.preset === preset;
           return (
@@ -284,7 +284,8 @@ export default function PresetSelector({ recipe, onChange }: Props) {
             <input
               id="custom-width"
               type="number"
-              autoComplete="off" 
+              inputMode="numeric"
+              autoComplete="off"
               min={16}
               max={7680}
               step={2}
@@ -310,6 +311,7 @@ export default function PresetSelector({ recipe, onChange }: Props) {
             <input
               id="custom-height"
               type="number"
+              inputMode="numeric"
               autoComplete="off"
               min={16}
               max={7680}

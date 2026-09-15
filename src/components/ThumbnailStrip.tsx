@@ -83,11 +83,23 @@ export default function ThumbnailStrip({
       canvas.height = thumbH;
 
       const times: number[] = [];
+      const seenTimestamps = new Set<string>();
+
       for (let t = 0; t <= duration; t += intervalSeconds) {
-        times.push(Math.min(t, duration - 0.1));
+        const roundedTime = Math.min(t, duration - 0.1);
+        const formatted = formatTime(roundedTime);
+        
+        if (!seenTimestamps.has(formatted)) {
+          seenTimestamps.add(formatted);
+          times.push(roundedTime);
+        }
       }
-      if ((times[times.length - 1] ?? 0) < duration - 0.5) {
-        times.push(duration - 0.1);
+
+      // Check if the final second boundary is missing from the timeline display
+      const finalTime = duration - 0.1;
+      const finalFormatted = formatTime(finalTime);
+      if (!seenTimestamps.has(finalFormatted) && finalTime > (times[times.length - 1] ?? 0)) {
+        times.push(finalTime);
       }
 
       const captured: Thumbnail[] = [];
@@ -145,6 +157,9 @@ export default function ThumbnailStrip({
 
   useEffect(() => {
     if (videoSrc && duration > 0) {
+      // Genuinely needs an effect: triggers async canvas/video capture work
+      // (seeking, drawing frames, Blob creation), not a derivable value.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       generateThumbnails();
     }
     return () => {
