@@ -131,7 +131,7 @@ jobs:
             // Enforce single assignee: reject if anyone is already assigned
             if (currentAssignees.length > 0) {
               await postComment(
-                `Hey @${commenter}, this issue is already assigned to @${currentAssignees[0]}. Please pick another issue or wait for it to become available. You can browse open unassigned issues here: https://github.com/magic-peach/reframe/issues?q=is%3Aissue+is%3Aopen+no%3Aassignee`
+                `Hey @${commenter}, this issue is already assigned to @${currentAssignees[0]}. Please pick another issue or wait for it to become available. You can browse open unassigned issues here: https://github.com/reframe-oss/reframe/issues?q=is%3Aissue+is%3Aopen+no%3Aassignee`
               );
               return;
             }

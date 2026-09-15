@@ -13,7 +13,7 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v10
+      - uses: actions/stale@v11
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           days-before-issue-stale: 30
@@ -26,7 +26,7 @@ jobs:
             If you're still interested in working on this, please leave a comment! 
             For GSSoC'26 contributors: make sure to keep your assigned issues active.
 
-            ⭐ [Star Reframe](https://github.com/magic-peach/reframe) if you find it useful!
+            ⭐ [Star Reframe](https://github.com/reframe-oss/reframe) if you find it useful!
           stale-pr-message: |
             👋 This PR has been inactive for **21 days**. It will be automatically closed in 14 days if there's no further activity.
 

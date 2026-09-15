@@ -20,17 +20,23 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function getCurrentTheme(): Theme {
-  if (
-    typeof document !== "undefined" &&
-    document.documentElement.classList.contains("dark")
-  ) {
-    return "dark";
+  if (typeof window !== "undefined") {
+    const savedTheme = localStorage.getItem("theme");
+
+    if (savedTheme === "dark" || savedTheme === "light") {
+      return savedTheme;
+    }
+
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
   }
+
   return "light";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(getCurrentTheme);
+  const [theme, setThemeState] = useState<Theme>("light");;
 
   const applyTheme = useCallback(
     (next: Theme, persist = true) => {
@@ -48,7 +54,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    setThemeState(getCurrentTheme());
+    // Genuinely needs an effect: getCurrentTheme() reads localStorage and
+    // matchMedia, browser-only APIs unavailable during SSR/render.
+    const currentTheme = getCurrentTheme();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    applyTheme(currentTheme, false);
 
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = (e: MediaQueryListEvent) => {

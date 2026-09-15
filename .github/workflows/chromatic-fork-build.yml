@@ -1,0 +1,77 @@
+name: 🎨 Chromatic Fork — Build
+
+# ── Part 1 of 2: build only, no secrets ─────────────────────────────────────
+#
+# GitHub deliberately withholds repository secrets from `pull_request` runs
+# triggered by a fork, so the main chromatic.yml workflow skips fork PRs — which
+# is nearly every contribution to this repo.
+#
+# The fix is to split the work across a trust boundary:
+#
+#   1. THIS workflow runs untrusted fork code (bun install, storybook build)
+#      with no secrets and a read-only token, and uploads the built Storybook
+#      as an artifact. A malicious PR gets nothing worth stealing.
+#
+#   2. chromatic-fork-publish.yml is triggered by this run completing. It has
+#      the token, but only ever downloads that artifact and uploads it to
+#      Chromatic — it never executes fork code.
+#
+# The alternative, switching chromatic.yml to `pull_request_target`, would run
+# fork code *with* our secrets in scope. Don't do that.
+
+on:
+  pull_request:
+    branches: [main]
+    # `labeled` lets a maintainer re-run visual review on a fork PR on demand
+    # by applying the `visual-review` label, without asking the contributor to
+    # push a no-op commit. It is also the only way to exercise this workflow
+    # end-to-end without waiting for a fresh fork PR to arrive.
+    types: [opened, synchronize, reopened, labeled]
+
+# No secrets are used here, and the token is read-only.
+permissions:
+  contents: read
+
+concurrency:
+  group: chromatic-fork-build-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Storybook (fork)
+    runs-on: ubuntu-latest
+
+    # Two gates:
+    #
+    #  * forks only — same-repo PRs already get a full Chromatic run from
+    #    chromatic.yml, which can use the secret directly, so building here too
+    #    would snapshot every same-repo PR twice.
+    #
+    #  * on a `labeled` event, only the `visual-review` label counts. Without
+    #    this, the auto-labeller applying `gssoc'26`, `level:*` and `type:*` to
+    #    every new PR would fire a duplicate build per label.
+    if: >-
+      github.event.pull_request.head.repo.full_name != github.repository &&
+      (github.event.action != 'labeled' ||
+       github.event.label.name == 'visual-review')
+
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build Storybook
+        run: bun run build-storybook
+
+      - name: Upload built Storybook
+        uses: actions/upload-artifact@v7
+        with:
+          name: storybook-static
+          path: storybook-static
+          retention-days: 1
+          if-no-files-found: error

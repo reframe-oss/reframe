@@ -40,3 +40,13 @@ bun.lockb
 
 # npm lockfile (project uses bun)
 package-lock.json
+
+# storybook
+/storybook-static
+*.storybook.log
+build-storybook.log
+chromatic.log
+.env*
+
+# Local Netlify folder
+.netlify

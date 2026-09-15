@@ -90,11 +90,27 @@
 }
 
 /* ── Base styles ── */
+html {
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
 body {
+  margin: 0;
+  min-height: 100vh;
   background-color: var(--bg);
   color: var(--text);
   line-height: 1.6;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
 }
 
 h1,

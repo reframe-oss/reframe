@@ -36,7 +36,10 @@ export function NativeShareButton({
     const dummyTestFile = new File([new Uint8Array([0])], 'test.mp4', { type: 'video/mp4' });
 
     // 3. Optimize Mount Lifecycle: Verify EXACTLY ONCE on component mount.
+    // Genuinely needs an effect: navigator.canShare is a browser-only API,
+    // unavailable during SSR/render, so it can't be computed as derived state.
     if (navigator.canShare && navigator.canShare({ files: [dummyTestFile] })) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsSupported(true);
     }
   }, []); // Empty dependency array ensures this runs only once
