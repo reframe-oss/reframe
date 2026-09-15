@@ -160,12 +160,12 @@ export default function VideoPreview({
   useEffect(() => {
     if (!videoRef.current || !recipe) return;
     videoRef.current.muted = !recipe.keepAudio;
-  }, [recipe, videoRef]);
+  }, [recipe?.keepAudio, videoRef]);
 
   useEffect(() => {
     if (!videoRef.current || !recipe) return;
     videoRef.current.playbackRate = recipe.speed;
-  }, [recipe, videoRef]);
+  }, [recipe?.speed, videoRef]);
 
   /**
    * Track preview container dimensions for text overlay positioning.
