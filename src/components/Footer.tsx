@@ -116,7 +116,7 @@ export default function Footer() {
             </h3>
 
             <form
-              className="flex items-center w-full sm:w-80 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 focus-within:border-[var(--accent)] transition"
+              className="flex items-center w-full lg:w-80 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 focus-within:border-[var(--accent)] transition"
               onSubmit={(e) => e.preventDefault()}
               aria-label="Newsletter signup"
             >
