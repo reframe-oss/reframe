@@ -3,15 +3,10 @@
 import React, { useState, useEffect } from 'react';
 
 interface NativeShareButtonProps {
-  /** The video file or blob to share */
   file: File | Blob;
-  /** Optional title for the share dialog */
   title?: string;
-  /** Optional text for the share dialog */
   text?: string;
-  /** Optional file name (if a Blob is provided) */
   fileName?: string;
-  /** Additional Tailwind classes */
   className?: string;
 }
 
@@ -26,26 +21,21 @@ export function NativeShareButton({
   const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
-    // 1. Safely check if we are in the browser environment (no SSR execution)
     if (typeof window === 'undefined' || !navigator) {
       return;
     }
 
-    // 2. Safe Capability Test: Instantiate a lightweight 1-byte dummy file to test browser capability.
-    // This avoids blocking the main thread by deferring heavy Blob/File interactions.
     const dummyTestFile = new File([new Uint8Array([0])], 'test.mp4', { type: 'video/mp4' });
 
-    // 3. Optimize Mount Lifecycle: Verify EXACTLY ONCE on component mount.
     if (navigator.canShare && navigator.canShare({ files: [dummyTestFile] })) {
       setIsSupported(true);
     }
-  }, []); // Empty dependency array ensures this runs only once
+  }, []);
 
   const handleShare = async () => {
     if (!isSupported) return;
 
-    // 4. Deferred Real Conversion: Defer the Blob to File conversion until the exact millisecond of execution.
-    const shareFile = file instanceof File 
+      const shareFile = file instanceof File 
       ? file 
       : new File([file], fileName, { type: file.type || 'video/mp4' });
 
@@ -58,17 +48,13 @@ export function NativeShareButton({
         files: [shareFile]
       });
     } catch (error) {
-      // 'AbortError' is thrown when the user intentionally cancels or dismisses the native share sheet. 
-      // We can safely ignore it.
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Error sharing file:', error);
-      }
+      // AbortError means user cancelled the share sheet — safe to ignore
+      if (error instanceof Error && error.name === 'AbortError') return;
     } finally {
       setIsSharing(false);
     }
   };
 
-  // Progressive enhancement fallback: hide the button entirely if file sharing is not supported by the browser.
   if (!isSupported) {
     return null;
   }
@@ -79,7 +65,7 @@ export function NativeShareButton({
       disabled={isSharing}
       type="button"
       aria-label="Share video"
-      className={`inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-[var(--accent-fg)] transition-colors duration-200 bg-[var(--accent)] rounded-md shadow-sm hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg)] disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
       <svg
         className="w-5 h-5 mr-2 -ml-1"
