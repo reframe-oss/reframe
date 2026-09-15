@@ -83,7 +83,7 @@ export default function RootLayout({
             >
               <div className="flex items-center gap-2">
                 <BrandLogo size={24} />
-                <h1 className="text-lg font-semibold">Reframe</h1>
+                <span className="text-lg font-semibold">Reframe</span>
               </div>
               <ThemeToggle />
             </header>
