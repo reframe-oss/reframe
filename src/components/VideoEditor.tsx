@@ -295,6 +295,8 @@ export default function VideoEditor() {
     navigator.clipboard.writeText(url.toString()).then(() => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
+    }).catch((err) => {
+      console.error("Failed to copy link to clipboard:", err);
     });
   };
 
