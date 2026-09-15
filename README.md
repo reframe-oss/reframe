@@ -475,3 +475,28 @@ Made with ❤️ for everyone who just wants to edit a video without the hassle.
 </div>
 
 ---
+
+## Troubleshooting
+
+### Installation fails
+- Ensure you're on [Bun](https://bun.sh) (this project uses `bun.lock`, not npm/yarn) with Node.js 20.9+.
+- Run `bun install`.
+- Delete `node_modules` and `bun.lock`, then reinstall if issues persist.
+
+### Environment variables not loading
+- Verify that a `.env.local` file exists (see `.env.example` for the required keys).
+- Restart the development server after making changes — env vars are only read at startup.
+
+## FAQ
+
+### How do I start the project?
+Run:
+
+```bash
+bun install
+bun run dev
+```
+
+### How do I report a bug?
+Please open a GitHub issue with reproduction steps and relevant logs.
+
