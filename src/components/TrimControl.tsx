@@ -57,39 +57,38 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     }
   }, [xToSeconds, duration, recipe.trimStart, recipe.trimEnd, onChange]);
 
- useEffect(() => {
-  const onMove = (e: MouseEvent | TouchEvent) => {
-    let clientX: number;
+  useEffect(() => {
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      let clientX: number;
 
-    if ("touches" in e) {
-      const touch = e.touches[0];
+      if ("touches" in e) {
+        const touch = e.touches[0];
+        if (!touch) return;
+        clientX = touch.clientX;
+      } else {
+        clientX = e.clientX;
+      }
 
-      if (!touch) return;
+      applyDrag(clientX);
+    };
 
-      clientX = touch.clientX;
-    } else {
-      clientX = e.clientX;
-    }
+    const onUp = () => {
+      dragging.current = null;
+    };
 
-    applyDrag(clientX);
-  };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("touchmove", onMove);
+    document.addEventListener("touchend", onUp);
 
-  const onUp = () => {
-    dragging.current = null;
-  };
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+    };
+  }, [applyDrag]);
 
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove);
-  document.addEventListener("touchend", onUp);
-
-  return () => {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.removeEventListener("touchmove", onMove);
-    document.removeEventListener("touchend", onUp);
-  };
-}, [applyDrag]);
   const handleStart = (val: string) => {
     setStartInput(val);
 
@@ -235,6 +234,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
           />
         </div>
       )}
+
       <div className="flex gap-3">
         <div className="flex-1">
           <label
@@ -328,5 +328,3 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     </div>
   );
 }
-
-

@@ -20,6 +20,61 @@ interface Props {
   multiTrackState?: MultiTrackEditorState | null;
   multiTrackVideoRefs?: Record<string, RefObject<HTMLVideoElement | null>>;
 }
+ 
+export interface VideoPreviewProps {
+  /** URL / object-URL of the video to preview */
+  src: string;
+  /** Current colour adjustments from the editor */
+  adjustments?: ColourAdjustments;
+  /** Optional: max width of the preview in px (default: 854) */
+  maxWidth?: number;
+}
+ 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+ 
+const DEFAULT: ColourAdjustments = {
+  brightness: 100,
+  contrast: 100,
+  saturation: 100,
+};
+ 
+function buildFilterString(adj: ColourAdjustments): string {
+  const parts: string[] = [];
+  if (adj.brightness !== DEFAULT.brightness)
+    parts.push(`brightness(${adj.brightness}%)`);
+  if (adj.contrast !== DEFAULT.contrast)
+    parts.push(`contrast(${adj.contrast}%)`);
+  if (adj.saturation !== DEFAULT.saturation)
+    parts.push(`saturate(${adj.saturation}%)`);
+  return parts.join(" ");
+}
+ 
+function isAdjusted(adj: ColourAdjustments): boolean {
+  return (
+    adj.brightness !== DEFAULT.brightness ||
+    adj.contrast !== DEFAULT.contrast ||
+    adj.saturation !== DEFAULT.saturation
+  );
+}
+ 
+// ── Component ────────────────────────────────────────────────────────────────
+ 
+export default function VideoPreview({
+  src,
+  adjustments = DEFAULT,
+  maxWidth = 854,
+}: VideoPreviewProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: maxWidth, height: 480 });
+ 
+  const filterString = useMemo(
+    () => buildFilterString(adjustments),
+    [adjustments]
+  );
+  const showSlider = isAdjusted(adjustments);
+ 
+  // Derive pixel dimensions once video metadata loads
 
 export default function VideoPreview({
   file,
@@ -91,6 +146,20 @@ export default function VideoPreview({
 
     const video = videoRef.current;
     if (!video) return;
+ 
+    const onMeta = () => {
+      const aspect = video.videoWidth / (video.videoHeight || 1);
+      const w = Math.min(maxWidth, video.videoWidth || maxWidth);
+      const h = Math.round(w / aspect);
+      setDimensions({ width: w, height: h });
+    };
+ 
+    video.addEventListener("loadedmetadata", onMeta);
+    return () => video.removeEventListener("loadedmetadata", onMeta);
+  }, [src, maxWidth]);
+ 
+  const { width, height } = dimensions;
+ 
 
     video.src = url;
     video.load();
