@@ -28,14 +28,33 @@ import { saveSessionFile, loadSessionFile, clearSessionFile } from "@/lib/sessio
 
 const DEFAULT_TITLE = "Reframe — Resize, trim, and export videos in your browser";
 
+/**
+ * Returns a metadata load timeout in milliseconds scaled to file size.
+ * Minimum: 10 s | Maximum: 60 s | Rate: 10 s per 100 MB above the first 100 MB.
+ */
+export function getMetadataTimeout(fileSizeBytes: number): number {
+  const MIN_TIMEOUT_MS = 10_000;
+  const MAX_TIMEOUT_MS = 60_000;
+  const BASE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+  const MS_PER_EXTRA_100MB = 10_000;
+
+  const extraMs =
+    fileSizeBytes > BASE_SIZE_BYTES
+      ? Math.floor((fileSizeBytes - BASE_SIZE_BYTES) / BASE_SIZE_BYTES) * MS_PER_EXTRA_100MB
+      : 0;
+
+  return Math.min(MIN_TIMEOUT_MS + extraMs, MAX_TIMEOUT_MS);
+}
+
 export function extractMetadata(file: File): Promise<{ width: number; height: number; duration: number }> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
+    const timeoutMs = getMetadataTimeout(file.size);
     const timeout = setTimeout(() => {
       URL.revokeObjectURL(url);
       reject( new Error("Video metaData load timeout — the file may be too large or the device too slow. Please try again.") );
-    }, 5000);
+    }, timeoutMs);
 
     video.preload = "metadata";
     video.onloadedmetadata = () => {
