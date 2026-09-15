@@ -78,8 +78,11 @@ function getTooltipStyle(
       };
     case "left":
       return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left - tw - TOOLTIP_OFFSET,
+       top: sr.top + sr.height / 2 - th / 2,
+       left: Math.max(               //Prevent Tooltip from going out of left viewport
+         PADDING,
+         sr.left - tw - TOOLTIP_OFFSET
+    ),
       };
     case "right":
       return {
