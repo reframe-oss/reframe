@@ -41,11 +41,44 @@ export default function VideoPreview({
     width: 0,
     height: 0,
   });
+  const [activeVideoRect, setActiveVideoRect] = useState({
+    width: 0,
+    height: 0,
+    left: 0,
+    top: 0,
+  });
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const onLoadedRef = useRef<(() => void) | null>(null);
   
   // Phase 1 MVP: Multi-track URL management
   const multiTrackUrlRefs = useRef<Record<string, string | null>>({});
+
+  const updateActiveVideoRect = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0 || containerDimensions.width === 0) {
+      return;
+    }
+
+    const videoRatio = video.videoWidth / video.videoHeight;
+    const containerRatio = containerDimensions.width / containerDimensions.height;
+
+    let width = 0;
+    let height = 0;
+    let left = 0;
+    let top = 0;
+
+    if (videoRatio > containerRatio) {
+      width = containerDimensions.width;
+      height = containerDimensions.width / videoRatio;
+      top = (containerDimensions.height - height) / 2;
+    } else {
+      height = containerDimensions.height;
+      width = containerDimensions.height * videoRatio;
+      left = (containerDimensions.width - width) / 2;
+    }
+
+    setActiveVideoRect({ width, height, left, top });
+  }, [containerDimensions, videoRef]);
 
   const handleGrabFrame = useCallback(() => {
     const video = videoRef.current;
@@ -185,6 +218,10 @@ export default function VideoPreview({
     window.addEventListener("resize", updateDimensions);
     return () => window.removeEventListener("resize", updateDimensions);
   }, []);
+
+  useEffect(() => {
+    updateActiveVideoRect();
+  }, [containerDimensions, isLoading, updateActiveVideoRect]);
 
   const overlay = (() => {
     if (!recipe || !showOverlay) return null;
@@ -370,11 +407,13 @@ export default function VideoPreview({
         )}
 
         {/* Draggable Text Overlays */}
-        {recipe && !isLoading && containerDimensions.width > 0 && (
+        {recipe && !isLoading && activeVideoRect.width > 0 && (
           <DraggableTextOverlays
             recipe={recipe}
-            containerWidth={containerDimensions.width}
-            containerHeight={containerDimensions.height}
+            containerWidth={activeVideoRect.width}
+            containerHeight={activeVideoRect.height}
+            videoLeft={activeVideoRect.left}
+            videoTop={activeVideoRect.top}
             selectedTextId={selectedTextId ?? null}
             onSelectText={onSelectText || (() => {})}
             onUpdateText={onUpdateText || (() => {})}
