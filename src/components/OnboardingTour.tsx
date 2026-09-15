@@ -63,6 +63,8 @@ function getTooltipStyle(
   const tw = tooltip?.offsetWidth ?? 320;
   const th = tooltip?.offsetHeight ?? 140;
 
+  const VIEWPORT_PADDING = 16;
+
   const sr = {
     top: rect.top - PADDING,
     left: rect.left - PADDING,
@@ -78,13 +80,31 @@ function getTooltipStyle(
       };
     case "left":
       return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left - tw - TOOLTIP_OFFSET,
+        top: Math.max(
+          VIEWPORT_PADDING,
+          Math.min(
+            sr.top + sr.height / 2 - th / 2,
+            window.innerHeight - th - VIEWPORT_PADDING
+          )
+        ),
+        left: Math.max(
+          VIEWPORT_PADDING,
+          sr.left - tw - TOOLTIP_OFFSET
+        ),
       };
     case "right":
       return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left + sr.width + TOOLTIP_OFFSET,
+        top: Math.max(
+          VIEWPORT_PADDING,
+          Math.min(
+            sr.top + sr.height / 2 - th / 2,
+            window.innerHeight - th - VIEWPORT_PADDING
+          )
+        ),
+        left: Math.min(
+          window.innerWidth - tw - VIEWPORT_PADDING,
+          sr.left + sr.width + TOOLTIP_OFFSET
+        ),
       };
     case "bottom":
     default:
