@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { FocusTrap } from "focus-trap-react";
 
 const TOUR_KEY = "reframe_onboarding_complete";
 
@@ -44,7 +45,7 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
-const PADDING = 12; // spotlight padding around target element
+const PADDING = 12;
 const TOOLTIP_OFFSET = 16;
 
 interface Rect {
@@ -76,16 +77,19 @@ function getTooltipStyle(
         top: sr.top - th - TOOLTIP_OFFSET,
         left: sr.left + sr.width / 2 - tw / 2,
       };
+
     case "left":
       return {
         top: sr.top + sr.height / 2 - th / 2,
         left: sr.left - tw - TOOLTIP_OFFSET,
       };
+
     case "right":
       return {
         top: sr.top + sr.height / 2 - th / 2,
         left: sr.left + sr.width + TOOLTIP_OFFSET,
       };
+
     case "bottom":
     default:
       return {
@@ -126,13 +130,14 @@ function Spotlight({ rect }: SpotlightProps) {
           />
         </mask>
       </defs>
+
       <rect
         width="100%"
         height="100%"
         fill="rgba(0,0,0,0.65)"
         mask="url(#spotlight-mask)"
       />
-      {/* Highlight ring */}
+
       <rect
         x={r.left}
         y={r.top}
@@ -183,7 +188,6 @@ function Tooltip({
       style={{ ...style }}
       tabIndex={-1}
     >
-      {/* Progress bar */}
       <div className="h-1 rounded-t-xl overflow-hidden bg-[var(--border)]">
         <div
           className="h-full bg-indigo-500 transition-all duration-300"
@@ -192,12 +196,12 @@ function Tooltip({
       </div>
 
       <div className="p-5">
-        {/* Step counter */}
         <p className="text-xs font-semibold tracking-widest uppercase text-indigo-500 mb-1">
           Step {stepIndex + 1} of {totalSteps}
         </p>
 
         <h2 className="text-base font-semibold mb-1">{step.title}</h2>
+
         <p className="text-sm text-[var(--muted)] leading-relaxed mb-4">
           {step.description}
         </p>
@@ -209,6 +213,7 @@ function Tooltip({
           >
             Skip tour
           </button>
+
           <button
             onClick={onNext}
             ref={(el) => {
@@ -231,8 +236,10 @@ export default function OnboardingTour() {
   const [stepIndex, setStepIndex] = useState(0);
   const [visible, setVisible] = useState(false);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
+
   const tooltipRef = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);
+
   const currentStep = TOUR_STEPS[stepIndex];
 
   const dismiss = useCallback(() => {
@@ -244,56 +251,96 @@ export default function OnboardingTour() {
     return new Promise((resolve) => {
       const attempt = (tries: number) => {
         const el = document.getElementById(id);
+
         if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+
           setTimeout(() => {
             const r = el.getBoundingClientRect();
+
             resolve({
               top: r.top,
               left: r.left,
               width: r.width,
               height: r.height,
             });
-          }, 400); // wait for scroll to finish
+          }, 400);
+
           return;
         }
+
         if (tries <= 0) {
           resolve(null);
           return;
         }
+
         setTimeout(() => attempt(tries - 1), 300);
       };
+
       attempt(5);
     });
   }, []);
 
-  // Initialise on mount
   useEffect(() => {
     if (localStorage.getItem(TOUR_KEY)) return;
+
     const t = setTimeout(async () => {
       const rect = await measureTarget(TOUR_STEPS[0]?.targetId ?? "");
+
       if (rect) {
         setTargetRect(rect);
         setVisible(true);
       }
     }, 600);
+
     return () => clearTimeout(t);
   }, [measureTarget]);
 
-  // Measure target whenever step changes (skip on first render — init effect handles that)
+  // Measure target whenever step changes
   useEffect(() => {
     if (!visible) return;
+
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
+
+    measureTarget(TOUR_STEPS[stepIndex]?.targetId ?? "").then((rect) => {
+      if (rect) {
+        setTargetRect(rect);
+
+        setTimeout(() => {
+          tooltipRef.current?.focus();
+        }, 50);
+      } else {
+        if (stepIndex < TOUR_STEPS.length - 1) {
+          setStepIndex((i) => i + 1);
+        } else {
+          dismiss();
+        }
+      }
+    });
+  }, [stepIndex, visible, measureTarget, dismiss]);
+
+  // Retry measuring the current target if necessary
+  useEffect(() => {
+    if (!visible) return;
+
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
     if (!currentStep) {
       dismiss();
       return;
     }
 
     let retryCount = 0;
-    const maxRetries = 10; // Retry up to ~5s with 500ms delays
+    const maxRetries = 10;
     let retryTimer: number | null = null;
     let cancelled = false;
 
@@ -301,17 +348,25 @@ export default function OnboardingTour() {
       measureTarget(currentStep.targetId)
         .then((rect) => {
           if (cancelled) return;
+
           if (rect) {
             setTargetRect(rect);
-            setTimeout(() => tooltipRef.current?.focus(), 50);
+
+            setTimeout(() => {
+              tooltipRef.current?.focus();
+            }, 50);
+
             retryCount = 0;
           } else if (retryCount < maxRetries) {
             retryCount++;
+
             retryTimer = window.setTimeout(tryMeasure, 500);
           } else {
-            // If we've retried enough, fallback to advancing or dismissing
-            if (stepIndex < TOUR_STEPS.length - 1) setStepIndex((i) => i + 1);
-            else dismiss();
+            if (stepIndex < TOUR_STEPS.length - 1) {
+              setStepIndex((i) => i + 1);
+            } else {
+              dismiss();
+            }
           }
         })
         .catch((error) => {
@@ -324,7 +379,10 @@ export default function OnboardingTour() {
 
     return () => {
       cancelled = true;
-      if (retryTimer !== null) clearTimeout(retryTimer);
+
+      if (retryTimer !== null) {
+        clearTimeout(retryTimer);
+      }
     };
   }, [stepIndex, visible, measureTarget, dismiss, currentStep]);
 
@@ -332,15 +390,22 @@ export default function OnboardingTour() {
   // requestAnimationFrame prevents layout thrashing on rapid scroll/resize events.
   useEffect(() => {
     if (!visible) return;
+
     let rafId: number;
+
     const remeasure = () => {
       cancelAnimationFrame(rafId);
+
       rafId = requestAnimationFrame(() => {
-        measureTarget(TOUR_STEPS[stepIndex]?.targetId ?? "").then(setTargetRect);
+        measureTarget(
+          TOUR_STEPS[stepIndex]?.targetId ?? ""
+        ).then(setTargetRect);
       });
     };
+
     window.addEventListener("resize", remeasure);
     window.addEventListener("scroll", remeasure, true);
+
     return () => {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", remeasure);
@@ -351,22 +416,33 @@ export default function OnboardingTour() {
   // Keyboard support
   useEffect(() => {
     if (!visible) return;
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") dismiss();
+      if (e.key === "Escape") {
+        dismiss();
+      }
+
       if (e.key === "ArrowRight" || e.key === "Enter") {
-        if (stepIndex < TOUR_STEPS.length - 1) setStepIndex((i) => i + 1);
-        else dismiss();
+        if (stepIndex < TOUR_STEPS.length - 1) {
+          setStepIndex((i) => i + 1);
+        } else {
+          dismiss();
+        }
       }
     };
+
     window.addEventListener("keydown", onKey);
+
     return () => window.removeEventListener("keydown", onKey);
   }, [visible, stepIndex, dismiss]);
 
   // Lock body scroll when tour is active
   useEffect(() => {
     if (!visible) return;
+
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
     return () => {
       document.body.style.overflow = originalOverflow;
     };
@@ -375,28 +451,41 @@ export default function OnboardingTour() {
   if (!visible || !targetRect || !currentStep) return null;
 
   return createPortal(
-    <>
-      {/* Clickable backdrop to skip */}
-      <div
-        className="fixed inset-0"
-        style={{ zIndex: 9997 }}
-        aria-hidden="true"
-        onClick={dismiss}
-      />
-      <Spotlight rect={targetRect} />
-      <Tooltip
-        step={currentStep}
-        stepIndex={stepIndex}
-        totalSteps={TOUR_STEPS.length}
-        rect={targetRect}
-        onNext={() => {
-          if (stepIndex < TOUR_STEPS.length - 1) setStepIndex((i) => i + 1);
-          else dismiss();
-        }}
-        onSkip={dismiss}
-        tooltipRef={tooltipRef}
-      />
-    </>,
+    <FocusTrap
+      active={visible}
+      focusTrapOptions={{
+        escapeDeactivates: true,
+        clickOutsideDeactivates: false,
+        fallbackFocus: () => tooltipRef.current!,
+      }}
+    >
+      <div>
+        <div
+          className="fixed inset-0"
+          style={{ zIndex: 9997 }}
+          aria-hidden="true"
+          onClick={dismiss}
+        />
+
+        <Spotlight rect={targetRect} />
+
+        <Tooltip
+          step={currentStep}
+          stepIndex={stepIndex}
+          totalSteps={TOUR_STEPS.length}
+          rect={targetRect}
+          onNext={() => {
+            if (stepIndex < TOUR_STEPS.length - 1) {
+              setStepIndex((i) => i + 1);
+            } else {
+              dismiss();
+            }
+          }}
+          onSkip={dismiss}
+          tooltipRef={tooltipRef}
+        />
+      </div>
+    </FocusTrap>,
     document.body,
   );
 }

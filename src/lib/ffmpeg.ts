@@ -2,7 +2,7 @@ import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, 
 import { getPresetById } from "./presets";
 import { buildTextFilter } from "./text-overlay";
 
-export class FFmpegLoadError extends Error {}
+export class FFmpegLoadError extends Error { }
 
 
 type SerializedFile = {
@@ -63,7 +63,7 @@ function createWorker(): Worker {
 
   // MUST be strictly inline for Next.js/Webpack to detect and compile the worker chunk
   ffmpegWorker = new Worker(new URL("./ffmpeg.worker.ts", import.meta.url), { type: "module" });
-  
+
   ffmpegWorker.onmessage = handleWorkerMessage;
   ffmpegWorker.onerror = (event) => {
     const message = event.message || "FFmpeg worker error";
@@ -165,8 +165,8 @@ export async function loadFFmpeg(
   onProgress?: (percent: number) => void
 ): Promise<void> {
   // 1. Capture if the worker is uninitialized before ensureWorker runs
-  const isFirstLoad = !ffmpegWorker; 
-  
+  const isFirstLoad = !ffmpegWorker;
+
   await ensureWorker();
 
   if (workerReady && workerReadyResolve === null) {
@@ -245,10 +245,10 @@ export async function exportVideo(
 
   const musicFilePayload = musicOptions?.file
     ? {
-        name: musicOptions.file.name,
-        type: musicOptions.file.type || "audio/mpeg",
-        data: await musicOptions.file.arrayBuffer(),
-      }
+      name: musicOptions.file.name,
+      type: musicOptions.file.type || "audio/mpeg",
+      data: await musicOptions.file.arrayBuffer(),
+    }
     : undefined;
 
   if (overlayOptions?.file && overlayOptions.file.size > MAX_FILE_SIZE) {
@@ -257,10 +257,10 @@ export async function exportVideo(
 
   const overlayFilePayload = overlayOptions?.file
     ? {
-        name: overlayOptions.file.name,
-        type: overlayOptions.file.type || "image/png",
-        data: await overlayOptions.file.arrayBuffer(),
-      }
+      name: overlayOptions.file.name,
+      type: overlayOptions.file.type || "image/png",
+      data: await overlayOptions.file.arrayBuffer(),
+    }
     : undefined;
 
   const sanitizedMusicOptions = musicOptions
@@ -441,9 +441,11 @@ export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: n
 
 export function buildAudioFilter(recipe: EditRecipe): string {
   if (recipe.speed <= 0) return "";
+
   const filters: string[] = [];
 
   let remaining = recipe.speed;
+
   while (remaining < 0.5) {
     filters.push("atempo=0.5");
     remaining /= 0.5;
@@ -527,38 +529,38 @@ function buildArguments(
       videoOut = "[vbase]";
     }
 
-if (hasOverlay) {
-  const scaledW = overlayOptions!.size;
-  const alpha = (overlayOptions!.opacity / 100).toFixed(2);
-  const posMap: Record<string, string> = {
-    "top-left":     "20:20",
-    "top-right":    "main_w-w-20:20",
-    "bottom-left":  "20:main_h-h-20",
-    "bottom-right": "main_w-w-20:main_h-h-20",
-  };
+    if (hasOverlay) {
+      const scaledW = overlayOptions!.size;
+      const alpha = (overlayOptions!.opacity / 100).toFixed(2);
+      const posMap: Record<string, string> = {
+        "top-left": "20:20",
+        "top-right": "main_w-w-20:20",
+        "bottom-left": "20:main_h-h-20",
+        "bottom-right": "main_w-w-20:main_h-h-20",
+      };
 
-interface PositionCoords {
-    x: number;
-    y: number;
-  }
+      interface PositionCoords {
+        x: number;
+        y: number;
+      }
 
-  const pos = typeof overlayOptions?.position === "string"
-    ? (posMap[overlayOptions.position] ?? "main_w-w-20:main_h-h-20")
-    : overlayOptions?.position
-    ? `(main_w)*${(overlayOptions.position as PositionCoords).x}/100:(main_h)*${(overlayOptions.position as PositionCoords).y}/100`
-    : "main_w-w-20:main_h-h-20";
+      const pos = typeof overlayOptions?.position === "string"
+        ? (posMap[overlayOptions.position] ?? "main_w-w-20:main_h-h-20")
+        : overlayOptions?.position
+          ? `(main_w)*${(overlayOptions.position as PositionCoords).x}/100:(main_h)*${(overlayOptions.position as PositionCoords).y}/100`
+          : "main_w-w-20:main_h-h-20";
 
-  filterParts.push(`[${overlayIdx}:v]scale=${scaledW}:-2,format=rgba,colorchannelmixer=aa=${alpha}[logo]`);
-  filterParts.push(`${videoOut}[logo]overlay=${pos}[vout]`);
-  videoOut = "[vout]";
-}
+      filterParts.push(`[${overlayIdx}:v]scale=${scaledW}:-2,format=rgba,colorchannelmixer=aa=${alpha}[logo]`);
+      filterParts.push(`${videoOut}[logo]overlay=${pos}[vout]`);
+      videoOut = "[vout]";
+    }
 
     let audioOut = "";
     if (shouldKeepAudio) {
       if (hasMusicTrack) {
         const musicVol = (musicOptions!.musicVolume / 100).toFixed(2);
         if (hasOriginalAudio) {
-          const origVol  = (musicOptions!.originalAudioVolume / 100).toFixed(2);
+          const origVol = (musicOptions!.originalAudioVolume / 100).toFixed(2);
           const origChain = afParts.length > 0
             ? `[0:a]${afParts.join(",")},volume=${origVol}[orig]`
             : `[0:a]volume=${origVol}[orig]`;
