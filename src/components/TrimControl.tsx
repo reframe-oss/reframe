@@ -21,9 +21,8 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
   const [invalidEnd, setEnd] = useState(false);
   const [startErrorMsg, setStartErrorMsg] = useState("");
   const [endErrorMsg, setEndErrorMsg] = useState("");
-  const [startInput, setStartInput] = useState(
-    recipe.trimStart.toString()
-  );
+  const [startInput, setStartInput] = useState(recipe.trimStart.toString());
+  const [endInput, setEndInput] = useState(recipe.trimEnd !== null ? recipe.trimEnd.toString() : "");
 
   const { waveform, isLoading: waveformLoading } = useAudioWaveform(file);
   const hasAudio = waveform.length > 0;
@@ -32,8 +31,11 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     setStartInput(recipe.trimStart.toString());
   }, [recipe.trimStart]);
 
-  const clipLength =
-    (recipe.trimEnd ?? duration) - recipe.trimStart;
+  useEffect(() => {
+    setEndInput(recipe.trimEnd !== null ? recipe.trimEnd.toString() : "");
+  }, [recipe.trimEnd]);
+
+  const clipLength = (recipe.trimEnd ?? duration) - recipe.trimStart;
 
   const trackRef = useRef<HTMLDivElement>(null);
   const dragging = useRef<"start" | "end" | null>(null);
@@ -57,39 +59,39 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     }
   }, [xToSeconds, duration, recipe.trimStart, recipe.trimEnd, onChange]);
 
- useEffect(() => {
-  const onMove = (e: MouseEvent | TouchEvent) => {
-    let clientX: number;
+  useEffect(() => {
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      let clientX: number;
 
-    if ("touches" in e) {
-      const touch = e.touches[0];
+      if ("touches" in e) {
+        const touch = e.touches[0];
 
-      if (!touch) return;
+        if (!touch) return;
 
-      clientX = touch.clientX;
-    } else {
-      clientX = e.clientX;
-    }
+        clientX = touch.clientX;
+      } else {
+        clientX = e.clientX;
+      }
 
-    applyDrag(clientX);
-  };
+      applyDrag(clientX);
+    };
 
-  const onUp = () => {
-    dragging.current = null;
-  };
+    const onUp = () => {
+      dragging.current = null;
+    };
 
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove);
-  document.addEventListener("touchend", onUp);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("touchmove", onMove);
+    document.addEventListener("touchend", onUp);
 
-  return () => {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.removeEventListener("touchmove", onMove);
-    document.removeEventListener("touchend", onUp);
-  };
-}, [applyDrag]);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+    };
+  }, [applyDrag]);
   const handleStart = (val: string) => {
     setStartInput(val);
 
@@ -132,10 +134,18 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     onChange({ trimStart: n });
   };
 
+  /**
+   * Handles changes to the trim-end input field.
+   * Uses local `endInput` state to avoid stripping decimals mid-entry
+   * (e.g. typing "2." would not be coerced to "2" before the user finishes).
+   */
   const handleEnd = (val: string) => {
+    setEndInput(val);
+
     if (val === "") {
       onChange({ trimEnd: null });
       setEnd(false);
+      setEndErrorMsg("");
       return;
     }
 
@@ -290,7 +300,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             min={0}
             max={duration > 0 ? duration : undefined}
             step={0.1}
-            value={recipe.trimEnd ?? ""}
+            value={endInput}
             spellCheck={false}
             onChange={(e) => handleEnd(e.target.value)}
             aria-label="Trim end time in seconds"
@@ -328,5 +338,3 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
     </div>
   );
 }
-
-
