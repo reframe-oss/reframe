@@ -79,11 +79,11 @@ export default function RootLayout({
           <ErrorBoundary>
             <header
               role="banner"
-              className="sticky top-0 z-50 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)]/95 px-6 py-3 backdrop-blur"
+              className="sticky top-0 z-50 flex items-center justify-between border-b-2 rounded-b-lg  border-[#0070b6] bg-[#f1f5f9] px-6 py-3  backdrop-blur "
             >
               <div className="flex items-center gap-2">
                 <BrandLogo size={24} />
-                <h1 className="text-lg font-semibold">Reframe</h1>
+                <h1 className="text-lg font-bold dark:text-[#000000]">Reframe</h1>
               </div>
               <ThemeToggle />
             </header>

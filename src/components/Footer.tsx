@@ -18,20 +18,20 @@ import {
 
 export default function Footer() {
   return (
-    <footer className="w-full border-t border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-6 py-16 mt-20 transition-colors duration-300">
+    <footer className="w-full border-t border-black bg-[#c3c4c7] text-[#030201] px-6 py-16 mt-20 transition-colors duration-300 dark:bg-[#6b7280] dark:text-[#f9fafb]">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-y-12 md:gap-x-12">
         {/* Brand Section */}
         <div className="md:col-span-5 space-y-6">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Reframe</h2>
-            <p className="text-[10px] font-mono tracking-[0.35em] uppercase opacity-50 mt-1">
+            <h2 className="text-3xl font-extrabold tracking-tight">Reframe</h2>
+            <p className="text-[10px]  font-mono tracking-[0.35em] uppercase mt-1">
               Browser Video Studio
             </p>
           </div>
 
-          <p className="text-sm opacity-70 leading-relaxed max-w-md">
+          <p className="text-sm  leading-relaxed max-w-md">
             Professional video processing directly in your browser using{" "}
-            <span className="font-medium opacity-100">FFmpeg.wasm</span> — fast,
+            <span className="font-medium">FFmpeg.wasm</span> — fast,
             private, and open source.
           </p>
 
@@ -43,7 +43,7 @@ export default function Footer() {
             ].map((tag) => (
               <span
                 key={tag.label}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[10px] font-semibold tracking-wide uppercase opacity-80 hover:opacity-100 hover:border-[var(--accent)] transition-all"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[10px] font-bold tracking-wide uppercase opacity-100 hover:opacity-80 hover:border-[var(--accent)] transition-all hover:scale-[0.99] "
               >
                 {tag.icon}
                 {tag.label}
@@ -54,27 +54,27 @@ export default function Footer() {
 
         {/* Navigation */}
         <div className="md:col-span-3 space-y-5">
-          <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] ">
             Navigation
           </h3>
 
-          <nav className="flex flex-col gap-3 text-sm">
+          <nav className="flex flex-col gap-5 text-sm ">
             <a
               href="https://github.com/reframe-oss/reframe"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="GitHub repository"
-              className="flex items-center gap-2 opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+              className="flex items-center gap-2  hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
             >
               <Github size={14} />
               GitHub
-              <ExternalLink size={10} className="opacity-60" />
+              <ExternalLink size={10} className="opacity-100" />
             </a>
 
             <Link
               href="/contact"
               aria-label="Contact page"
-              className="flex items-center gap-2 opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+              className="flex items-center gap-2  hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
             >
               <Mail size={14} />
               Contact
@@ -83,7 +83,7 @@ export default function Footer() {
             <Link
               href="/privacy"
               aria-label="Privacy policy"
-              className="flex items-center gap-2 opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+              className="flex items-center gap-2  hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
             >
               <Lock size={14} />
               Privacy Policy
@@ -111,12 +111,12 @@ export default function Footer() {
           {/* Newsletter */}
 
           <div className="space-y-3">
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] ">
               Updates
             </h3>
 
             <form
-              className="flex items-center w-full sm:w-80 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 focus-within:border-[var(--accent)] transition"
+              className="flex items-center w-full sm:w-80 bg-[var(--surface)] border border rounded-lg  px-3 focus-within:border-[var(--accent)] transition"
               onSubmit={(e) => e.preventDefault()}
               aria-label="Newsletter signup"
             >
@@ -125,15 +125,15 @@ export default function Footer() {
                 required
                 placeholder="Enter your email"
                 aria-label="Email address"
-                className="w-full bg-transparent py-3 text-[11px] font-semibold tracking-widest uppercase placeholder:opacity-30 focus:outline-none"
+                className="w-full bg-transparent py-3 text-[11px] border border-none font-semibold tracking-widest uppercase placeholder:opacity-100 focus:outline-none focus:ring-0"
               />
 
               <button
                 type="submit"
                 aria-label="Subscribe to updates"
-                onMouseDown={(e) => e.preventDefault()} className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+                onMouseDown={(e) => e.preventDefault()} className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded hover:scale-[1.05] hover:color-[#2c3338] active:color-[#1d2327]"
               >
-                <ArrowRight size={16} />
+                <ArrowRight size={30} strokeWidth={3} color="#c3c4c7" />
               </button>
             </form>
           </div>
@@ -141,7 +141,7 @@ export default function Footer() {
           {/* Community */}
 
           <div className="space-y-3">
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] ">
               Community
             </h3>
 
@@ -178,7 +178,7 @@ export default function Footer() {
                   aria-label={social.label}
                   className="relative group p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
                 >
-                  <span className="opacity-70 group-hover:opacity-100">
+                  <span className="opacity-100 group-hover:opacity-75 transition-opacity transition-duration-100">
                     {social.icon}
 
                   </span>
@@ -190,7 +190,7 @@ export default function Footer() {
       </div>
 
       {/* Bottom Bar */}
-      <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-semibold uppercase tracking-[0.25em] opacity-50">
+      <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-bold uppercase tracking-[0.25em] ">
         <p>© {new Date().getFullYear()} Reframe · MIT License</p>
 
         <div className="flex items-center gap-6">

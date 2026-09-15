@@ -9,7 +9,7 @@ export default function Home() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="View Reframe on GitHub"
-        className="hidden sm:flex fixed top-4 right-4 md:right-16 z-50 items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[10px] font-heading font-semibold uppercase tracking-wider transition-all duration-200 ease-in-out hover:scale-105 hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] hover:shadow-[var(--shadow)]"
+        className="hidden sm:flex fixed top-4 right-4 md:right-16 z-50 mr-5 items-center gap-3 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[10px] font-heading font-semibold uppercase tracking-wider transition-all duration-200 ease-in-out hover:scale-105 hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] hover:shadow-[var(--shadow)]"
       >
         ⭐ Star on GitHub
       </a>
