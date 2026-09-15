@@ -63,6 +63,10 @@ function getTooltipStyle(
   const tw = tooltip?.offsetWidth ?? 320;
   const th = tooltip?.offsetHeight ?? 140;
 
+  const VIEWPORT_MARGIN = 12; // minimum gap from viewport edge
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
   const sr = {
     top: rect.top - PADDING,
     left: rect.left - PADDING,
@@ -70,29 +74,71 @@ function getTooltipStyle(
     height: rect.height + PADDING * 2,
   };
 
-  switch (position) {
-    case "top":
-      return {
-        top: sr.top - th - TOOLTIP_OFFSET,
-        left: sr.left + sr.width / 2 - tw / 2,
-      };
-    case "left":
-      return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left - tw - TOOLTIP_OFFSET,
-      };
-    case "right":
-      return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left + sr.width + TOOLTIP_OFFSET,
-      };
-    case "bottom":
-    default:
-      return {
-        top: sr.top + sr.height + TOOLTIP_OFFSET,
-        left: sr.left + sr.width / 2 - tw / 2,
-      };
+  // Compute position for a given side
+  const calcPos = (side: TourStep["position"]): { top: number; left: number } => {
+    switch (side) {
+      case "top":
+        return {
+          top: sr.top - th - TOOLTIP_OFFSET,
+          left: sr.left + sr.width / 2 - tw / 2,
+        };
+      case "left":
+        return {
+          top: sr.top + sr.height / 2 - th / 2,
+          left: sr.left - tw - TOOLTIP_OFFSET,
+        };
+      case "right":
+        return {
+          top: sr.top + sr.height / 2 - th / 2,
+          left: sr.left + sr.width + TOOLTIP_OFFSET,
+        };
+      case "bottom":
+      default:
+        return {
+          top: sr.top + sr.height + TOOLTIP_OFFSET,
+          left: sr.left + sr.width / 2 - tw / 2,
+        };
+    }
+  };
+
+  // Check if a position fits within the viewport
+  const fits = (pos: { top: number; left: number }): boolean =>
+    pos.top >= VIEWPORT_MARGIN &&
+    pos.left >= VIEWPORT_MARGIN &&
+    pos.top + th <= vh - VIEWPORT_MARGIN &&
+    pos.left + tw <= vw - VIEWPORT_MARGIN;
+
+  const opposite: Record<string, TourStep["position"]> = {
+    top: "bottom",
+    bottom: "top",
+    left: "right",
+    right: "left",
+  };
+
+  // Try preferred side first, then opposite, then remaining sides
+  let pos = calcPos(position);
+  if (!fits(pos)) {
+    const oppPos = calcPos(opposite[position ?? "bottom"]);
+    if (fits(oppPos)) {
+      pos = oppPos;
+    } else {
+      // Try all sides and pick the first that fits
+      const sides: TourStep["position"][] = ["bottom", "right", "top", "left"];
+      for (const side of sides) {
+        const sidePos = calcPos(side);
+        if (fits(sidePos)) {
+          pos = sidePos;
+          break;
+        }
+      }
+    }
   }
+
+  // Final clamp: ensure tooltip never exceeds viewport bounds
+  pos.top = Math.max(VIEWPORT_MARGIN, Math.min(pos.top, vh - th - VIEWPORT_MARGIN));
+  pos.left = Math.max(VIEWPORT_MARGIN, Math.min(pos.left, vw - tw - VIEWPORT_MARGIN));
+
+  return { top: pos.top, left: pos.left };
 }
 
 interface SpotlightProps {
