@@ -421,10 +421,16 @@ export default function VideoEditor() {
               <FileUpload onFileSelect={handleFileSelect} currentFile={file} fileError={fileError} duration={duration} />
 
               {!file && (
+ fix-remove-console-log
                 <div className="text-center text-[var(--muted)] py-6">
                   <p>Upload a video to get started</p>
                   <p className="text-sm">Supports MP4, MOV, WebM and more</p>
                 </div>
+              <div className="text-center text-[var(--muted)] py-6">
+                <p>Upload a video to get started</p>
+              
+              </div>
+ main
               )}
 
               {file && (
