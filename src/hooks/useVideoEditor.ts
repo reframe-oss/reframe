@@ -332,6 +332,7 @@ export function useVideoEditor() {
       const recipeKeys = Object.keys(DEFAULT_RECIPE) as Array<keyof EditRecipe>;
 
       recipeKeys.forEach((key) => {
+        if (key === "textOverlays") return;
         const currentVal = recipe[key];
         const defaultVal = DEFAULT_RECIPE[key];
 
