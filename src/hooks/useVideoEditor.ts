@@ -614,38 +614,13 @@ export function useVideoEditor() {
     };
   }, [file, status, handleExport]);
 
-  // M key: toggle audio mute — only when a file is loaded and focus isn't in a text field
   useEffect(() => {
-    if (!file) return;
-
-    const handleMuteShortcut = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== "m" || e.ctrlKey || e.metaKey || e.altKey) return;
-
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-
-      setRecipe((prev) => ({ ...prev, keepAudio: !prev.keepAudio }));
-    };
-
-    document.addEventListener("keydown", handleMuteShortcut);
     return () => {
-      document.removeEventListener("keydown", handleMuteShortcut);
-    };
-  }, [file]);
-
-  useEffect(()=>{
-    return ()=>{
-      if(result?.blobUrl){
+      if (result?.blobUrl) {
         URL.revokeObjectURL(result.blobUrl);
       }
-    }
-   },[result?.blobUrl])
+    };
+  }, [result?.blobUrl]);
 
   useEffect(() => {
     return () => {
