@@ -11,6 +11,7 @@ const meta = {
   component: ExportSettings,
   parameters: { layout: "padded" },
   args: {
+    videoFile: null,
     recipe: makeRecipe(),
     onChange: () => {},
     duration: 90,
@@ -19,6 +20,7 @@ const meta = {
     <RecipeHarness initial={args.recipe}>
       {(recipe, onChange) => (
         <ExportSettings
+          videoFile={args.videoFile}
           recipe={recipe}
           onChange={onChange}
           duration={args.duration}
