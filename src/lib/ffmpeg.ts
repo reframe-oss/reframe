@@ -614,6 +614,13 @@ interface PositionCoords {
     if (shouldKeepAudio) args.push("-c:a", "aac", "-b:a", "128k");
   }
 
+  // Constrain output duration so exports always terminate.
+  // When source has no audio, and we loop/map background music directly,
+  // the output can otherwise run until the audio stream ends (or forever with -stream_loop -1).
+  if (hasMusicTrack && !hasOriginalAudio) {
+    args.push("-shortest");
+  }
+
   // Add explicit output duration when speed != 1 to prevent slight duration
   // overshoot caused by encoder/filter pipeline frame flush at stream end.
   if (recipe.speed !== 1) {
