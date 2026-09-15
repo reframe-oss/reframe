@@ -37,6 +37,10 @@ export interface EditRecipe {
   soundOnCompletion: boolean;
   sharpness: number;
   textOverlays: TextOverlay[];
+  chromaKeyEnabled: boolean;
+  chromaKeyColor: string;
+  chromaKeySimilarity: number;
+  chromaKeyBlend: number;
   version: number;
 }
 
@@ -147,6 +151,11 @@ export function isValidRecipe(value: unknown): value is EditRecipe {
   if (typeof v.saturation !== "number" || !isFinite(v.saturation)) return false;
   if (typeof v.soundOnCompletion !== "boolean") return false;
   if (!Array.isArray(v.textOverlays)) return false;
+  
+  if (typeof v.chromaKeyEnabled !== "boolean") return false;
+  if (typeof v.chromaKeyColor !== "string") return false;
+  if (typeof v.chromaKeySimilarity !== "number" || !isFinite(v.chromaKeySimilarity)) return false;
+  if (typeof v.chromaKeyBlend !== "number" || !isFinite(v.chromaKeyBlend)) return false;
 
   return true;
 }

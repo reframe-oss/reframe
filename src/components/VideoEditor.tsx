@@ -18,6 +18,7 @@ import ExportSettings from "./ExportSettings";
 import ExportOverlay from "./ExportOverlay";
 import DownloadResult from "./DownloadResult";
 import ImageOverlay from "./ImageOverlay"
+import ChromaKeyControl from "./ChromaKeyControl"
 import { getPresetById } from "@/lib/presets";
 
 import { cn } from "@/lib/utils";
@@ -625,6 +626,7 @@ export default function VideoEditor() {
                       </div>
                     </div>
                   </Section>
+                  <ChromaKeyControl recipe={recipe} onChange={updateRecipe} />
                   <Section icon={<SlidersHorizontal size={12} />} title="Output format" delay={190}>
                     <FormatSelector recipe={recipe} onChange={updateRecipe} />
                   </Section>

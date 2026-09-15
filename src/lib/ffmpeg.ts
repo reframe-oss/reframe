@@ -377,6 +377,10 @@ export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: n
     }
   }
 
+  if (recipe.chromaKeyEnabled && recipe.chromaKeyColor) {
+    filters.push(`colorkey=${recipe.chromaKeyColor}:${recipe.chromaKeySimilarity}:${recipe.chromaKeyBlend}`);
+  }
+
   if (recipe.stabilization) {
     filters.push("deshake");
   }
