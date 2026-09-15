@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Film, FolderOpen } from "lucide-react";
+import { Film, FolderOpen, Info } from "lucide-react";
 import LottiePlayer from "./LottiePlayer";
 import uploadAnim from "@/lib/lottie/upload.json";
 import { cn, formatBytes, formatDuration } from "@/lib/utils";
@@ -12,6 +12,82 @@ interface Props {
   currentFile: File | null;
   fileError: string;
   duration: number;
+}
+
+function UploadRequirements() {
+  return (
+    <section
+      aria-labelledby="upload-requirements-title"
+      className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow)]"
+    >
+      <div className="flex items-start gap-3">
+        <div
+          aria-hidden="true"
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-film-600"
+        >
+          <Info size={16} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3
+            id="upload-requirements-title"
+            className="font-heading text-sm font-semibold text-[var(--text)]"
+          >
+            Upload requirements
+          </h3>
+
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Check these details before choosing a video.
+          </p>
+
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold text-[var(--text)]">
+                File size
+              </dt>
+              <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                Up to {formatBytes(MAX_FILE_SIZE)}. Files over{" "}
+                {formatBytes(WARNING_FILE_SIZE)} may process more slowly.
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-xs font-semibold text-[var(--text)]">
+                Supported formats
+              </dt>
+              <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                MP4, MOV, AVI, MKV and WebM.
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-xs font-semibold text-[var(--text)]">
+                Best compatibility
+              </dt>
+              <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                MP4 with H.264 video and AAC audio is recommended.
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-xs font-semibold text-[var(--text)]">
+                Processing
+              </dt>
+              <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                Processing happens locally in your browser using FFmpeg.wasm.
+              </dd>
+            </div>
+          </dl>
+
+          <p className="mt-3 border-t border-[var(--border)] pt-3 text-xs leading-5 text-[var(--muted)]">
+            Large, high-resolution or complex videos can exceed browser memory,
+            especially on devices with limited RAM. For smoother exports, close
+            unused tabs and use the recommended MP4 format.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 // ── File info (shown after upload) ─────────────────────
@@ -329,23 +405,26 @@ export default function FileUpload({
             onChangeClick={() => inputRef.current?.click()}
           />
         ) : (
-          <DropZone
-            dragging={dragging}
-            error={error}
-            fileError={fileError}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            onClick={() => inputRef.current?.click()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                inputRef.current?.click();
-              }
-            }}
-          />
+          <div className="space-y-3">
+            <DropZone
+              dragging={dragging}
+              error={error}
+              fileError={fileError}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              onClick={() => inputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  inputRef.current?.click();
+                }
+              }}
+            />
+            <UploadRequirements />
+          </div>
         )}
         <input
           ref={inputRef}
