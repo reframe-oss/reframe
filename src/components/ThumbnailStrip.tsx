@@ -409,6 +409,13 @@ export default function ThumbnailStrip({
           z-index: 3;
         }
 
+        .thumb-btn:focus-visible {
+          transform: translateY(-3px) scale(1.04);
+          box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), var(--shadow);
+          outline: none;
+          z-index: 4;
+        }
+
         .thumb-btn.active img {
           filter: brightness(1.1);
         }

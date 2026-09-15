@@ -249,7 +249,7 @@ export default function DraggableTextOverlays({
               editingId === overlay.id ? "cursor-text" : "cursor-move"
             } select-none transition-all ${
               isDragging ? "scale-105" : "scale-100"
-            } ${
+            } focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:outline-none focus-visible:ring-offset-black/50 ${
               isSelected
                 ? "ring-2 ring-film-500 ring-offset-1 ring-offset-black/50"
                 : ""

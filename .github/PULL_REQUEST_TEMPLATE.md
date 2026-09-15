@@ -26,6 +26,8 @@
 - [ ] `bun run lint` passes (no ESLint errors)
 - [ ] `bunx tsc --noEmit` passes (no TypeScript errors)
 - [ ] New interactive elements have `aria-label` / accessible names
+- [ ] Keyboard navigation: I have verified that all new/modified interactive elements can be focused using `Tab` and activated using `Space`/`Enter`
+- [ ] Keyboard focus states: I have verified focus indicators are clearly visible and theme-aware (have sufficient color contrast in light, dark, and high-contrast modes)
 - [ ] No `console.log` statements left in
 - [ ] This PR is related to a valid issue
 - [ ] **Screen recording attached above** (required for UI/feature/design changes)

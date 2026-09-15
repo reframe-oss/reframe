@@ -158,10 +158,17 @@ textarea:focus {
 }
 
 :focus-visible {
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--accent-muted);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
   border-radius: var(--radius);
 }
+
+[data-theme="high-contrast"] :focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+  box-shadow: none !important;
+}
+
 
 detail > summary {
   list-style: none;
