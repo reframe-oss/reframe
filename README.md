@@ -479,14 +479,13 @@ Made with ❤️ for everyone who just wants to edit a video without the hassle.
 ## Troubleshooting
 
 ### Installation fails
-- Ensure you are using the supported Node.js version.
-- Run `npm install` or `npm ci`.
-- Delete `node_modules` and reinstall dependencies if necessary.
+- Ensure you're on [Bun](https://bun.sh) (this project uses `bun.lock`, not npm/yarn) with Node.js 20.9+.
+- Run `bun install`.
+- Delete `node_modules` and `bun.lock`, then reinstall if issues persist.
 
 ### Environment variables not loading
-- Verify that a `.env` file exists.
-- Ensure all required variables are defined.
-- Restart the development server after making changes.
+- Verify that a `.env.local` file exists (see `.env.example` for the required keys).
+- Restart the development server after making changes — env vars are only read at startup.
 
 ## FAQ
 
@@ -494,8 +493,8 @@ Made with ❤️ for everyone who just wants to edit a video without the hassle.
 Run:
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 ### How do I report a bug?
