@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useVideoEditor } from "@/hooks/useVideoEditor";
 import { TextOverlay } from "@/lib/types";
 import FileUpload from "./FileUpload";
 import PrivacyBanner from "./PrivacyBanner";
 import VideoPreview from "./VideoPreview";
-import ThumbnailStrip from "./ThumbnailStrip";
 import PresetSelector from "./PresetSelector";
 import FramingControl from "./FramingControl";
 import TrimControl from "./TrimControl";
@@ -17,15 +17,32 @@ import FormatSelector from "./FormatSelector";
 import ExportSettings from "./ExportSettings";
 import ExportOverlay from "./ExportOverlay";
 import DownloadResult from "./DownloadResult";
-import ImageOverlay from "./ImageOverlay"
+import ImageOverlay from "./ImageOverlay";
 import { getPresetById } from "@/lib/presets";
+
+/**
+ * ThumbnailStrip is only rendered after a file is uploaded.
+ * Lazy-load it to keep the initial JS bundle smaller.
+ */
+const ThumbnailStrip = dynamic(() => import("./ThumbnailStrip"), {
+  ssr: false,
+  loading: () => <div className="h-12 w-full animate-pulse rounded bg-[var(--border)]" />,
+});
+
+/**
+ * OnboardingTour is shown only once on first visit — defer it entirely
+ * so it never blocks the initial render.
+ */
+const OnboardingTour = dynamic(() => import("./OnboardingTour"), {
+  ssr: false,
+  loading: () => null,
+});
 
 import { cn } from "@/lib/utils";
 import {
   Layers, Crop, Scissors, RotateCw, Volume2, Type,
   SlidersHorizontal, Zap, AlertTriangle, Github, Copy
 } from "lucide-react";
-import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { loadOverlayState, persistOverlayState } from "@/lib/editorPersistence";
 

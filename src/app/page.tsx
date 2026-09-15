@@ -1,5 +1,33 @@
-import VideoEditor from "@/components/VideoEditor";
-import Footer from "@/components/Footer";
+"use client";
+
+import dynamic from "next/dynamic";
+import { Suspense } from "react";
+
+/**
+ * Lazy-load VideoEditor (the heaviest component ~32 KB).
+ * `ssr: false` is required because VideoEditor uses browser-only APIs
+ * (e.g. URL.createObjectURL, navigator, ffmpeg.wasm).
+ */
+const VideoEditor = dynamic(() => import("@/components/VideoEditor"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-3 text-[var(--muted)]">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+        <p className="text-xs font-mono uppercase tracking-widest opacity-60">Loading editor…</p>
+      </div>
+    </div>
+  ),
+});
+
+/**
+ * Footer lives below the fold — load it lazily so it never blocks
+ * the critical rendering path.
+ */
+const Footer = dynamic(() => import("@/components/Footer"), {
+  ssr: false,
+  loading: () => null,
+});
 
 export default function Home() {
   return (
@@ -15,10 +43,15 @@ export default function Home() {
       </a>
 
       <main id="main-content" tabIndex={-1}>
-        <VideoEditor />
+        <Suspense fallback={null}>
+          <VideoEditor />
+        </Suspense>
       </main>
 
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
     </>
   );
 }
+
