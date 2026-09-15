@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 
 const TOUR_KEY = "reframe_onboarding_complete";
@@ -26,7 +26,7 @@ const TOUR_STEPS: TourStep[] = [
     title: "Pick an output format",
     description:
       "Choose a preset optimised for your platform — Instagram, YouTube, TikTok and more.",
-    position: "left",
+    position: "bottom",
   },
   {
     targetId: "trim",
@@ -34,6 +34,7 @@ const TOUR_STEPS: TourStep[] = [
     description:
       "After uploading, set in/out points and tweak colour in the controls that appear on the left.",
     position: "left",
+    requiresFile: true,
   },
   {
     targetId: "export-button",
@@ -41,11 +42,13 @@ const TOUR_STEPS: TourStep[] = [
     description:
       "Click Export (or press ⌘↵) to process your video locally — nothing ever leaves your device.",
     position: "top",
+    requiresFile: true,
   },
 ];
 
-const PADDING = 12; // spotlight padding around target element
+const PADDING = 12;
 const TOOLTIP_OFFSET = 16;
+const VIEWPORT_MARGIN = 8;
 
 interface Rect {
   top: number;
@@ -63,6 +66,9 @@ function getTooltipStyle(
   const tw = tooltip?.offsetWidth ?? 320;
   const th = tooltip?.offsetHeight ?? 140;
 
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
   const sr = {
     top: rect.top - PADDING,
     left: rect.left - PADDING,
@@ -70,34 +76,42 @@ function getTooltipStyle(
     height: rect.height + PADDING * 2,
   };
 
+  let top: number;
+  let left: number;
+
   switch (position) {
     case "top":
-      return {
-        top: sr.top - th - TOOLTIP_OFFSET,
-        left: sr.left + sr.width / 2 - tw / 2,
-      };
+      top = sr.top - th - TOOLTIP_OFFSET;
+      left = sr.left + sr.width / 2 - tw / 2;
+      break;
     case "left":
-      return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left - tw - TOOLTIP_OFFSET,
-      };
+      top = sr.top + sr.height / 2 - th / 2;
+      left = sr.left - tw - TOOLTIP_OFFSET;
+      break;
     case "right":
-      return {
-        top: sr.top + sr.height / 2 - th / 2,
-        left: sr.left + sr.width + TOOLTIP_OFFSET,
-      };
+      top = sr.top + sr.height / 2 - th / 2;
+      left = sr.left + sr.width + TOOLTIP_OFFSET;
+      break;
     case "bottom":
     default:
-      return {
-        top: sr.top + sr.height + TOOLTIP_OFFSET,
-        left: sr.left + sr.width / 2 - tw / 2,
-      };
+      top = sr.top + sr.height + TOOLTIP_OFFSET;
+      left = sr.left + sr.width / 2 - tw / 2;
+      break;
   }
+
+  // Clamp within viewport so the tooltip is never cut off
+  left = Math.max(VIEWPORT_MARGIN, Math.min(left, vw - tw - VIEWPORT_MARGIN));
+  top = Math.max(VIEWPORT_MARGIN, Math.min(top, vh - th - VIEWPORT_MARGIN));
+
+  return { top, left };
+
+  return { top, left };
 }
 
 interface SpotlightProps {
   rect: Rect;
 }
+
 
 function Spotlight({ rect }: SpotlightProps) {
   const r = {
@@ -132,7 +146,6 @@ function Spotlight({ rect }: SpotlightProps) {
         fill="rgba(0,0,0,0.65)"
         mask="url(#spotlight-mask)"
       />
-      {/* Highlight ring */}
       <rect
         x={r.left}
         y={r.top}
@@ -166,6 +179,11 @@ function Tooltip({
   onSkip,
   tooltipRef,
 }: TooltipProps) {
+  const [, forceUpdate] = useState(0);
+  useLayoutEffect(() => {
+    forceUpdate((n) => n + 1);
+  }, [stepIndex]);
+
   const style = getTooltipStyle(rect, step.position, tooltipRef);
   const isLast = stepIndex === totalSteps - 1;
 
@@ -175,7 +193,7 @@ function Tooltip({
       role="dialog"
       aria-modal="true"
       aria-label={`Onboarding step ${stepIndex + 1} of ${totalSteps}: ${step.title}`}
-      className="fixed z-[9999] w-80 rounded-xl shadow-2xl border
+  className="fixed z-[9999] w-80 max-w-[calc(100vw-16px)] rounded-xl shadow-2xl border
         bg-[var(--surface)]
         border-[var(--border)]
         text-[var(--text)]
@@ -183,7 +201,6 @@ function Tooltip({
       style={{ ...style }}
       tabIndex={-1}
     >
-      {/* Progress bar */}
       <div className="h-1 rounded-t-xl overflow-hidden bg-[var(--border)]">
         <div
           className="h-full bg-indigo-500 transition-all duration-300"
@@ -192,7 +209,6 @@ function Tooltip({
       </div>
 
       <div className="p-5">
-        {/* Step counter */}
         <p className="text-xs font-semibold tracking-widest uppercase text-indigo-500 mb-1">
           Step {stepIndex + 1} of {totalSteps}
         </p>
@@ -227,7 +243,7 @@ function Tooltip({
   );
 }
 
-export default function OnboardingTour() {
+export default function OnboardingTour({ hasFile = false }: { hasFile?: boolean }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [visible, setVisible] = useState(false);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
@@ -254,7 +270,7 @@ export default function OnboardingTour() {
               width: r.width,
               height: r.height,
             });
-          }, 400); // wait for scroll to finish
+          }, 400);
           return;
         }
         if (tries <= 0) {
@@ -267,7 +283,6 @@ export default function OnboardingTour() {
     });
   }, []);
 
-  // Initialise on mount
   useEffect(() => {
     if (localStorage.getItem(TOUR_KEY)) return;
     const t = setTimeout(async () => {
@@ -280,7 +295,6 @@ export default function OnboardingTour() {
     return () => clearTimeout(t);
   }, [measureTarget]);
 
-  // Measure target whenever step changes (skip on first render — init effect handles that)
   useEffect(() => {
     if (!visible) return;
     if (isFirstRender.current) {
@@ -292,8 +306,14 @@ export default function OnboardingTour() {
       return;
     }
 
+    if (currentStep.requiresFile && !hasFile) {
+      if (stepIndex < TOUR_STEPS.length - 1) setStepIndex((i) => i + 1);
+      else dismiss();
+      return;
+    }
+
     let retryCount = 0;
-    const maxRetries = 10; // Retry up to ~5s with 500ms delays
+    const maxRetries = 10;
     let retryTimer: number | null = null;
     let cancelled = false;
 
@@ -309,7 +329,6 @@ export default function OnboardingTour() {
             retryCount++;
             retryTimer = window.setTimeout(tryMeasure, 500);
           } else {
-            // If we've retried enough, fallback to advancing or dismissing
             if (stepIndex < TOUR_STEPS.length - 1) setStepIndex((i) => i + 1);
             else dismiss();
           }
@@ -326,10 +345,8 @@ export default function OnboardingTour() {
       cancelled = true;
       if (retryTimer !== null) clearTimeout(retryTimer);
     };
-  }, [stepIndex, visible, measureTarget, dismiss, currentStep]);
+  }, [stepIndex, visible, measureTarget, dismiss, currentStep, hasFile]);
 
-  // Re-measure on resize or scroll so spotlight stays anchored to target.
-  // requestAnimationFrame prevents layout thrashing on rapid scroll/resize events.
   useEffect(() => {
     if (!visible) return;
     let rafId: number;
@@ -348,7 +365,6 @@ export default function OnboardingTour() {
     };
   }, [visible, stepIndex, measureTarget]);
 
-  // Keyboard support
   useEffect(() => {
     if (!visible) return;
     const onKey = (e: KeyboardEvent) => {
@@ -376,8 +392,7 @@ export default function OnboardingTour() {
 
   return createPortal(
     <>
-      {/* Clickable backdrop to skip */}
-      <div
+       <div
         className="fixed inset-0"
         style={{ zIndex: 9997 }}
         aria-hidden="true"
