@@ -44,20 +44,24 @@ export default function FileUpload({
   // Uses a counter so nested dragenter/dragleave don't flicker
   useEffect(() => {
     const onDragEnter = (e: DragEvent) => {
-      e.preventDefault();
-      dragCounterRef.current += 1;
-      if (dragCounterRef.current === 1) setPageDragging(true);
-    };
+  if (!e.dataTransfer?.types?.includes("Files")) return;
+  e.preventDefault();
+  dragCounterRef.current += 1;
+  if (dragCounterRef.current === 1) setPageDragging(true);
+};
 
     const onDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      dragCounterRef.current -= 1;
-      if (dragCounterRef.current === 0) setPageDragging(false);
-    };
+  if (!e.dataTransfer?.types?.includes("Files")) return;
+  e.preventDefault();
+  dragCounterRef.current -= 1;
+  if (dragCounterRef.current === 0) setPageDragging(false);
+};
 
-    const onDragOver = (e: DragEvent) => {
-      e.preventDefault(); // required to allow drop
-    };
+const onDragOver = (e: DragEvent) => {
+  if (!e.dataTransfer?.types?.includes("Files")) return;
+  e.preventDefault();
+};
+    ;
 
     const onDrop = (e: DragEvent) => {
       e.preventDefault();
