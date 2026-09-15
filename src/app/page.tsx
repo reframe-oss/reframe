@@ -3,7 +3,7 @@ import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
-    <>
+    <div className="min-h-screen flex flex-col bg-[var(--bg)]">
       <a
         href="https://github.com/reframe-oss/reframe"
         target="_blank"
@@ -14,11 +14,11 @@ export default function Home() {
         ⭐ Star on GitHub
       </a>
 
-      <main id="main-content" tabIndex={-1}>
+      <main id="main-content" tabIndex={-1} className="flex-1">
         <VideoEditor />
       </main>
 
       <Footer />
-    </>
+    </div>
   );
 }
