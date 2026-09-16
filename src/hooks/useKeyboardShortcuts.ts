@@ -11,6 +11,7 @@ interface UseKeyboardShortcutsProps {
   status: ExportStatus;
   cancelExport: () => void;
   onToggleShortcutsModal: () => void;
+  onReplayTour: () => void;
   currentTime: number;
   duration: number;
 }
@@ -24,6 +25,7 @@ export function useKeyboardShortcuts({
   status,
   cancelExport,
   onToggleShortcutsModal,
+  onReplayTour,
   currentTime,
   duration,
 }: UseKeyboardShortcutsProps) {
@@ -78,6 +80,10 @@ export function useKeyboardShortcuts({
         case "O":
           updateRecipe({trimEnd: Math.floor(currentTimeRef.current)});
           break;
+        case "t":
+        case "T":
+          onReplayTour();
+          break;
 
         default:
           if (e.key >= "1" && e.key <= "9") {
@@ -91,5 +97,5 @@ export function useKeyboardShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [file, recipe, resetSettings, updateRecipe, handleExport, status, cancelExport, onToggleShortcutsModal, currentTime, duration]);
+  }, [file, recipe, resetSettings, updateRecipe, handleExport, status, cancelExport, onToggleShortcutsModal, onReplayTour, currentTime, duration]);
 }
