@@ -188,6 +188,10 @@ function KeyboardShortcutsPanel() {
       keys: [<Kbd key="o">O</Kbd>],
       label: "Set trim out point",
     },
+    {
+      keys: [<Kbd key="t">T</Kbd>],
+      label: "Replay onboarding tour"
+    }
   ];
 
   return (
@@ -273,6 +277,8 @@ export default function VideoEditor() {
     toggleSound,
   } = useVideoEditor();
 
+  const [tourReplayTrigger, setTourReplayTrigger] = useState(0);
+
   useKeyboardShortcuts({
     file,
     recipe,
@@ -282,6 +288,7 @@ export default function VideoEditor() {
     status,
     cancelExport,
     onToggleShortcutsModal: () => {},
+    onReplayTour: () => setTourReplayTrigger((value) => value + 1),
     currentTime,
     duration,
   });
@@ -407,7 +414,7 @@ export default function VideoEditor() {
         exportStartedAt={exportStartedAt}
         onCancel={cancelExport}
       />
-      <OnboardingTour />
+      <OnboardingTour replayTrigger={tourReplayTrigger} />
 
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {status === "exporting" && `Exporting video: ${progress}%`}
