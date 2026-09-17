@@ -364,6 +364,10 @@ function buildSessionId(): string {
 }
 
 export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: number): string {
+  // Ensure target dimensions are even to prevent libx264 "not divisible by 2" errors
+  targetW = Math.floor(targetW / 2) * 2;
+  targetH = Math.floor(targetH / 2) * 2;
+
   const filters: string[] = [];
 
   if (recipe.trimStart > 0 || recipe.trimEnd !== null) {
