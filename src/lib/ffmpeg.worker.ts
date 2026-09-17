@@ -425,8 +425,13 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const paletteName = `palette_${sessionId}.png`;
   const cleanupFiles = new Set<string>([inputName, outputName, fallbackOutputName, paletteName]);
 
+  // Post initialization message from the background Web Worker thread
+  postMessage({ type: "progress", percent: 2 });
+
   const fileBytes = serializeFileBuffer(request.file);
   await ffmpeg.writeFile(inputName, fileBytes, { signal: activeExportAbortController?.signal });
+
+  postMessage({ type: "progress", percent: 5 });
 
   const hasMusicTrack = !!(request.musicFile && recipe.keepAudio);
   const musicInputName = `music_input_${sessionId}.mp3`;
@@ -435,10 +440,13 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
     await ffmpeg.writeFile(musicInputName, serializeFileBuffer(request.musicFile!), {
       signal: activeExportAbortController?.signal,
     });
+    // Post multi-track audio track load signal back to main thread
+    postMessage({ type: "progress", percent: 8 });
   }
 
   const hasOverlay = !!request.overlayFile;
   const overlayExt = request.overlayFile?.name.split(".").pop() ?? "png";
+
   const overlayInputName = `overlay_${sessionId}.${overlayExt}`;
   if (hasOverlay) {
     cleanupFiles.add(overlayInputName);
