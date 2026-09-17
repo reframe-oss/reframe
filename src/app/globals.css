@@ -169,3 +169,25 @@ detail > summary {
 details > summary::-webkit-details-marker {
   display: none;
 }
+
+/* ── Mobile Layout Fixes (Issue #1392) ── */
+@media (max-width: 480px) {
+  #trim-control {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem !important;
+    margin-top: 1rem !important;
+  }
+
+  /* Shift inputs and E2E control buttons below the timeline track container */
+  #trim-control > div[role="toolbar"] {
+    margin-bottom: 1rem !important;
+  }
+
+  /* Prevent overlapping slider thumbs from blocking touch interactions on playback controls */
+  #trim-control [role="slider"] {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    z-index: 10;
+  }
+}
