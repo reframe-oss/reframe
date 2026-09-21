@@ -5,7 +5,10 @@ import { cn } from "@/lib/utils";
 import {
   SlidersHorizontal,
   Info as InfoIcon,
+  Zap,
 } from "lucide-react";
+import React, { useState } from "react";
+import VideoCompressor from "@/components/VideoCompressor";
 
 import {
   estimateExportSize,
@@ -13,6 +16,7 @@ import {
 } from "@/lib/exportEstimate";
 
 interface Props {
+  videoFile: File | null;
   recipe: EditRecipe;
   duration: number;
   onChange: (
@@ -23,6 +27,7 @@ interface Props {
 export default function ExportSettings({
   recipe,
   duration,
+  videoFile,
   onChange,
 }: Props) {
   const label =
@@ -41,6 +46,7 @@ export default function ExportSettings({
         duration
       )
     );
+    const [isCompressEnabled, setIsCompressEnabled] = useState(false);
 
   return (
     <>
@@ -140,6 +146,29 @@ export default function ExportSettings({
         </div>
         )}
       </div>
+
+ <div className="mt-6 pt-6 border-t border-gray-700">
+  <div className="flex items-center justify-between mb-4">
+    <label htmlFor="compress-video-toggle" className="text-sm font-heading font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center gap-2">
+      <Zap size={14} className="text-yellow-400" />
+      Compress Video
+    </label>
+    <input
+      id="compress-video-toggle"
+      type="checkbox"
+      checked={isCompressEnabled}
+      onChange={(e) => setIsCompressEnabled(e.target.checked)}
+      className="accent-film-600 cursor-pointer"
+    />
+  </div>
+
+  {isCompressEnabled && (
+    <div className="mt-2 mb-4">
+      <VideoCompressor videoFile={videoFile} />
+    </div>
+  )}
+</div>
+      
 
       <div>
         <div className="flex items-center justify-between mb-1">
