@@ -76,6 +76,19 @@ Reframe is a **browser-based video editor** — everything happens on your devic
 
 > Built for everyone — whether you're a creator resizing videos for social media, or just someone who wants to quickly trim and convert without installing bulky software.
 
+## Why Reframe?
+
+Reframe takes a privacy-focused approach to browser-based video editing. Unlike many online editors, Reframe processes videos entirely on the user's device and does not require an account or video uploads.
+
+| | Reframe | CapCut | Kapwing | Clipchamp |
+|---|---|---|---|---|
+| Video processing | Client-side | Online editor | Online editor | Client-side editing and export |
+| Video upload | Not required | Required for online editing | Required | Not required for local editing |
+| Account | Not required | Required for online account features | Account required for many features | Microsoft account |
+| Open source | Yes | No | No | No |
+
+**Reframe's focus:** privacy, local processing, no account requirement, and open-source software. It is designed for users who want to edit videos directly in their browser while keeping their media on their device.
+
 ## Features
 
 - **Instant Resizing** — 11 preset formats (Reels, TikTok, YouTube, Instagram, etc.) + custom dimensions
@@ -90,14 +103,15 @@ Reframe is a **browser-based video editor** — everything happens on your devic
 Everything stays on your device. No servers. No tracking. No login.
 
 ---
+
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| Ctrl+Enter / Cmd+Enter | Export video |
-| Space | Play/pause video preview |
-| M | Toggle audio mute |
-| Escape | Cancel export |
+| Shortcut               | Action                   |
+| ---------------------- | ------------------------ |
+| Ctrl+Enter / Cmd+Enter | Export video             |
+| Space                  | Play/pause video preview |
+| M                      | Toggle audio mute        |
+| Escape                 | Cancel export            |
 
 > On macOS, use `Cmd` instead of `Ctrl` for keyboard shortcuts.
 
@@ -136,7 +150,6 @@ Reframe supports a theme toggle in the header that switches between light, dark,
 - Use the theme button in the top-right to switch modes.
 - The selected theme is persisted across sessions.
 - You can override the theme manually in the browser console by setting `localStorage.setItem('theme', 'dark')` (values: `light`, `dark`, `high-contrast`) and reloading the page.
-
 
 Outputs a static site to `out/` — deploy to Vercel, Netlify, GitHub Pages, or any static host.
 
@@ -277,6 +290,7 @@ bun run build
 The production files will be generated in the `out/` directory.
 
 You can deploy the `out/` folder using:
+
 - GitHub Pages
 - `gh-pages` branch
 - GitHub Actions workflow
@@ -288,11 +302,13 @@ You can deploy the `out/` folder using:
 For detailed technical information about Reframe's architecture, design choices, and implementation details, see the [Architecture Documentation](docs/ARCHITECTURE.md).
 
 > Reframe requires WebAssembly (WASM) support to process videos in the browser.
+
 ---
 
 ## Development Tips
 
 ### 1. Next.js Fast Refresh
+
 This project uses Next.js Fast Refresh in development mode. Most changes to React components, hooks, and styles are reflected instantly in the browser without restarting the dev server.
 
 - Component updates appear immediately
@@ -304,6 +320,7 @@ Learn more: https://nextjs.org/docs/architecture/fast-refresh
 ---
 
 ### 2. FFmpeg Module Changes
+
 Changes to `ffmpeg.ts` may not hot-reload correctly because FFmpeg initialization and WebAssembly modules can persist in memory.
 
 If updates are not reflected:
@@ -317,6 +334,7 @@ FFmpeg WASM reference: https://ffmpegwasm.netlify.app/docs/overview
 ---
 
 ### 3. Monitor FFmpeg Downloads
+
 FFmpeg WebAssembly assets can be large and may take time to download during development.
 
 Use the browser DevTools **Network** tab to:
@@ -331,6 +349,7 @@ Chrome DevTools: https://developer.chrome.com/docs/devtools/network
 ---
 
 ### 4. Use React DevTools
+
 Install React DevTools for easier component inspection and debugging.
 
 Helpful for:
@@ -345,6 +364,7 @@ React DevTools: https://react.dev/learn/react-developer-tools
 ---
 
 ### 5. Keep Console Open During Development
+
 The browser console provides important runtime diagnostics for:
 
 - FFmpeg initialization issues
@@ -357,6 +377,7 @@ Filtering logs by warnings/errors can speed up debugging significantly.
 ---
 
 ### 6. Use Source Maps for Easier Debugging
+
 Development builds include source maps, allowing you to debug original TypeScript/React source files directly from DevTools.
 
 Tips:
@@ -370,6 +391,7 @@ JavaScript debugging guide: https://developer.chrome.com/docs/devtools/javascrip
 ---
 
 ### 7. Watch for Memory Usage
+
 FFmpeg WebAssembly processing can consume significant browser memory during video operations.
 
 Recommendations:
@@ -383,6 +405,7 @@ Performance tools: https://developer.chrome.com/docs/devtools/performance
 ---
 
 ### 8. Verify Environment Variables
+
 After modifying `.env.local`, restart the Next.js development server because environment variables are loaded only during server startup.
 
 Example:
@@ -435,12 +458,9 @@ Reframe is an **official project in GirlScript Summer of Code (GSSoC) 2026**! We
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide including development setup, code style, and PR checklist.
 
-
-
 ## Privacy
 
-Reframe processes all videos **100% client-side**. Your video files are never uploaded to any server. You can even use Reframe offline (after first load). The source code is fully open for inspection.
----
+## Reframe processes all videos **100% client-side**. Your video files are never uploaded to any server. You can even use Reframe offline (after first load). The source code is fully open for inspection.
 
 ## Contributors
 
@@ -479,17 +499,20 @@ Made with ❤️ for everyone who just wants to edit a video without the hassle.
 ## Troubleshooting
 
 ### Installation fails
+
 - Ensure you're on [Bun](https://bun.sh) (this project uses `bun.lock`, not npm/yarn) with Node.js 20.9+.
 - Run `bun install`.
 - Delete `node_modules` and `bun.lock`, then reinstall if issues persist.
 
 ### Environment variables not loading
+
 - Verify that a `.env.local` file exists (see `.env.example` for the required keys).
 - Restart the development server after making changes — env vars are only read at startup.
 
 ## FAQ
 
 ### How do I start the project?
+
 Run:
 
 ```bash
@@ -498,5 +521,5 @@ bun run dev
 ```
 
 ### How do I report a bug?
-Please open a GitHub issue with reproduction steps and relevant logs.
 
+Please open a GitHub issue with reproduction steps and relevant logs.
