@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ScrollToTop from "@/components/ScrollToTop";
 import BrandLogo from "@/components/BrandLogo";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Reframe — Resize, trim, and export videos in your browser",
@@ -65,6 +66,19 @@ export default function RootLayout({
 })();`,
           }}
         />
+
+        <Script id="sw-register" strategy="afterInteractive">
+          {`
+          if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+          navigator.serviceWorker
+          .register('/sw.js')
+          .catch((err) => console.error('SW registration failed:', err));
+          });
+          }
+        `}
+        </Script>
+
         <link rel="preconnect" href="https://cdn.jsdelivr.net" />
         <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
       </head>
