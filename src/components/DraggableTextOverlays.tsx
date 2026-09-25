@@ -14,10 +14,6 @@ interface DraggableTextOverlaysProps {
   onSelectText: (id: string | null) => void;
 }
 
-/**
- * Renders draggable text overlays on the video preview.
- * Users can click and drag text to reposition it on the canvas.
- */
 export default function DraggableTextOverlays({
   recipe,
   containerWidth,
@@ -43,9 +39,6 @@ export default function DraggableTextOverlays({
     return Array.isArray(overlays) ? overlays : [];
   }, [recipe?.textOverlays]);
 
-  /**
-   * Handles the start of a drag operation.
-   */
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>, overlayId: string) => {
       e.preventDefault();
@@ -73,9 +66,6 @@ export default function DraggableTextOverlays({
     [textOverlays, containerWidth, containerHeight, onSelectText]
   );
 
-  /**
-   * Handles double-click to enter edit mode.
-   */
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>, overlayId: string) => {
       e.preventDefault();
@@ -90,9 +80,7 @@ export default function DraggableTextOverlays({
     [textOverlays]
   );
 
-  /**
-   * Saves the edited text and exits edit mode.
-   */
+  
   const handleSaveEdit = useCallback(
     (overlayId: string) => {
       if (editText.trim()) {
@@ -104,9 +92,7 @@ export default function DraggableTextOverlays({
     [editText, onUpdateText]
   );
 
-  /**
-   * Handles keyboard events in edit mode.
-   */
+  
   const handleEditKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>, overlayId: string) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -121,9 +107,6 @@ export default function DraggableTextOverlays({
     [handleSaveEdit]
   );
 
-  /**
-   * Handles dragging of text overlays.
-   */
   useEffect(() => {
     if (!draggingId || !containerRef.current) return;
 
@@ -192,9 +175,6 @@ export default function DraggableTextOverlays({
     }
   }, [textOverlays]);
 
-  /**
-   * Focus edit input when entering edit mode.
-   */
   useEffect(() => {
     if (editingId && editInputRef.current) {
       // Set the initial text content
