@@ -536,6 +536,8 @@ export default function VideoEditor() {
                       onChange={updateRecipe}
                       duration={duration}
                       file={file}
+                      currentTime={currentTime}
+                      onSeek={seekTo}
                     />
                   </AccordionSection>
 
