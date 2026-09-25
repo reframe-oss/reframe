@@ -42,7 +42,7 @@ function RatioBox({
     <div
       className={cn(
         "border-2 flex-shrink-0 rounded-sm transition-colors",
-        active ? "border-film-600" : "border-[var(--muted)] opacity-60",
+        active ? "border-film-600" : "border-white/40",
       )}
       style={{ width: w, height: h }}
     />
@@ -155,13 +155,13 @@ export default function PresetSelector({ recipe, onChange }: Props) {
                 "flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg border text-center transition-all duration-150 cursor-pointer hover:scale-[1.04] active:scale-[0.97]",
                 isActive
                   ? "border-film-500 bg-film-50 text-film-600"
-                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-film-300 hover:bg-film-50/30 hover:text-[var(--text)]",
+                  : "border-slate-200 bg-slate-50 text-[var(--text)] dark:border-white/25 dark:bg-white/5 hover:border-film-400 hover:bg-film-50/50 dark:hover:bg-white/10 hover:text-film-600",
               )}
             >
               {icon}
               <span className={cn(
                 "text-[9px] font-heading font-bold uppercase tracking-wide leading-none",
-                isActive ? "text-film-700" : "text-[var(--muted)]",
+                isActive ? "text-film-700" : "text-[var(--text)]",
               )}>
                 {label}
               </span>
@@ -204,7 +204,7 @@ export default function PresetSelector({ recipe, onChange }: Props) {
                   "min-h-[44px] min-w-[44px] flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border text-center transition-all duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98]",
                   active
                     ? "border-film-500 bg-film-50"
-                    : "border-[var(--border)] bg-[var(--surface)] hover:border-film-300 hover:bg-film-50/30",
+                    : "border-slate-200 bg-slate-50 dark:border-white/25 dark:bg-white/5 hover:border-film-400 hover:bg-film-50/50 dark:hover:bg-white/10 hover:shadow-sm",
                 )}
               >
                 <RatioBox
@@ -242,7 +242,7 @@ export default function PresetSelector({ recipe, onChange }: Props) {
             "min-h-[44px] min-w-[44px] flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border text-center transition-all duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98]",
             recipe.preset === "custom"
               ? "border-film-500 bg-film-50"
-              : "border-[var(--border)] bg-[var(--surface)] hover:border-film-300 hover:bg-film-50/30",
+              : "border-slate-200 bg-slate-50 dark:border-white/25 dark:bg-white/5 hover:border-film-400 hover:bg-film-50/50 dark:hover:bg-white/10 hover:shadow-sm",
           )}
         >
           <Settings2
