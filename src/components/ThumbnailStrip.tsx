@@ -45,6 +45,10 @@ export default function ThumbnailStrip({
 
   const cancelThumbnailRun = useCallback(() => {
     lastRunIdRef.current += 1;
+    if (offscreenVideoRef.current) {
+      offscreenVideoRef.current.src = "";
+      offscreenVideoRef.current.load();
+    }
   }, []);
 
   const generateThumbnails = useCallback(async () => {
@@ -109,8 +113,15 @@ export default function ThumbnailStrip({
 
         const time = times[i] ?? 0;
         await new Promise<void>((resolve) => {
-          const onSeeked = async () => {
+          let timeoutId: number | undefined;
+
+          const cleanup = () => {
             video.removeEventListener("seeked", onSeeked);
+            if (timeoutId) window.clearTimeout(timeoutId);
+          };
+
+          const onSeeked = async () => {
+            cleanup();
 
             if (lastRunIdRef.current !== runId) {
               resolve();
@@ -139,6 +150,13 @@ export default function ThumbnailStrip({
             setProgress(Math.round(((i + 1) / times.length) * 100));
             resolve();
           };
+
+          // Setup timeout fallback (2 seconds max per seek to prevent hang)
+          timeoutId = window.setTimeout(() => {
+            cleanup();
+            resolve();
+          }, 2000);
+
           video.addEventListener("seeked", onSeeked);
           video.currentTime = time;
         });

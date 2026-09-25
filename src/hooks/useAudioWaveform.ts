@@ -45,6 +45,13 @@ export function useAudioWaveform(
         return;
       }
 
+      // Skip decoding for files larger than 100MB to prevent browser OOM crash
+      if (file.size > 100 * 1024 * 1024) {
+        setWaveform([]);
+        setIsLoading(false);
+        return;
+      }
+
       const AudioContextCtor =
         window.AudioContext || (window as BrowserWindow).webkitAudioContext;
 
