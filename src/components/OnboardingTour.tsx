@@ -13,6 +13,10 @@ interface TourStep {
   requiresFile?: boolean;
 }
 
+interface OnboardingTourProps {
+  replayTrigger?: number;
+}
+
 const TOUR_STEPS: TourStep[] = [
   {
     targetId: "upload-zone",
@@ -249,7 +253,9 @@ function Tooltip({
   );
 }
 
-export default function OnboardingTour() {
+export default function OnboardingTour({
+  replayTrigger = 0,
+}: OnboardingTourProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [visible, setVisible] = useState(false);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
@@ -301,6 +307,24 @@ export default function OnboardingTour() {
     }, 600);
     return () => clearTimeout(t);
   }, [measureTarget]);
+
+  useEffect(() => {
+    if (replayTrigger === 0) return;
+
+    const replayTour = async () => {
+      localStorage.removeItem(TOUR_KEY);
+      setStepIndex(0);
+
+      const rect = await measureTarget(TOUR_STEPS[0]?.targetId ?? "");
+
+      if (rect) {
+        setTargetRect(rect);
+        setVisible(true);
+      }
+    };
+
+    replayTour();
+  }, [replayTrigger, measureTarget]);
 
   // Measure target whenever step changes (skip on first render — init effect handles that)
   useEffect(() => {

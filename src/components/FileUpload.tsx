@@ -179,7 +179,6 @@ function DropZone({
 }: DropZoneProps) {
   return (
     <div
-      id="upload-zone"
       role="button"
       tabIndex={0}
       aria-label="Video upload area. Drag and drop a video file or press Enter to browse."
@@ -386,7 +385,7 @@ export default function FileUpload({
       )}
 
       {/* ── Normal upload UI ── */}
-      <div className="space-y-2">
+      <div id="upload-zone" className="space-y-2">
         {error && (
           <p role="alert" className="text-sm text-[var(--error)]">
             {error}
