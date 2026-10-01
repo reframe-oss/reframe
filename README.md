@@ -458,6 +458,10 @@ We welcome contributions of all kinds — code, documentation, design, and feedb
 
 Thanks to [Chromatic](https://www.chromatic.com/) for providing the visual testing platform that helps us review UI changes and catch visual regressions.
 
+<a href="https://www.datadoghq.com/"><img src="public/badges/datadog-logo.png" width="153" alt="Datadog" /></a>
+
+Reframe is part of the [Datadog Open Source Program](https://www.datadoghq.com/partners/open-source/). Thank you to [Datadog](https://www.datadoghq.com/) for supporting the project and for the Real User Monitoring that helps us understand FFmpeg.wasm load performance and export reliability.
+
 ---
 
 ## License
