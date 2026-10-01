@@ -24,7 +24,7 @@
     "lottie-web": "^5.12.2",
     "lucide-react": "^0.577.0",
     "next": "16.3.4",
-    "react": "19.2.8",
+    "react": "19.3.0",
     "react-dom": "19.2.8",
     "reframe": ".",
     "tailwind-merge": "^3.6.0",
