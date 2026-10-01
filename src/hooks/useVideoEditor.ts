@@ -14,6 +14,7 @@ import {
 import { DEFAULT_RECIPE, SPEED_STEPS } from "@/lib/constants";
 import { getPresetById } from "@/lib/presets";
 import { loadFFmpeg, exportVideo, terminateFFmpeg, FFmpegLoadError } from "@/lib/ffmpeg";
+import { trackAction } from "@/lib/telemetry";
 import { suggestPreset } from "@/lib/presetSuggestion";
 import { validateDimensions, getDownscaledDimensions } from "@/utils/video-validation";
 import {
@@ -530,6 +531,7 @@ export function useVideoEditor() {
     exportCancelledRef.current = false;
 
     try {
+      trackAction("export_start");
       setStatus("loading-engine");
       setProgress(0);
       setError(null);
@@ -569,8 +571,10 @@ export function useVideoEditor() {
         exportDurationMs: Date.now() - startedAt,
       });
       setStatus("done");
+      trackAction("export_success", { durationMs: Date.now() - startedAt });
     } catch (err) {
       if (exportCancelledRef.current) return;
+      trackAction("export_failure", { reason: err instanceof Error ? err.name : "unknown" });
 
       console.error("export failed:", err);
       if (err instanceof FFmpegLoadError) {

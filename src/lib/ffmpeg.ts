@@ -1,6 +1,7 @@
 import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, MAX_FILE_SIZE } from "./types";
 import { getPresetById } from "./presets";
 import { buildTextFilter } from "./text-overlay";
+import { trackAction, trackTiming } from "./telemetry";
 
 export class FFmpegLoadError extends Error {}
 
@@ -198,8 +199,20 @@ export async function loadFFmpeg(
 
   signal?.addEventListener("abort", onAbort, { once: true });
 
+  const loadStart = performance.now();
   try {
     await workerReady;
+    const durationMs = Math.round(performance.now() - loadStart);
+    trackAction("ffmpeg_load_success", { durationMs });
+    trackTiming("ffmpeg_ready");
+  } catch (err) {
+    if (!(err instanceof DOMException && err.name === "AbortError")) {
+      trackAction("ffmpeg_load_failure", {
+        durationMs: Math.round(performance.now() - loadStart),
+        reason: err instanceof Error ? err.name : "unknown",
+      });
+    }
+    throw err;
   } finally {
     cleanup();
   }
