@@ -212,49 +212,6 @@ You can also deploy Reframe on other static hosting providers:
 | **GitHub Pages**     | Deploy the generated `out/` folder to the `gh-pages` branch |
 | **Cloudflare Pages** | Connect your fork in Cloudflare Pages                       |
 
-### Deploying to Vercel
-
-The quickest way to get Reframe live:
-
-**Option 1 — Vercel Dashboard (Recommended)**
-
-1. Fork this repository on GitHub
-2. Go to [vercel.com/new](https://vercel.com/new) and import your fork
-3. Vercel auto-detects Next.js settings:
-   - **Framework Preset:** Next.js
-   - **Build Command:** `bun run build`
-   - **Output Directory:** leave blank (Vercel auto-detects `out` for static exports)
-4. Click **Deploy** — your site will be live in ~2 minutes
-
-**Option 2 — Vercel CLI**
-
-```bash
-# Install Vercel CLI globally
-npm i -g vercel
-
-# Login to Vercel
-vercel login
-
-# Deploy from project root
-vercel --prod
-```
-
-> **Note:** FFmpeg.wasm requires COOP/COEP headers for SharedArrayBuffer support. On Vercel, add a `vercel.json` in your project root:
->
-> ```json
-> {
->   "headers": [
->     {
->       "source": "/(.*)",
->       "headers": [
->         { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
->         { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
->       ]
->     }
->   ]
-> }
-> ```
-
 ### Deploying to Netlify
 
 1. Push your fork to GitHub
