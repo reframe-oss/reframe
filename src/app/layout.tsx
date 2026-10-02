@@ -79,13 +79,25 @@ export default function RootLayout({
           <ErrorBoundary>
             <header
               role="banner"
-              className="sticky top-0 z-50 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)]/95 px-6 py-3 backdrop-blur"
+              className="sticky top-0 z-50 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)]/95 px-4 sm:px-6 py-3 backdrop-blur"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <BrandLogo size={24} />
-                <h1 className="text-lg font-semibold">Reframe</h1>
+                <h1 className="text-lg font-semibold tracking-tight">Reframe</h1>
               </div>
-              <ThemeToggle />
+              
+              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                <a
+                  href="https://github.com/magic-peach/reframe"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="View Reframe on GitHub"
+                  className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[10px] font-heading font-semibold uppercase tracking-wider transition-all duration-200 ease-in-out hover:scale-105 hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] hover:shadow-[var(--shadow)]"
+                >
+                  ⭐ <span className="hidden sm:inline">Star on GitHub</span>
+                </a>
+                <ThemeToggle />
+              </div>
             </header>
             <main id="main-content" tabIndex={-1}>
               {children}
