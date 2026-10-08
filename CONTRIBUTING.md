@@ -44,7 +44,7 @@ If you're ready to tackle some open issues, **[we've collected some good first i
 ### Prerequisites
 
 - [Git](https://git-scm.com)
-- [Bun](https://bun.sh) (recommended) — or Node.js 18+
+- [Bun](https://bun.sh) (recommended) — or Node.js 20.9.0+ (required by Next.js 16; Node.js 18 is not supported)
 - A modern browser (Chrome, Firefox, or Safari)
 
 ### Fork and Clone

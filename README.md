@@ -105,7 +105,7 @@ Everything stays on your device. No servers. No tracking. No login.
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) (recommended) or Node.js 18+
+- [Bun](https://bun.sh) (recommended) or Node.js 20.9.0+ (required by Next.js 16; Node.js 18 is not supported)
 
 ### Installation
 
