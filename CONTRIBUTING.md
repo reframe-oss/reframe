@@ -31,6 +31,7 @@ If you're ready to tackle some open issues, **[we've collected some good first i
 - [Claiming Issues](#-claiming-issues)
 - [Making Changes](#making-changes)
 - [Submitting a Pull Request](#submitting-a-pull-request)
+- [Component Development / Storybook](#component-development--storybook)
 - [Visual Review (Chromatic)](#visual-review-chromatic)
 - [Code Style](#code-style)
 - [Development Tips](#development-tips)
@@ -359,6 +360,36 @@ Attach the recording directly to the PR by dragging the file into the GitHub com
 - [ ] **Screen recording attached** (required for all UI/feature PRs)
 
 ---
+
+## Component Development / Storybook
+
+Storybook lets you develop and inspect a component in isolation without uploading a
+video or navigating through the full editor. From the repository root, after
+installing dependencies, run:
+
+```bash
+bun run storybook
+```
+
+Open [http://localhost:6006](http://localhost:6006) and select a component and its
+story from the sidebar. Change its controls to explore the supplied props and
+states. This is a separate development server from the Next.js app on port 3000.
+
+Add a `ComponentName.stories.tsx` file beside each new component in
+`src/components/`, and update its stories when changing existing UI. Start with
+`src/components/FramingControl.stories.tsx` for an interactive control example;
+it uses `RecipeHarness` to keep recipe changes visible. Include representative
+states such as defaults, disabled controls, and errors where applicable. The
+story patterns are registered in `.storybook/main.ts`.
+
+To check that the stories build for publication, run:
+
+```bash
+bun run build-storybook
+```
+
+Chromatic uses these stories for the visual comparisons described below. Keep
+them deterministic so animations or live data do not produce false differences.
 
 ## Visual Review (Chromatic)
 
