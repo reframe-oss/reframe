@@ -394,6 +394,27 @@ async function removeFile(path: string) {
   }
 }
 
+async function execWithTimeout(args: string[], timeoutMs = 300000): Promise<number> {
+  if (!ffmpeg) throw new Error("FFmpeg engine is not loaded.");
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      if (activeExportAbortController && !activeExportAbortController.signal.aborted) {
+        activeExportAbortController.abort();
+      }
+      reject(new Error("FFmpeg execution timed out. Process killed to prevent memory leak."));
+    }, timeoutMs);
+  });
+  try {
+    const execPromise = ffmpeg.exec(args, undefined, {
+      signal: activeExportAbortController?.signal,
+    });
+    return await Promise.race([execPromise, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function runExport(request: ExportRequest): Promise<ResultPayload> {
   if (!ffmpeg) throw new Error("FFmpeg engine is not loaded.");
   if (activeExportAbortController?.signal.aborted) {
@@ -476,17 +497,13 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
           })()
         : [];
 
-      const pass1Code = await ffmpeg.exec(
-        ["-i", inputName, "-vf", vfWithPalette, ...gifDurationArgs, "-y", paletteName],
-        undefined,
-        { signal: activeExportAbortController?.signal }
+      const pass1Code = await execWithTimeout(
+        ["-i", inputName, "-vf", vfWithPalette, ...gifDurationArgs, "-y", paletteName]
       );
       if (pass1Code !== 0) throw new Error("GIF palette generation failed");
 
-      const pass2Code = await ffmpeg.exec(
-        ["-i", inputName, "-i", paletteName, "-lavfi", vfWithPaletteUse, ...gifDurationArgs, "-y", outputName],
-        undefined,
-        { signal: activeExportAbortController?.signal }
+      const pass2Code = await execWithTimeout(
+        ["-i", inputName, "-i", paletteName, "-lavfi", vfWithPaletteUse, ...gifDurationArgs, "-y", outputName]
       );
       if (pass2Code !== 0) throw new Error("GIF export failed");
 
@@ -536,9 +553,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
       videoDuration
     );
 
-    let exitCode = await ffmpeg.exec(args, undefined, {
-      signal: activeExportAbortController?.signal,
-    });
+    let exitCode = await execWithTimeout(args);
 
     if (exitCode !== 0 && missingAudioDetected) {
       missingAudioDetected = false;
@@ -558,9 +573,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
         false,
         videoDuration
       );
-      exitCode = await ffmpeg.exec(args, undefined, {
-        signal: activeExportAbortController?.signal,
-      });
+      exitCode = await execWithTimeout(args);
     }
 
     if (exitCode !== 0) {
@@ -581,9 +594,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
         videoDuration
       );
 
-      const fallbackCode = await ffmpeg.exec(args, undefined, {
-        signal: activeExportAbortController?.signal,
-      });
+      const fallbackCode = await execWithTimeout(args);
       if (fallbackCode !== 0) throw new Error("Export failed");
 
       const data = await ffmpeg.readFile(fallbackOutputName, undefined, {
