@@ -9,6 +9,8 @@ interface DraggableTextOverlaysProps {
   recipe?: EditRecipe;
   containerWidth: number;
   containerHeight: number;
+  videoLeft?: number;
+  videoTop?: number;
   selectedTextId: string | null;
   onUpdateText: (id: string, updates: Partial<TextOverlay>) => void;
   onSelectText: (id: string | null) => void;
@@ -22,6 +24,8 @@ export default function DraggableTextOverlays({
   recipe,
   containerWidth,
   containerHeight,
+  videoLeft = 0,
+  videoTop = 0,
   selectedTextId,
   onUpdateText,
   onSelectText,
@@ -216,8 +220,13 @@ export default function DraggableTextOverlays({
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 pointer-events-none"
-      style={{ width: containerWidth, height: containerHeight }}
+      className="absolute pointer-events-none"
+      style={{
+        left: `${videoLeft}px`,
+        top: `${videoTop}px`,
+        width: containerWidth,
+        height: containerHeight,
+      }}
     >
       {textOverlays.map((overlay) => {
         const { left, top } = getTextPixelPosition(
