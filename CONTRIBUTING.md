@@ -90,32 +90,67 @@ bunx tsc --noEmit  # Run TypeScript type checking
 reframe/
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx          # Root layout, metadata, fonts
-│   │   ├── page.tsx            # Home page
-│   │   └── globals.css         # Global styles
+│   │   ├── layout.tsx           # Root layout, metadata, fonts
+│   │   ├── page.tsx             # Home page
+│   │   ├── not-found.tsx        # 404 page
+│   │   ├── globals.css          # Global styles
+│   │   ├── contact/
+│   │   │   └── page.tsx         # Contact page
+│   │   └── privacy/
+│   │       └── page.tsx         # Privacy policy page
 │   ├── components/
-│   │   ├── VideoEditor.tsx     # Root editor component
-│   │   ├── FileUpload.tsx      # Drag-drop file upload
-│   │   ├── VideoPreview.tsx    # HTML5 video player
-│   │   ├── PresetSelector.tsx  # 11 preset formats + custom
-│   │   ├── FramingControl.tsx  # Fit/Fill framing toggle
-│   │   ├── TrimControl.tsx     # Start/end time inputs
-│   │   ├── RotateControl.tsx   # Rotation buttons
-│   │   ├── AudioSpeedControl.tsx  # Audio + speed
-│   │   ├── ExportSettings.tsx  # Quality CRF slider
-│   │   ├── ExportOverlay.tsx   # Export progress modal
-│   │   ├── DownloadResult.tsx  # Success + download
-│   │   └── LottiePlayer.tsx    # Lottie animation wrapper
+│   │   ├── VideoEditor.tsx      # Root editor component
+│   │   ├── FileUpload.tsx       # Drag-drop file upload
+│   │   ├── VideoPreview.tsx     # HTML5 video player
+│   │   ├── PresetSelector.tsx   # Format presets + custom
+│   │   ├── FramingControl.tsx   # Fit/Fill framing toggle
+│   │   ├── TrimControl.tsx      # Start/end time inputs
+│   │   ├── RotateControl.tsx    # Rotation buttons
+│   │   ├── AudioSpeedControl.tsx
+│   │   ├── ExportSettings.tsx   # Quality CRF slider
+│   │   ├── ExportOverlay.tsx    # Export progress modal
+│   │   ├── DownloadResult.tsx   # Success + download
+│   │   ├── TextControls.tsx     # Text overlay controls
+│   │   ├── DraggableTextOverlays.tsx
+│   │   ├── ImageOverlay.tsx
+│   │   ├── ComparisonPreview.tsx
+│   │   ├── ThemeProvider.tsx    # Dark/light mode context
+│   │   ├── ThemeToggle.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── OnboardingTour.tsx
+│   │   ├── LottiePlayer.tsx     # Lottie animation wrapper
+│   │   └── ui/
+│   │       ├── BaseButton.tsx   # Base button primitive
+│   │       └── Skeleton.tsx     # Loading skeleton
 │   ├── hooks/
-│   │   └── useVideoEditor.ts   # Main state management hook
-│   └── lib/
-│       ├── ffmpeg.ts           # FFmpeg wrapper & filter builders
-│       ├── presets.ts          # Preset definitions
-│       └── types.ts            # TypeScript types
-├── public/                     # Static assets
+│   │   ├── useVideoEditor.ts    # Main state management hook
+│   │   ├── useAudioWaveform.ts
+│   │   ├── useFontManager.ts
+│   │   └── useKeyboardShortcuts.ts
+│   ├── lib/
+│   │   ├── ffmpeg.ts            # FFmpeg wrapper & filter builders
+│   │   ├── ffmpeg.worker.ts     # FFmpeg web worker
+│   │   ├── presets.ts           # Preset definitions
+│   │   ├── types.ts             # TypeScript types
+│   │   ├── constants.ts
+│   │   ├── utils.ts
+│   │   ├── exportEstimate.ts
+│   │   ├── frame-export.ts
+│   │   ├── presetSuggestion.ts
+│   │   ├── text-overlay.ts
+│   │   └── lottie/              # Lottie animation JSON assets
+│   └── utils/
+│       ├── fontLoader.ts
+│       ├── fontValidation.ts
+│       └── video-validation.ts
+├── docs/
+│   └── ARCHITECTURE.md          # Architecture overview
+├── .github/                     # Workflows & issue templates
+├── public/                      # Static assets
 ├── next.config.ts
 ├── tailwind.config.ts
-└── tsconfig.json
+├── tsconfig.json
+└── vitest.config.ts
 ```
 ---
 
