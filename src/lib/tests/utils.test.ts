@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatBytes, formatDuration  } from "../utils";
+import { formatBytes, formatDuration, formatTrimTime } from "../utils";
 
 describe("formatBytes", () => {
   it("returns '0 Bytes' for zero input", () => {
@@ -71,5 +71,25 @@ describe("formatDuration", () => {
 
   it("handles negative values", () => {
     expect(formatDuration(-1)).toBe("0:00");
+  });
+});
+
+describe("formatTrimTime", () => {
+  it("formats raw seconds as MM:SS.d", () => {
+    expect(formatTrimTime(65.5)).toBe("01:05.5");
+  });
+
+  it("pads seconds under one minute", () => {
+    expect(formatTrimTime(5)).toBe("00:05.0");
+  });
+
+  it("preserves one decimal place", () => {
+    expect(formatTrimTime(12.34)).toBe("00:12.3");
+  });
+
+  it("handles invalid values", () => {
+    expect(formatTrimTime(NaN)).toBe("00:00.0");
+    expect(formatTrimTime(Infinity)).toBe("00:00.0");
+    expect(formatTrimTime(-1)).toBe("00:00.0");
   });
 });
