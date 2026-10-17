@@ -16,8 +16,6 @@
   --accent-muted: rgba(59, 130, 246, 0.12);
   --radius: 10px;
   --shadow: 0 2px 12px rgba(15, 23, 42, 0.12);
-  --film-600: #e63946;
-  --film-400: #ff6b6b;
   --warning: #f59e0b;
   --error: #ef4444;
   --error-bg: #fee2e2;
@@ -62,8 +60,6 @@
   --error: #FF6666;
   --success: #66FF66;
 
-  --film-600: #FF6666;
-  --film-400: #66FF66;
 }
 
 /* Ensure export overlay text is readable in high-contrast by forcing dark text */
