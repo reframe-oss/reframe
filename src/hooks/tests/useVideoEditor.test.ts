@@ -1,5 +1,5 @@
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useVideoEditor } from "../useVideoEditor";
 import { DEFAULT_RECIPE } from "@/lib/constants";
 
@@ -39,29 +39,38 @@ describe("useVideoEditor core controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  });
+
+  afterEach(() => {
+    localStorageMock.clear();
   });
 
   it("should initialize with the default recipe", () => {
-    const { result } = renderHook(() => useVideoEditor());
+    const { result, unmount } = renderHook(() => useVideoEditor());
     expect(result.current.recipe).toEqual({
       ...DEFAULT_RECIPE,
       soundOnCompletion: false,
     });
     expect(result.current.status).toBe("idle");
     expect(result.current.file).toBeNull();
+    unmount();
   });
 
   it("should safely update recipe with valid patch values", () => {
-    const { result } = renderHook(() => useVideoEditor());
+    const { result, unmount } = renderHook(() => useVideoEditor());
     act(() => {
       result.current.updateRecipe({ speed: 2, quality: 20 });
     });
     expect(result.current.recipe.speed).toBe(2);
     expect(result.current.recipe.quality).toBe(20);
+    unmount();
   });
 
   it("should ignore invalid patch values via isValidValue check", () => {
-    const { result } = renderHook(() => useVideoEditor());
+    const { result, unmount } = renderHook(() => useVideoEditor());
     act(() => {
       // 9999 is invalid for speed, -50 is invalid for quality
       result.current.updateRecipe({ speed: 9999, quality: -50 } as any);
@@ -69,6 +78,7 @@ describe("useVideoEditor core controller", () => {
     // Values should remain as defaults
     expect(result.current.recipe.speed).toBe(DEFAULT_RECIPE.speed);
     expect(result.current.recipe.quality).toBe(DEFAULT_RECIPE.quality);
+    unmount();
   });
 
   it("should reset settings to default when resetSettings is called", () => {
@@ -83,4 +93,24 @@ describe("useVideoEditor core controller", () => {
     });
     expect(result.current.recipe.speed).toBe(DEFAULT_RECIPE.speed);
   });
+
+  it("should handle recipes with Unicode characters in text overlays without crashing", () => {
+    const { result } = renderHook(() => useVideoEditor());
+    const unicodeOverlay = {
+      id: "test-1",
+      text: "Hello 🎬 😊 广州!",
+      x: 10,
+      y: 20,
+      fontSize: 24,
+      color: "#ffffff",
+      fontWeight: "normal" as const,
+    };
+
+    act(() => {
+      result.current.updateRecipe({ textOverlays: [unicodeOverlay] });
+    });
+
+    expect(result.current.recipe.textOverlays).toEqual([unicodeOverlay]);
+  });
 });
+

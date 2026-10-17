@@ -1,7 +1,5 @@
-import { describe, test, expect } from "vitest";
 import { estimateExportSize, formatEstimatedSize } from "./exportEstimate";
 import { EditRecipe } from "./types";
-import { describe, test, expect } from "vitest";
 
 // Minimal recipe factory — only the fields estimateExportSize cares about
 function makeRecipe(overrides: Partial<EditRecipe> = {}): EditRecipe {
@@ -50,9 +48,9 @@ describe("estimateExportSize", () => {
     expect(long / short).toBeCloseTo(4, 0);
   });
 
-  test("higher resolution (4k) produces a larger estimate than 720p", () => {
-    const hd  = estimateExportSize(makeRecipe({ preset: "720p" }), 60);
-    const uhd = estimateExportSize(makeRecipe({ preset: "4k"   }), 60);
+  test("higher resolution produces a larger estimate than lower resolution", () => {
+    const hd  = estimateExportSize(makeRecipe({ preset: "twitter-hd" }), 60);
+    const uhd = estimateExportSize(makeRecipe({ preset: "landscape-16-9" }), 60);
     expect(uhd).toBeGreaterThan(hd);
   });
 

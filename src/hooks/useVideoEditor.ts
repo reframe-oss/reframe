@@ -154,7 +154,11 @@ function decodeRecipe(encoded: string): Partial<EditRecipe> | null {
         throw new Error();
       }
     } catch {
-      jsonString = atob(encoded);
+      try {
+        jsonString = decodeURIComponent(escape(atob(encoded)));
+      } catch {
+        jsonString = atob(encoded);
+      }
     }
     const decoded = JSON.parse(jsonString);
     if (!decoded || typeof decoded !== "object") return null;
