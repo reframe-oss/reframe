@@ -681,7 +681,7 @@ export default function VideoEditor() {
                     </div>
                   </Section>
                   <Section icon={<SlidersHorizontal size={12} />} title="Output format" delay={190}>
-                    <FormatSelector recipe={recipe} onChange={updateRecipe} />
+                    <FormatSelector recipe={recipe} duration={duration} onChange={updateRecipe} />
                   </Section>
                   <AccordionSection
                     id="export"

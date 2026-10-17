@@ -53,13 +53,19 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
   const applyDrag = useCallback((clientX: number) => {
     const seconds = xToSeconds(clientX);
     if (dragging.current === "start") {
-      const clamped = Math.min(seconds, (recipe.trimEnd ?? duration) - 0.1);
+      let clamped = Math.min(seconds, (recipe.trimEnd ?? duration) - 0.1);
+      if (recipe.format === "gif" && (recipe.trimEnd ?? duration) - clamped > 10) {
+        clamped = Math.max(clamped, (recipe.trimEnd ?? duration) - 10);
+      }
       onChange({ trimStart: Math.max(0, clamped) });
     } else if (dragging.current === "end") {
-      const clamped = Math.max(seconds, recipe.trimStart + 0.1);
+      let clamped = Math.max(seconds, recipe.trimStart + 0.1);
+      if (recipe.format === "gif" && clamped - recipe.trimStart > 10) {
+        clamped = Math.min(clamped, recipe.trimStart + 10);
+      }
       onChange({ trimEnd: Math.min(duration, clamped) });
     }
-  }, [xToSeconds, duration, recipe.trimStart, recipe.trimEnd, onChange]);
+  }, [xToSeconds, duration, recipe.trimStart, recipe.trimEnd, recipe.format, onChange]);
 
  useEffect(() => {
   const onMove = (e: MouseEvent | TouchEvent) => {
@@ -168,6 +174,12 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
       setEndErrorMsg(
         `End time cannot exceed duration (${duration.toFixed(1)}s).`,
       );
+      return;
+    }
+
+    if (recipe.format === "gif" && n - recipe.trimStart > 10.05) {
+      setEnd(true);
+      setEndErrorMsg("GIF format allows a maximum duration of 10s.");
       return;
     }
 
@@ -328,6 +340,12 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
           <p className="text-[10px] text-[var(--error)] font-heading">
             Clip must be at least 0.1 seconds long.
           </p>
+      )}
+      {recipe.format === "gif" && (
+        <p className="text-[11px] text-amber-600 dark:text-amber-400 font-heading flex items-center gap-1 mt-1">
+          <AlertCircle size={11} className="shrink-0" />
+          GIF format selected: clip length is limited to 10 seconds maximum.
+        </p>
       )}
     </div>
   );

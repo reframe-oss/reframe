@@ -1,5 +1,5 @@
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useVideoEditor } from "../useVideoEditor";
 import { DEFAULT_RECIPE } from "@/lib/constants";
 
@@ -39,29 +39,38 @@ describe("useVideoEditor core controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  });
+
+  afterEach(() => {
+    localStorageMock.clear();
   });
 
   it("should initialize with the default recipe", () => {
-    const { result } = renderHook(() => useVideoEditor());
+    const { result, unmount } = renderHook(() => useVideoEditor());
     expect(result.current.recipe).toEqual({
       ...DEFAULT_RECIPE,
       soundOnCompletion: false,
     });
     expect(result.current.status).toBe("idle");
     expect(result.current.file).toBeNull();
+    unmount();
   });
 
   it("should safely update recipe with valid patch values", () => {
-    const { result } = renderHook(() => useVideoEditor());
+    const { result, unmount } = renderHook(() => useVideoEditor());
     act(() => {
       result.current.updateRecipe({ speed: 2, quality: 20 });
     });
     expect(result.current.recipe.speed).toBe(2);
     expect(result.current.recipe.quality).toBe(20);
+    unmount();
   });
 
   it("should ignore invalid patch values via isValidValue check", () => {
-    const { result } = renderHook(() => useVideoEditor());
+    const { result, unmount } = renderHook(() => useVideoEditor());
     act(() => {
       // 9999 is invalid for speed, -50 is invalid for quality
       result.current.updateRecipe({ speed: 9999, quality: -50 } as any);
@@ -69,10 +78,11 @@ describe("useVideoEditor core controller", () => {
     // Values should remain as defaults
     expect(result.current.recipe.speed).toBe(DEFAULT_RECIPE.speed);
     expect(result.current.recipe.quality).toBe(DEFAULT_RECIPE.quality);
+    unmount();
   });
 
   it("should reset settings to default when resetSettings is called", () => {
-    const { result } = renderHook(() => useVideoEditor());
+    const { result, unmount } = renderHook(() => useVideoEditor());
     act(() => {
       result.current.updateRecipe({ speed: 1.5 });
     });
@@ -82,5 +92,33 @@ describe("useVideoEditor core controller", () => {
       result.current.resetSettings();
     });
     expect(result.current.recipe.speed).toBe(DEFAULT_RECIPE.speed);
+    unmount();
+  });
+
+  it("should clamp trimEnd to 10s maximum when format is set to gif", () => {
+    const { result, unmount } = renderHook(() => useVideoEditor());
+    act(() => {
+      result.current.updateRecipe({ trimStart: 0, trimEnd: 30 });
+    });
+    expect(result.current.recipe.trimEnd).toBe(30);
+
+    act(() => {
+      result.current.updateRecipe({ format: "gif" });
+    });
+    expect(result.current.recipe.format).toBe("gif");
+    expect(result.current.recipe.trimEnd).toBe(10);
+    expect(result.current.recipe.keepAudio).toBe(false);
+    unmount();
+  });
+
+  it("should clamp trimEnd to at most trimStart + 10s when format is gif", () => {
+    const { result, unmount } = renderHook(() => useVideoEditor());
+    act(() => {
+      result.current.updateRecipe({ format: "gif", trimStart: 5, trimEnd: 25 });
+    });
+    expect(result.current.recipe.format).toBe("gif");
+    expect(result.current.recipe.trimStart).toBe(5);
+    expect(result.current.recipe.trimEnd).toBe(15);
+    unmount();
   });
 });

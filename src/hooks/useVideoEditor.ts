@@ -136,6 +136,13 @@ function validateRecipe(recipe: EditRecipe, duration: number): string | null {
 
     [recipe.saturation < 0 || recipe.saturation > 3, "Saturation must be between 0 and 3."],
     [recipe.sharpness < 0 || recipe.sharpness > 3, "Sharpness must be between 0 and 3."],
+    [
+      recipe.format === "gif" &&
+        (recipe.trimEnd !== null ? recipe.trimEnd : duration > 0 ? duration : 0) -
+          recipe.trimStart >
+          10.05,
+      "GIF export duration must be 10 seconds or less. Please adjust your trim range under 10 seconds.",
+    ],
   ];
 
   return validations.find(([condition]) => condition)?.[1] ?? null;
@@ -275,10 +282,17 @@ export function useVideoEditor() {
       // GIF has no audio — force keepAudio off
       if (next.format === "gif") {
         next.keepAudio = false;
+        // Enforce maximum 10s duration for GIF format
+        const effectiveEnd = next.trimEnd ?? (duration > 0 ? duration : null);
+        if (effectiveEnd !== null && effectiveEnd - next.trimStart > 10) {
+          next.trimEnd = parseFloat(
+            Math.min(duration > 0 ? duration : next.trimStart + 10, next.trimStart + 10).toFixed(1)
+          );
+        }
       }
       return next;
     });
-  }, []);
+  }, [duration]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -500,7 +514,7 @@ export function useVideoEditor() {
           return {
             ...prev,
             trimStart: 0,
-            trimEnd: null,
+            trimEnd: prev.format === "gif" && dur > 10 ? 10 : null,
             ...(shouldApplySuggestion ? { preset: suggestedPreset } : {}),
           };
         });

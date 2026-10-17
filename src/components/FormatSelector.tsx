@@ -1,12 +1,13 @@
 "use client";
 
 import { EditRecipe } from "@/lib/types";
-import { Film } from "lucide-react";
+import { Film, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
   recipe: EditRecipe;
   onChange: (patch: Partial<EditRecipe>) => void;
+  duration?: number;
 }
 
 const FORMAT_OPTIONS = [
@@ -16,7 +17,11 @@ const FORMAT_OPTIONS = [
   { id: "gif", label: "GIF", description: "Animated image — keep clips under 10 s" },
 ] as const;
 
-export default function FormatSelector({ recipe, onChange }: Props) {
+export default function FormatSelector({ recipe, onChange, duration }: Props) {
+  const effectiveEnd = recipe.trimEnd ?? (duration && duration > 0 ? duration : null);
+  const clipLength = effectiveEnd !== null ? effectiveEnd - recipe.trimStart : 0;
+  const isOverGifLimit = recipe.format === "gif" && clipLength > 10.05;
+
   return (
     <div>
       <div className="flex items-center gap-1 mb-3">
@@ -48,6 +53,24 @@ export default function FormatSelector({ recipe, onChange }: Props) {
       <p className="text-[10px] text-[var(--muted)] mt-2">
         {FORMAT_OPTIONS.find((o) => o.id === recipe.format)?.description}
       </p>
+
+      {recipe.format === "gif" && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-2.5 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400"
+        >
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-0.5">
+            <p className="font-semibold">GIF Limit: Maximum 10 seconds</p>
+            <p className="text-[11px] opacity-90">
+              {isOverGifLimit
+                ? `Clip is currently ${clipLength.toFixed(1)}s. Trimming to under 10s is required to prevent oversized files and browser freezes.`
+                : "Clips are automatically capped under 10s to ensure fast generation and reasonable file sizes."}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
