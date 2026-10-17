@@ -1,21 +1,31 @@
 name: 🔒 Snyk
 
-# Dependency vulnerability scanning.
+# Dependency vulnerability scanning and automated triage alerting.
 #
 # Runs as its own workflow rather than a job inside CI, matching how this repo
 # already separates concerns (lint.yml, typecheck.yml, main.yml, chromatic.yml
 # are each one file). Concretely it needs a different trigger gate, a different
 # secret, and has different failure semantics from a build — folding it into
 # main.yml would mean a security finding reads as "the build broke".
+#
+# In addition to push/PR events, this runs on a recurring weekly schedule
+# (Mondays at 06:00 UTC) to catch newly disclosed CVEs even when no new code
+# has been merged. When high/critical vulnerabilities are detected on main,
+# it automatically creates or updates a tracking issue for maintainer triage.
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Recurring weekly scan: Every Monday at 06:00 UTC (matches Dependabot's weekly schedule)
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: snyk-${{ github.ref }}
@@ -30,9 +40,11 @@ jobs:
     # almost every contribution here comes from one. Without this gate SNYK_TOKEN
     # would be empty on those runs and the job would fail red on contributor PRs
     # through no fault of theirs — the same trap the Vercel check falls into.
-    # main still gets scanned on every push.
+    # main still gets scanned on every push, weekly schedule, and manual dispatch.
     if: >-
       github.event_name == 'push' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
       github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
@@ -60,6 +72,7 @@ jobs:
         run: npm install --package-lock-only --ignore-scripts
 
       - name: Run Snyk
+        id: snyk
         uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -68,3 +81,92 @@ jobs:
           # a wall of low-severity transitive noise. Lower it once the backlog
           # is clean.
           args: --severity-threshold=high --file=package-lock.json
+
+      - name: Alert on High/Critical Snyk Findings
+        if: failure() && steps.snyk.outcome == 'failure' && (github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/github-script@v9
+        env:
+          HAS_SNYK_TOKEN: ${{ secrets.SNYK_TOKEN != '' }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            if (process.env.HAS_SNYK_TOKEN !== 'true') {
+              console.log('SNYK_TOKEN secret is not set; skipping automated vulnerability issue creation.');
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const commitSha = context.sha ? context.sha.substring(0, 7) : 'unknown';
+            const MARKER = '<!-- snyk-vulnerability-alert -->';
+
+            // Check if an open alert issue already exists to avoid spamming duplicates
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              labels: 'security',
+              per_page: 50,
+            });
+
+            const existingIssue = issues.find(i => i.body && i.body.includes(MARKER));
+
+            if (existingIssue) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existingIssue.number,
+                body: [
+                  `### ⚠️ Recurring Snyk Scan Alert Update`,
+                  ``,
+                  `The automated Snyk scan on \`main\` detected active high/critical vulnerabilities.`,
+                  ``,
+                  `- **Trigger:** \`${context.eventName}\``,
+                  `- **Commit:** \`${commitSha}\``,
+                  `- **Workflow Run:** [View Snyk Logs](${runUrl})`,
+                  ``,
+                  `Please follow the triage and remediation guide in [docs/DEPENDENCY_REVIEW.md](https://github.com/${owner}/${repo}/blob/main/docs/DEPENDENCY_REVIEW.md).`,
+                ].join('\n'),
+              });
+              console.log(`Updated existing security tracking issue #${existingIssue.number}`);
+            } else {
+              const newIssue = await github.rest.issues.create({
+                owner,
+                repo,
+                title: '🔒 [Security Alert] High/Critical vulnerabilities detected by Snyk',
+                labels: ['security', 'dependencies', 'type:security', 'level:intermediate'],
+                body: [
+                  MARKER,
+                  `## 🔒 Snyk Security Scan Alert`,
+                  ``,
+                  `The recurring Snyk dependency scan on \`main\` has detected one or more **high** or **critical** severity vulnerabilities.`,
+                  ``,
+                  `### Scan Context`,
+                  `- **Trigger Event:** \`${context.eventName}\``,
+                  `- **Commit:** \`${commitSha}\``,
+                  `- **Run Details:** [View Workflow Run & Vulnerability Logs](${runUrl})`,
+                  `- **Severity Threshold:** \`high\` / \`critical\``,
+                  ``,
+                  `### Triage Expectations & SLA`,
+                  `- **Critical Findings:** Triage within **48 hours**; resolve/mitigate within **7 days**.`,
+                  `- **High Findings:** Triage within **5 business days**; resolve/mitigate within **14 days**.`,
+                  ``,
+                  `### Action Checklist for Maintainers & Contributors`,
+                  `1. **Inspect Findings:** Review the [Workflow Run](${runUrl}) logs to identify the vulnerable packages and CVE details.`,
+                  `2. **Check Dependabot Overlap:** Review open [Dependabot PRs](https://github.com/${owner}/${repo}/pulls?q=is%3Apr+is%3Aopen+label%3Adependencies) to see if an automated update PR already exists for the flagged package.`,
+                  `3. **Local Reproduction & Fix:**`,
+                  `   \`\`\`bash`,
+                  `   npm run security # generates temporary package-lock.json and runs snyk test`,
+                  `   bun update <vulnerable-package>`,
+                  `   bun test`,
+                  `   bun run build`,
+                  `   \`\`\``,
+                  `   > **Note:** Never commit \`package-lock.json\`. Keep \`bun.lock\` as the single source of truth.`,
+                  `4. **Unreachable / Dev-Only Exceptions:** If a vulnerability is confirmed non-exploitable (e.g. dev-only build tool with no client-side runtime path), document the exception with a clear rationale and expiry date in [\`.snyk\`](https://github.com/${owner}/${repo}/blob/main/.snyk).`,
+                  ``,
+                  `📖 Process details: [docs/DEPENDENCY_REVIEW.md](https://github.com/${owner}/${repo}/blob/main/docs/DEPENDENCY_REVIEW.md)`,
+                ].join('\n'),
+              });
+              console.log(`Created new security tracking issue #${newIssue.data.number}`);
+            }

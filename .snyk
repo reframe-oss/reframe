@@ -12,6 +12,7 @@
 #           reason: Not reachable — dev-only transitive dep, no runtime path
 #           expires: 2026-12-31T00:00:00.000Z
 #
+# See docs/DEPENDENCY_REVIEW.md for the full triage and exception procedure.
 # `patch` is unused: this project has no Snyk-patchable dependencies.
 version: v1.25.0
 ignore: {}
