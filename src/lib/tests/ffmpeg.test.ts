@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAudioFilter } from "../ffmpeg";
+import { buildAudioFilter, buildArguments } from "../ffmpeg";
 import { EditRecipe } from "../types";
 
 function build(speed: number, normalizeAudio: boolean): string {
@@ -48,3 +48,124 @@ describe("buildAudioFilter", () => {
     expect(result).toBe("volume=1.50");
   });
 });
+
+describe("buildArguments background music and keepAudio handling", () => {
+  const baseRecipe: EditRecipe = {
+    preset: "1080p",
+    customWidth: 1920,
+    customHeight: 1080,
+    quality: 23,
+    speed: 1,
+    trimStart: 0,
+    trimEnd: null,
+    format: "mp4",
+    keepAudio: true,
+    stabilization: false,
+    soundOnCompletion: false,
+    brightness: 0,
+    contrast: 1,
+    saturation: 1,
+    framing: "fit",
+    rotation: 0,
+    volume: 100,
+  };
+
+  const musicOptions = {
+    file: null,
+    musicVolume: 80,
+    originalAudioVolume: 50,
+    loopMusic: true,
+  };
+
+  it("includes background music as sole audio track when keepAudio is false", () => {
+    const recipe: EditRecipe = { ...baseRecipe, keepAudio: false };
+    const args = buildArguments(
+      recipe,
+      "mp4",
+      "output.mp4",
+      "input.mp4",
+      1920,
+      1080,
+      true, // hasMusicTrack
+      "music.mp3",
+      musicOptions,
+      false, // hasOverlay
+      "",
+      undefined,
+      true, // hasOriginalAudio
+      60
+    );
+
+    // Should include music input and loop option
+    expect(args).toContain("-i");
+    expect(args).toContain("music.mp3");
+    expect(args).toContain("-stream_loop");
+
+    // Filter complex should format music volume to [aout] without mixing [orig]
+    const filterComplexIndex = args.indexOf("-filter_complex");
+    expect(filterComplexIndex).toBeGreaterThan(-1);
+    const filterComplex = args[filterComplexIndex + 1];
+    expect(filterComplex).toContain("[1:a]volume=0.80[aout]");
+    expect(filterComplex).not.toContain("amix");
+
+    // Output should map [aout] and include audio codec (not -an)
+    expect(args).toContain("-map");
+    expect(args).toContain("[aout]");
+    expect(args).not.toContain("-an");
+    expect(args).toContain("-c:a");
+  });
+
+  it("mixes original audio and background music when keepAudio is true", () => {
+    const recipe: EditRecipe = { ...baseRecipe, keepAudio: true };
+    const args = buildArguments(
+      recipe,
+      "mp4",
+      "output.mp4",
+      "input.mp4",
+      1920,
+      1080,
+      true, // hasMusicTrack
+      "music.mp3",
+      musicOptions,
+      false, // hasOverlay
+      "",
+      undefined,
+      true, // hasOriginalAudio
+      60
+    );
+
+    const filterComplexIndex = args.indexOf("-filter_complex");
+    expect(filterComplexIndex).toBeGreaterThan(-1);
+    const filterComplex = args[filterComplexIndex + 1];
+    expect(filterComplex).toContain("volume=0.50[orig]");
+    expect(filterComplex).toContain("[1:a]volume=0.80[music]");
+    expect(filterComplex).toContain("[orig][music]amix=inputs=2:duration=first:dropout_transition=0[aout]");
+    expect(args).toContain("-map");
+    expect(args).toContain("[aout]");
+    expect(args).not.toContain("-an");
+  });
+
+  it("mutes audio completely with -an when keepAudio is false and there is no background music", () => {
+    const recipe: EditRecipe = { ...baseRecipe, keepAudio: false };
+    const args = buildArguments(
+      recipe,
+      "mp4",
+      "output.mp4",
+      "input.mp4",
+      1920,
+      1080,
+      false, // hasMusicTrack
+      "",
+      undefined,
+      false, // hasOverlay
+      "",
+      undefined,
+      true, // hasOriginalAudio
+      60
+    );
+
+    expect(args).toContain("-an");
+    expect(args).not.toContain("-c:a");
+  });
+});
+
