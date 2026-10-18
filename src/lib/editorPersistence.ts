@@ -19,7 +19,7 @@ function clamp(value: number, min: number, max: number): number {
 
 const VALID_FONT_WEIGHTS = ["normal", "bold", "900"];
 
-function sanitizeTextOverlay(overlay: any): TextOverlay {
+export function sanitizeTextOverlay(overlay: any): TextOverlay {
   return {
     id: typeof overlay.id === "string" ? overlay.id : generateTextOverlayId(),
     text: typeof overlay.text === "string" ? overlay.text.slice(0, 500) : "",

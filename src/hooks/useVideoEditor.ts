@@ -10,6 +10,7 @@ import {
   TimelineTrack,
   MultiTrackEditorState,
   isValidRecipe,
+  TextOverlay,
 } from "@/lib/types";
 import { DEFAULT_RECIPE, SPEED_STEPS } from "@/lib/constants";
 import { getPresetById } from "@/lib/presets";
@@ -31,6 +32,7 @@ import {
   migrateRecipe as migratePersistedRecipe,
   persistRecipe,
   persistSoundPreference,
+  sanitizeTextOverlay,
   RECIPE_STORAGE_KEY,
   LEGACY_SETTINGS_KEY,
 } from "@/lib/editorPersistence";
@@ -258,6 +260,22 @@ export function useVideoEditor() {
         return typeof val === "number" && !isNaN(val) && val >= 0 && val <= 2;
       case "saturation":
         return typeof val === "number" && !isNaN(val) && val >= 0 && val <= 3;
+      case "textOverlays":
+        return (
+          Array.isArray(val) &&
+          val.every(
+            (o) =>
+              o &&
+              typeof o === "object" &&
+              typeof o.id === "string" &&
+              typeof o.text === "string" &&
+              typeof o.x === "number" &&
+              typeof o.y === "number" &&
+              typeof o.fontSize === "number" &&
+              typeof o.color === "string" &&
+              ["normal", "bold", "900"].includes(o.fontWeight)
+          )
+        );
       default:
         return true;
     }
@@ -329,7 +347,20 @@ export function useVideoEditor() {
             const defaultType = typeof DEFAULT_RECIPE[key];
             let parsedVal: any;
 
-            if (defaultType === "number") {
+            if (key === "textOverlays") {
+              try {
+                const parsed = JSON.parse(paramVal);
+                if (Array.isArray(parsed)) {
+                  parsedVal = parsed.map(sanitizeTextOverlay);
+                } else if (paramVal.trim()) {
+                  parsedVal = [sanitizeTextOverlay({ text: paramVal })];
+                }
+              } catch {
+                if (paramVal.trim()) {
+                  parsedVal = [sanitizeTextOverlay({ text: paramVal })];
+                }
+              }
+            } else if (defaultType === "number") {
               parsedVal = parseFloat(paramVal);
             } else if (defaultType === "boolean") {
               parsedVal = paramVal === "true";
@@ -350,15 +381,48 @@ export function useVideoEditor() {
           }));
         }
       } else {
-        setRecipe((current) =>
-          loadPersistedRecipe(
-            localStorage,
-            migratePersistedRecipe({
-              ...current,
-              soundOnCompletion: getStoredSoundPreference(localStorage),
-            })
-          )
+        const textOverlaysParam = params.get("textOverlays");
+        let initialRecipe = loadPersistedRecipe(
+          localStorage,
+          migratePersistedRecipe({
+            ...DEFAULT_RECIPE,
+            soundOnCompletion: getStoredSoundPreference(localStorage),
+          })
         );
+
+        if (textOverlaysParam) {
+          try {
+            const parsed = JSON.parse(textOverlaysParam);
+            if (Array.isArray(parsed)) {
+              initialRecipe = {
+                ...initialRecipe,
+                textOverlays: parsed.map(sanitizeTextOverlay),
+              };
+            } else if (typeof textOverlaysParam === "string" && textOverlaysParam.trim()) {
+              initialRecipe = {
+                ...initialRecipe,
+                textOverlays: [
+                  sanitizeTextOverlay({
+                    text: textOverlaysParam,
+                  }),
+                ],
+              };
+            }
+          } catch {
+            if (textOverlaysParam.trim()) {
+              initialRecipe = {
+                ...initialRecipe,
+                textOverlays: [
+                  sanitizeTextOverlay({
+                    text: textOverlaysParam,
+                  }),
+                ],
+              };
+            }
+          }
+        }
+
+        setRecipe(initialRecipe);
       }
     } catch (e) {
       // ignore
@@ -374,6 +438,14 @@ export function useVideoEditor() {
       recipeKeys.forEach((key) => {
         const currentVal = recipe[key];
         const defaultVal = DEFAULT_RECIPE[key];
+
+        if (key === "textOverlays") {
+          const overlays = Array.isArray(currentVal) ? (currentVal as TextOverlay[]) : [];
+          if (overlays.length > 0) {
+            params.set(key, JSON.stringify(overlays));
+          }
+          return;
+        }
 
         if (currentVal !== defaultVal) {
           params.set(key, currentVal === null ? "null" : String(currentVal));

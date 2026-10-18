@@ -39,6 +39,7 @@ describe("useVideoEditor core controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
+    window.history.replaceState(null, "", "/");
   });
 
   it("should initialize with the default recipe", () => {
@@ -82,5 +83,35 @@ describe("useVideoEditor core controller", () => {
       result.current.resetSettings();
     });
     expect(result.current.recipe.speed).toBe(DEFAULT_RECIPE.speed);
+  });
+
+  it("should parse textOverlays string from query param on initial load", () => {
+    window.history.replaceState(null, "", "/?textOverlays=hello");
+    const { result } = renderHook(() => useVideoEditor());
+    expect(result.current.recipe.textOverlays).toHaveLength(1);
+    expect(result.current.recipe.textOverlays[0]?.text).toBe("hello");
+  });
+
+  it("should parse textOverlays JSON array from query param on initial load", () => {
+    const overlays = [
+      {
+        id: "custom-1",
+        text: "Title overlay",
+        x: 50,
+        y: 20,
+        fontSize: 36,
+        color: "#ffffff",
+        fontWeight: "bold",
+      },
+    ];
+    window.history.replaceState(
+      null,
+      "",
+      `/?textOverlays=${encodeURIComponent(JSON.stringify(overlays))}`
+    );
+    const { result } = renderHook(() => useVideoEditor());
+    expect(result.current.recipe.textOverlays).toHaveLength(1);
+    expect(result.current.recipe.textOverlays[0]?.text).toBe("Title overlay");
+    expect(result.current.recipe.textOverlays[0]?.fontWeight).toBe("bold");
   });
 });

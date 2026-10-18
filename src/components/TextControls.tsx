@@ -214,10 +214,39 @@ export default function TextControls({
               ))}
             </div>
           </div>
+
+          {/* Position Presets */}
+          <div>
+            <span className="text-xs text-[var(--muted)] font-medium mb-1 block">
+              Position Presets
+            </span>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { label: "Top Left", x: 10, y: 10 },
+                { label: "Top", x: 50, y: 10 },
+                { label: "Top Right", x: 90, y: 10 },
+                { label: "Left", x: 10, y: 50 },
+                { label: "Center", x: 50, y: 50 },
+                { label: "Right", x: 90, y: 50 },
+                { label: "Bottom Left", x: 10, y: 90 },
+                { label: "Bottom", x: 50, y: 90 },
+                { label: "Bottom Right", x: 90, y: 90 },
+              ].map((pos) => (
+                <button
+                  key={pos.label}
+                  type="button"
+                  onClick={() =>
+                    handleUpdateText(selectedTextId!, { x: pos.x, y: pos.y })
+                  }
+                  className="px-2 py-1 text-[11px] rounded border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--border)] hover:text-[var(--text)] transition-colors"
+                >
+                  {pos.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
-}
-
-// help
+}
