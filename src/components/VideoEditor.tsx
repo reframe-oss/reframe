@@ -469,7 +469,12 @@ export default function VideoEditor() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
           <div className="space-y-4 min-w-0">
             {!file && <PrivacyBanner />}
-            <div className="bg-[var(--surface)] rounded-xl p-3 border border-[var(--border)] animate-fade-in">
+            <div
+              className={cn(
+                "bg-[var(--surface)] rounded-xl p-3 border border-[var(--border)] animate-fade-in",
+                file && "lg:sticky lg:top-16 lg:z-30 lg:shadow-md"
+              )}
+            >
               <FileUpload
                 onFileSelect={handleFileSelect}
                 currentFile={file}
