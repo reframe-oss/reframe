@@ -14,6 +14,7 @@ import {
   Lock,
   Mail,
   HeartHandshake,
+  Scale,
 } from "lucide-react";
 
 export default function Footer() {
@@ -87,6 +88,15 @@ export default function Footer() {
             >
               <Lock size={14} />
               Privacy Policy
+            </Link>
+
+            <Link
+              href="/terms"
+              aria-label="Terms and Conditions"
+              className="flex items-center gap-2 opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+            >
+              <Scale size={14} />
+              Terms &amp; Conditions
             </Link>
 
             {/* Netlify's open source plan expects a publicly reachable Code of
