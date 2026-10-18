@@ -278,7 +278,16 @@ export default function FileUpload({
     setError("");
     setWarning("");
 
-    if (!file.type.startsWith("video/")) {
+    const validExtensions = [".mp4", ".mov", ".avi", ".webm", ".mkv"];
+    const filename = file.name.toLowerCase();
+    const hasValidExtension = validExtensions.some((ext) => filename.endsWith(ext));
+    const isVideoMime = file.type.startsWith("video/");
+    const isGenericMime =
+      !file.type ||
+      file.type === "application/octet-stream" ||
+      file.type === "application/x-matroska";
+
+    if (!isVideoMime && (!hasValidExtension || !isGenericMime)) {
       setError("Please drop a valid video file (MP4, MOV, AVI, WebM, etc.)");
       return;
     }
@@ -429,7 +438,7 @@ export default function FileUpload({
         <input
           ref={inputRef}
           type="file"
-          accept="video/*"
+          accept="video/*,.mp4,.mov,.avi,.webm,.mkv"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];

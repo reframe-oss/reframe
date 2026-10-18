@@ -39,6 +39,7 @@ describe("useVideoEditor core controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
+    window.history.replaceState(null, "", "/");
   });
 
   it("should initialize with the default recipe", () => {
@@ -62,6 +63,7 @@ describe("useVideoEditor core controller", () => {
 
   it("should ignore invalid patch values via isValidValue check", () => {
     const { result } = renderHook(() => useVideoEditor());
+    expect(result.current.recipe.speed).toBe(DEFAULT_RECIPE.speed);
     act(() => {
       // 9999 is invalid for speed, -50 is invalid for quality
       result.current.updateRecipe({ speed: 9999, quality: -50 } as any);
@@ -82,5 +84,32 @@ describe("useVideoEditor core controller", () => {
       result.current.resetSettings();
     });
     expect(result.current.recipe.speed).toBe(DEFAULT_RECIPE.speed);
+  });
+
+  it("should accept video file with empty or generic MIME type if extension is valid", () => {
+    const { result } = renderHook(() => useVideoEditor());
+    const validFileWithGenericMime = new File(["dummy content"], "test.mp4", {
+      type: "",
+    });
+
+    act(() => {
+      result.current.handleFileSelect(validFileWithGenericMime);
+    });
+
+    expect(result.current.fileError).toBe("");
+    expect(result.current.error).toBeNull();
+  });
+
+  it("should reject non-video files even if MIME type is empty or generic", () => {
+    const { result } = renderHook(() => useVideoEditor());
+    const invalidFile = new File(["dummy content"], "document.pdf", {
+      type: "",
+    });
+
+    act(() => {
+      result.current.handleFileSelect(invalidFile);
+    });
+
+    expect(result.current.fileError).toBe("Please upload a video file only.");
   });
 });

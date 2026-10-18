@@ -424,7 +424,17 @@ export function useVideoEditor() {
       return;
     }
 
-    if (!selectedFile.type.startsWith("video/")) {
+    const validExtensions = [".mp4", ".mov", ".avi", ".webm", ".mkv"];
+    const filename = selectedFile.name.toLowerCase();
+    const hasValidExtension = validExtensions.some((ext) => filename.endsWith(ext));
+
+    const isVideoMime = selectedFile.type.startsWith("video/");
+    const isGenericMime =
+      !selectedFile.type ||
+      selectedFile.type === "application/octet-stream" ||
+      selectedFile.type === "application/x-matroska";
+
+    if (!isVideoMime && (!hasValidExtension || !isGenericMime)) {
       setFileError("Please upload a video file only.");
       return;
     }
@@ -438,9 +448,6 @@ export function useVideoEditor() {
       return;
     }
 
-    const validExtensions = [".mp4", ".mov", ".avi", ".webm", ".mkv"];
-    const filename = selectedFile.name.toLowerCase();
-    const hasValidExtension = validExtensions.some((ext) => filename.endsWith(ext));
     if (!hasValidExtension) {
       setError(
         `Layer 1 Validation Failed: Invalid file extension. Expected one of: ${validExtensions.join(", ")}`
@@ -449,7 +456,7 @@ export function useVideoEditor() {
       return;
     }
 
-    if (!selectedFile.type.startsWith("video/")) {
+    if (!isVideoMime && !isGenericMime) {
       setError(
         `Layer 2 Validation Failed: Invalid MIME type. Expected video/*, got ${selectedFile.type || "unknown"}`
       );
