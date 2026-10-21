@@ -94,10 +94,15 @@ Everything stays on your device. No servers. No tracking. No login.
 
 | Shortcut | Action |
 |----------|--------|
-| Ctrl+Enter / Cmd+Enter | Export video |
+| Ctrl+Shift+E / Cmd+Shift+E | Export video |
 | Space | Play/pause video preview |
 | M | Toggle audio mute |
+| R | Reset all settings |
 | Escape | Cancel export |
+| 1–9 | Switch preset by index |
+| I | Set trim in-point |
+| O | Set trim out-point |
+| ? | Toggle keyboard shortcuts panel |
 
 > On macOS, use `Cmd` instead of `Ctrl` for keyboard shortcuts.
 
