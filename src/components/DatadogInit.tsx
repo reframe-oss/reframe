@@ -1,21 +1,17 @@
 "use client";
 
 import { useEffect } from "react";
-import { capabilityContext, registerRum } from "@/lib/telemetry";
-
-/** Strip query strings: Reframe mirrors editing settings into the URL. */
-function stripQuery(url: string | undefined): string | undefined {
-  if (!url) return url;
-  const i = url.indexOf("?");
-  return i === -1 ? url : url.slice(0, i);
-}
+import { capabilityContext, currentTelemetryEnv, registerRum, sanitizeRumEvent } from "@/lib/telemetry";
 
 export default function DatadogInit() {
   useEffect(() => {
     const applicationId = process.env.NEXT_PUBLIC_DATADOG_APPLICATION_ID;
     const clientToken = process.env.NEXT_PUBLIC_DATADOG_CLIENT_TOKEN;
 
-    if (!applicationId || !clientToken) {
+    // null on localhost, LAN addresses and automated browsers unless
+    // NEXT_PUBLIC_DATADOG_ENV names a non-production env (see telemetry.ts).
+    const env = currentTelemetryEnv();
+    if (!applicationId || !clientToken || !env) {
       return;
     }
 
@@ -33,8 +29,7 @@ export default function DatadogInit() {
             clientToken,
             site: "datadoghq.com",
             service: "reframe",
-            // Lets local/preview measurements be separated from production.
-            env: process.env.NEXT_PUBLIC_DATADOG_ENV || "production",
+            env,
             version: "0.1.0",
             sessionSampleRate: 100,
             // Reframe advertises itself as 100% private client-side video editing —
@@ -48,18 +43,9 @@ export default function DatadogInit() {
             enablePrivacyForActionName: true,
             trackResources: true,
             trackLongTasks: true,
-            beforeSend: (event) => {
-              // The editor mirrors recipe settings into the query string, and
-              // previews are blob: URLs — neither should leave the device.
-              if (event.view) {
-                event.view.url = stripQuery(event.view.url) ?? event.view.url;
-                event.view.referrer = stripQuery(event.view.referrer);
-              }
-              if (event.type === "resource" && event.resource.url.startsWith("blob:")) {
-                return false;
-              }
-              return true;
-            },
+            // Strips the recipe query string, blob: previews, file names,
+            // captions and local paths from automatically collected events.
+            beforeSend: (event) => sanitizeRumEvent(event as Parameters<typeof sanitizeRumEvent>[0]),
           });
           datadogRum.setGlobalContext(capabilityContext());
           registerRum(datadogRum);

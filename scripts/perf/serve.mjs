@@ -1,11 +1,12 @@
-// Minimal static server for `out/` that mirrors the headers in vercel.json
-// (COOP/COEP etc.), so local runs see the cross-origin-isolated mode that
-// vercel.json intends. NOISO=1 drops the headers (what production currently
-// serves — see docs/PERFORMANCE.md). Usage: [NOISO=1] node serve.mjs <dir> <port>
+// Minimal static server for `out/` that sends the headers declared in
+// vercel.json (read at startup, so local runs test the deployed config).
+// NOISO=1 drops COOP/COEP to exercise the single-threaded fallback.
+// Usage: [NOISO=1] node serve.mjs <dir> <port>
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
+import { fileURLToPath } from "node:url";
 
 const root = path.resolve(process.argv[2]);
 const port = Number(process.argv[3] ?? 4300);
@@ -14,11 +15,14 @@ const types = {
   ".svg": "image/svg+xml", ".json": "application/json", ".txt": "text/plain",
   ".woff2": "font/woff2", ".mp3": "audio/mpeg", ".png": "image/png", ".wasm": "application/wasm",
 };
-const headers = process.env.NOISO ? { "X-Content-Type-Options": "nosniff" } : {
-  "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp",
-};
+
+const vercelJson = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../vercel.json");
+const rule = JSON.parse(fs.readFileSync(vercelJson, "utf8")).headers.find((h) => h.source === "/(.*)");
+const headers = Object.fromEntries(rule.headers.map((h) => [h.key, h.value]));
+if (process.env.NOISO) {
+  delete headers["Cross-Origin-Opener-Policy"];
+  delete headers["Cross-Origin-Embedder-Policy"];
+}
 
 http.createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, "http://x").pathname);
@@ -38,4 +42,4 @@ http.createServer((req, res) => {
     return;
   }
   res.writeHead(200, h).end(body);
-}).listen(port, () => console.log(`serving ${root} on http://localhost:${port}`));
+}).listen(port, () => console.log(`serving ${root} on http://localhost:${port}${process.env.NOISO ? " (no COOP/COEP)" : ""}`));

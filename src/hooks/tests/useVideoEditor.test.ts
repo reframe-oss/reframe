@@ -8,7 +8,9 @@ vi.mock("@/lib/ffmpeg", () => ({
   loadFFmpeg: vi.fn().mockResolvedValue(true),
   exportVideo: vi.fn().mockResolvedValue({ blobUrl: "blob:test" }),
   terminateFFmpeg: vi.fn(),
+  getEngineMode: vi.fn(() => null),
   FFmpegLoadError: class extends Error {},
+  ExportStalledError: class extends Error {},
 }));
 
 vi.mock("@/lib/sessionDB", () => ({

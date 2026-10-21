@@ -5,7 +5,11 @@ import {
   terminateFFmpeg,
   dedupeProgress,
   getFFmpegClientState,
+  getEngineMode,
+  resetEnginePreferenceForTests,
   FFmpegLoadError,
+  ExportStalledError,
+  STALL_TIMEOUT_MS,
 } from "../ffmpeg";
 import { DEFAULT_RECIPE } from "../constants";
 
@@ -24,14 +28,14 @@ const workers: FakeWorker[] = [];
 class FakeWorker {
   onmessage: ((e: MessageEvent) => void) | null = null;
   onerror: ((e: ErrorEvent) => void) | null = null;
-  posted: { type: string; id?: string }[] = [];
+  posted: { type: string; id?: string; singleThread?: boolean }[] = [];
   terminated = false;
   constructor() {
     workers.push(this);
   }
-  postMessage(msg: { type: string; id?: string }) {
+  postMessage(msg: { type: string; id?: string; singleThread?: boolean }) {
     this.posted.push(msg);
-    if (msg.type === "load") queueMicrotask(() => (script.onLoad ?? ((w) => w.emit({ type: "ready" })))(this));
+    if (msg.type === "load") queueMicrotask(() => (script.onLoad ?? ((w) => w.emit({ type: "ready", mode: "single" })))(this));
     if (msg.type === "export") queueMicrotask(() => script.onExport?.(this, msg.id!));
   }
   terminate() {
@@ -66,6 +70,8 @@ beforeEach(() => {
 
 afterEach(() => {
   terminateFFmpeg();
+  resetEnginePreferenceForTests();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -162,4 +168,70 @@ describe("FFmpeg client lifecycle", () => {
     res.dispose();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:out");
   });
+
+  it("records which core the worker actually loaded", async () => {
+    script.onLoad = (w) => w.emit({ type: "ready", mode: "multi" });
+    expect(getEngineMode()).toBeNull();
+    await loadFFmpeg();
+    expect(getEngineMode()).toBe("multi");
+  });
+
+  it("a worker error without an export id fails the pending export instead of hanging it", async () => {
+    script.onExport = (w) => w.emit({ type: "error", message: "unexpected" });
+    await loadFFmpeg();
+    await expect(run()).rejects.toBeInstanceOf(FFmpegLoadError);
+    expect(workers[0]!.terminated).toBe(true);
+    expect(getFFmpegClientState()).toEqual({ hasWorker: false, hasPendingExport: false, hasPendingProgress: false });
+  });
+
+  it("cancelling during engine load discards the half-loaded worker", async () => {
+    script.onLoad = () => {}; // never finishes
+    const controller = new AbortController();
+    const loading = loadFFmpeg(controller.signal);
+    await new Promise((r) => setTimeout(r, 0));
+    controller.abort();
+    await expect(loading).rejects.toMatchObject({ name: "AbortError" });
+    expect(workers[0]!.terminated).toBe(true);
+
+    script.onLoad = undefined;
+    script.onExport = (w, id) => w.emit(result(id));
+    await expect(run()).resolves.toMatchObject({ format: "mp4" });
+    expect(workers).toHaveLength(2);
+  });
+
+  it("heartbeats keep a slow export alive", async () => {
+    vi.useFakeTimers();
+    let worker!: FakeWorker;
+    let jobId = "";
+    script.onExport = (w, id) => {
+      worker = w;
+      jobId = id;
+    };
+    const pending = run();
+    for (let t = 0; t < STALL_TIMEOUT_MS * 2; t += 10_000) {
+      await vi.advanceTimersByTimeAsync(10_000);
+      worker?.emit({ type: "heartbeat" });
+    }
+    worker.emit(result(jobId));
+    await expect(pending).resolves.toMatchObject({ size: 8 });
+  });
+
+  it("a stalled multi-threaded export fails, and the retry loads the single-threaded core", async () => {
+    vi.useFakeTimers();
+    script.onLoad = (w) => w.emit({ type: "ready", mode: "multi" });
+    script.onExport = () => {}; // wedged: no progress, no heartbeat
+    const pending = run();
+    const assertion = expect(pending).rejects.toBeInstanceOf(ExportStalledError);
+    await vi.advanceTimersByTimeAsync(STALL_TIMEOUT_MS + 5_000);
+    await assertion;
+    await expect(pending).rejects.toMatchObject({ mode: "multi" });
+    expect(workers[0]!.terminated).toBe(true);
+    expect(getFFmpegClientState().hasWorker).toBe(false);
+
+    script.onLoad = undefined;
+    script.onExport = (w, id) => w.emit(result(id));
+    await expect(run()).resolves.toMatchObject({ format: "mp4" });
+    expect(workers[1]!.posted.find((m) => m.type === "load")).toMatchObject({ singleThread: true });
+  });
 });
+

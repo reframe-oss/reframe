@@ -142,38 +142,191 @@ stay responsive.
 9. **The `-t` output-duration fix (#1289) never reached the worker.** It only
    changed the unused main-thread copy of `buildArguments`. The worker now
    always passes `-t`, which prevents endless exports with looped music on
-   silent clips.
+   silent clips. The copies are now merged (see "FFmpeg export reliability").
 10. **The multi-threaded core deadlocked.** On "auto" thread count,
     libx264/libvpx asked for more threads than the core-mt pthread pool holds.
-    Encoder threads are now capped at 4 when cross-origin isolated (see
-    "Cross-origin isolation" below).
+    Decoder, filter and encoder threads are now capped at 4, only when the
+    multi-threaded core actually loaded (see "FFmpeg export reliability").
 11. **`ResizeObserver` for preview sizing.** It replaces a `window` resize
     listener that missed layout-driven size changes. Sub-pixel changes no
     longer re-render.
 12. **A drop on the drop zone was handled twice**, once by the zone and once
     by the document listener, so validation and metadata extraction ran twice.
 
-## Cross-origin isolation: production finding (needs a maintainer)
+## Deployment headers and cross-origin isolation
 
-The live deployment sends **none** of the headers in `vercel.json`. On
-2026-10-21, `curl -sI https://reframe-lilac.vercel.app/` showed only Vercel's
-default `strict-transport-security`: no COOP/COEP, `X-Frame-Options`,
-`X-Content-Type-Options`, `Referrer-Policy` or `Permissions-Policy`.
+### What production serves today (observed)
 
-The likely cause is that `vercel.json` combines the legacy `routes` key with
-`headers`, which Vercel documents as mutually exclusive. This has not been
-verified on Vercel. Consequences:
+On 2026-10-21 `node scripts/perf/check-headers.mjs https://reframe-lilac.vercel.app/`
+reported **every** header from `vercel.json` missing. The only security header
+was Vercel's own default `Strict-Transport-Security: max-age=63072000;
+includeSubDomains; preload`. So production is not cross-origin isolated and
+runs the single-threaded FFmpeg core.
 
-- Production runs the **single-threaded** core (exports are 4–4.5× slower
-  than multi-threaded in the table above).
-- The intended security headers are not applied.
-- Until this branch, **turning the headers on would have broken exports**:
-  the multi-threaded path deadlocked (fix 10).
+### Root cause (confirmed locally; not yet confirmed on a Vercel deployment)
 
-`vercel.json` is deliberately unchanged here. Suggested follow-up: remove the
-`routes` block (`handle: filesystem` is already the default for static
-output), deploy a preview, confirm the headers with `curl -sI`, and run an
-export on the preview before promoting it.
+`vercel.json` had a legacy `routes: [{ "handle": "filesystem" }]` block next to
+`headers`. Vercel's docs now allow both keys together, so the config wasn't
+rejected. But compiling the project with `vercel build` (CLI 59.11.2, offline,
+`framework: nextjs`) shows where the header rule ends up:
+
+| | Compiled route order (`.vercel/output/config.json`) |
+|---|---|
+| With `routes` | `…, handle: filesystem, ^/(.*)$ → headers, …` |
+| Without `routes` | `…, ^/(.*)$ → headers (continue), …, handle: filesystem, …` |
+
+With `routes`, the header rule sits *after* the filesystem phase. Every page
+of a static export is a file, so the filesystem phase serves it and routing
+stops before the headers are added. Removing the block changes nothing else:
+apart from the build ID, every other compiled route is identical.
+`handle: filesystem` was redundant, since the filesystem is checked by
+default.
+
+### Supported configuration (this branch)
+
+`vercel.json` keeps one catch-all `headers` rule and no `routes`.
+`src/lib/tests/deployConfig.test.ts` fails if `routes` comes back, if a
+required header goes missing, or if `netlify.toml` / `public/_headers` drift
+out of sync.
+
+| Header | Value | Why |
+|---|---|---|
+| `Cross-Origin-Opener-Policy` | `same-origin` | Needed, with COEP, for `crossOriginIsolated` → SharedArrayBuffer → multi-threaded core. Reframe opens no cross-origin popups that need `window.opener`. |
+| `Cross-Origin-Embedder-Policy` | `require-corp` | See above. Compatible because the app loads no third-party scripts, styles, fonts or images. The FFmpeg cores are fetched with CORS (jsDelivr sends `Access-Control-Allow-Origin: *`) and used as `blob:` URLs. Datadog's SDK is bundled, and its intake calls are CORS `fetch`/beacon. |
+| `X-Content-Type-Options` | `nosniff` | |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | The query string holds the recipe; this policy never sends it cross-origin. |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | The app uses none of these. Web Share and clipboard write keep their same-origin defaults. |
+| `X-Frame-Options` | `DENY` | Reframe isn't meant to be embedded. This header alone covers it; a CSP `frame-ancestors` would be a duplicate. |
+
+Deliberately omitted:
+- **`Strict-Transport-Security`.** The old value (1 year, no `preload`)
+  never reached production. Now that headers apply, it would *downgrade*
+  Vercel's default (2 years, `preload`). Netlify files keep theirs.
+- **`Content-Security-Policy`.** A useful CSP needs `wasm-unsafe-eval`,
+  `blob:` workers, jsDelivr and the Datadog intake allow-listed. That needs
+  its own preview test; a broad one risks breaking exports.
+
+Verified locally: `scripts/perf/serve.mjs` now reads `vercel.json`, so local
+runs send exactly the deployed headers. The isolated run loaded the
+multi-threaded core with 0 COEP-blocked requests and exported successfully
+(next section). **A Vercel deployment with these headers has not been
+observed yet**: the CLI token on this machine is invalid, and preview URLs
+are behind Vercel SSO.
+
+### Preview verification steps (maintainer)
+
+```bash
+git push -u origin feat/premium-ui-perf      # Vercel builds a preview for the branch
+# Find the preview URL in the PR's Vercel check or `vercel ls`. Previews use
+# Vercel SSO; for scripted checks create a Protection Bypass for Automation
+# secret (Project → Settings → Deployment Protection) and export it:
+VERCEL_AUTOMATION_BYPASS_SECRET=… node scripts/perf/check-headers.mjs https://<preview>.vercel.app/
+```
+
+Then, in a normal browser window on the preview:
+1. In DevTools, `crossOriginIsolated` should be `true`, and the console
+   should show no `Cross-Origin-Embedder-Policy` errors.
+2. Upload a clip. Check preview, playback, frame strip and trim.
+3. Export MP4 1080p. The Network panel should show `@ffmpeg/core-mt@0.12.10`
+   files, and the export should finish.
+4. Export WebM and GIF; cancel once during "Loading engine" and once during
+   encoding, then export again; download the result.
+5. Open the preview in a context without isolation (or locally with
+   `NOISO=1`) and confirm an export still finishes on `@ffmpeg/core@0.12.10`.
+6. Only after all of that: promote. Production promotion is a separate,
+   explicit decision.
+
+## FFmpeg export reliability
+
+- **One command builder.** `src/lib/ffmpegArgs.ts` builds every FFmpeg
+  command, and the worker runs them. Merging the copies fixed three settings
+  the running worker had silently ignored, because only the unused
+  main-thread copy handled them: **Sharpness** (`unsharp`), **Volume**
+  (`volume=`), and #1289's `-t` guard. `ffmpegWorker.test.ts` runs the real
+  worker module against a fake FFmpeg and checks the commands it actually
+  passes to `exec`.
+- **Thread caps.** `resolveThreadCount(mode, cores)` returns 0 for the
+  single-threaded core (no thread flags at all), and `min(4, cores)` for the
+  multi-threaded one. The cap is applied to:
+  - the decoder (`-threads` before `-i`)
+  - the filter graph (`-filter_threads`, plus `-filter_complex_threads` when
+    there is one)
+  - the encoder
+
+  Why the cap is needed: `@ffmpeg/core-mt` pre-spawns 32 pthread workers, and
+  starting a thread beyond that needs the FFmpeg worker's event loop, which
+  is blocked inside `exec`. With "auto", the decoder and x264 each size
+  themselves from the CPU count, which deadlocked at 0% on an 11-core
+  machine.
+- **Mode decided by what loaded, not by headers alone.** The worker reports
+  the core it loaded (`ready: { mode }`). If the multi-threaded core fails
+  to download or instantiate, it falls back to the single-threaded core, and
+  no thread flags are passed.
+- **Stall watchdog.** The worker sends a heartbeat (at most every 2 s) on
+  FFmpeg log and progress output. With no activity for 60 s, the client
+  fails the export with `ExportStalledError` and discards the worker. If the
+  stalled export was multi-threaded, later exports in that page session use
+  the single-threaded core, and the message says so ("…switched to its
+  compatible (single-threaded) engine — select Retry export"). This caught a
+  real hang during testing: the old VP9 settings hung the multi-threaded
+  core instead of erroring.
+- **WebM fixed (pre-existing on `main`).** In `@ffmpeg/core` 0.12.10 every
+  `libvpx-vp9` setting tried (realtime/good, CRF/bitrate, `row-mt 0`,
+  `lag-in-frames 0`) and `libopus` trap with
+  `RuntimeError: memory access out of bounds`; x264, VP8 and Vorbis work.
+  Tested in a throwaway diagnostic build. WebM now uses **VP8 + Vorbis**
+  (`-deadline realtime -cpu-used 8`, CRF with an 8 Mb/s ceiling). The WebM
+  fallback for failed MP4/MKV exports used VP9 too, so it could never have
+  worked either.
+- **Lifecycle fixes:**
+  - A worker error without an export id used to clear the pending export
+    without rejecting it, leaving the UI on "Exporting" forever. It now fails
+    the export and discards the worker.
+  - Cancelling during engine load now discards the half-loaded worker; the
+    next export starts fresh.
+  - A leaked FFmpeg log listener, added on every export and never removed,
+    is fixed.
+  - The `(error as Error).message` pattern sent `undefined` for wasm traps,
+    which reject with a string. The message is now kept, and categorised as
+    `crash`, not `memory`.
+  - Engine downloads check `response.ok`.
+- Temp files (`input_<id>`, `output_<id>`, palette, music, overlay) are
+  deleted after every export. Names come from the job id, never from the
+  user's file name.
+
+### Validation matrix (local, 2026-10-21)
+
+Chrome 155.0.8059.85 headless, macOS, M3 Pro (11 cores). Production build of
+this branch, served by `scripts/perf/serve.mjs` (headers from `vercel.json`;
+`NOISO=1` without COOP/COEP). Clip: `sample-6s.mp4` (6.02 s, 640×360 H.264 +
+AAC stereo, generated by `make-fixture.js`). Default settings unless noted;
+output 1920×1080 unless noted. These are **local measurements**, not
+production observations.
+
+| Scenario | Isolated (core-mt) | Not isolated (core) |
+|---|---|---|
+| Core actually fetched | `@ffmpeg/core-mt` only | `@ffmpeg/core` only |
+| COEP-blocked requests | 0 | 0 |
+| Datadog requests (localhost) | 0 | 0 |
+| MP4 1280×720 / 1920×1080 / 1080×1920 encode | 1.21 / 2.66 / 1.61 s | 5.16 / 11.26 / 7.45 s |
+| Long tasks during those exports; worst frame gap | 0; 17–33 ms | 0; 17–33 ms |
+| MP4 with sharpness 2 + volume 50% | ok, 5.8 s cold | ok, 15.7 s cold |
+| WebM (VP8 + Vorbis) | ok, 9.2 s, 0.98 MB | ok, 9.3 s, 0.93 MB |
+| WebM with VP9 + Opus (previous commit; `main` checked non-isolated only) | **fails** (hang → watchdog) | **fails** (also on `main`) |
+| GIF | ok, 80.8 s, 130.6 MB | ok, 77.3 s, 130.6 MB |
+| Cancel during engine load → idle; workers after | 51 ms; 0 | 21 ms; 0 |
+| …then export | ok | ok |
+| Engine download blocked → message → Retry | "The video engine couldn't start…"; retry ok | same |
+| 3 × export→cancel at 5%: cancel → idle; workers | 8–40 ms; 34, 34, 34 | 8–11 ms; 2, 2, 2 |
+| Export after cancels; workers 5 s later | ok; 34 → 34 | ok; 2 → 2 |
+
+"Cold" times include engine start. Worker counts include the pthread pool
+(32) in isolated mode.
+
+Not covered: Safari, Firefox and mobile devices, files over 6 s, and a
+many-core device. Chrome's `Emulation.setHardwareConcurrencyOverride`
+doesn't reach workers, so the cap's behaviour above 11 cores is reasoned
+from the 32-thread pool, not measured.
 
 ## Datadog RUM
 
@@ -191,17 +344,41 @@ Configured in `src/components/DatadogInit.tsx`, with helpers in
     URLs and referrers, and drops `blob:` resources.
   - Custom events carry only buckets and enums, never file names, captions,
     paths or exact values.
-- `NEXT_PUBLIC_DATADOG_ENV` (default `production`) lets local and preview
-  runs be separated.
+- **Environment separation** (`resolveTelemetryEnv` in `telemetry.ts`):
+  - RUM does not start on `localhost`, `*.local`, loopback or private-LAN
+    addresses, or when `navigator.webdriver` is true (Puppeteer, Playwright,
+    Lighthouse CI). This holds even though `.env.local` holds real keys, and
+    even if `NEXT_PUBLIC_DATADOG_ENV=production` is set locally.
+  - To measure locally on purpose, build with a non-production env, e.g.
+    `NEXT_PUBLIC_DATADOG_ENV=local-perf bun run build`. Set it to `off` to
+    disable RUM anywhere.
+  - Deployed builds report `preview` when Vercel exposes
+    `NEXT_PUBLIC_VERCEL_ENV=preview`, and `production` otherwise (as before).
+  - Missing keys mean no RUM and no queued calls.
+  - Earlier on 2026-10-21, before this guard, local baseline runs sent some
+    events tagged `env:production`; later ones were tagged `local-perf`.
+- **Scrubbing automatically collected events** (`sanitizeRumEvent`, used as
+  `beforeSend`):
+  - Removes query strings and hashes from view, referrer, resource and error
+    resource URLs.
+  - Drops `blob:`, `data:` and `file:` resources.
+  - In error messages, stacks, causes, action target names and view names,
+    replaces the current video, music and overlay file names (and their
+    stems) and the caption text with `[redacted]`. These are registered
+    in memory only.
+  - Also replaces any media file name, local path (`/Users/…`, `C:\…`) and
+    `blob:`/`file:` URL.
+  - Caps text at 1,000 characters.
+  - Tested in `telemetry.test.ts`.
 
 | Event | Type | Properties |
 |---|---|---|
-| `ffmpeg_init` | duration vital + action | `threading` (`multi`/`single`), `durationMs` |
+| `ffmpeg_init` | duration vital + action | `threading` (`multi`/`single`, the core that actually loaded), `durationMs` |
 | `ffmpeg_load_success` / `ffmpeg_load_failure` | action | `durationMs`, `threading` / `reason` |
 | `export_start` | action | `format`, `resolution` bucket, `input_size` bucket, `clip_length` bucket, `has_text`, `has_music`, `has_image_overlay` |
 | `export` | duration vital + action | encoding time only (engine start is `ffmpeg_init`) + the above |
 | `export_success` | action | the above + `output_size` bucket, `durationMs` |
-| `export_failure` | action | the above + `stage` (`engine`/`encode`), `category` (`engine`/`network`/`codec`/`memory`/`ffmpeg`) |
+| `export_failure` | action | the above + `engine` (`multi`/`single`/`none`), `stage` (`engine`/`encode`), `category` (`engine`/`network`/`codec`/`memory`/`crash`/`stalled`/`ffmpeg`) |
 | `export_cancel` | action | `stage`, `durationMs` |
 | `thumbnails_generated` | duration vital + action | `frames`, `skipped`, `durationMs` |
 | `thumbnails_failed` | action | `reason` (`timeout`/`decode`) |
@@ -228,8 +405,9 @@ bun run test
 
 # Production build served like production
 bun run build
-node scripts/perf/serve.mjs out 4300              # with COOP/COEP (vercel.json intent)
-NOISO=1 node scripts/perf/serve.mjs out 4301      # without (what production serves today)
+node scripts/perf/serve.mjs out 4300              # headers read from vercel.json
+NOISO=1 node scripts/perf/serve.mjs out 4301      # without COOP/COEP (single-threaded fallback)
+node scripts/perf/check-headers.mjs http://localhost:4300/   # or a deployed URL
 
 # Lighthouse, mobile preset, 5 runs, prints per-run and median
 scripts/perf/lighthouse.sh http://localhost:4300/ local 5
@@ -239,6 +417,7 @@ scripts/perf/lighthouse.sh https://reframe-lilac.vercel.app/ live 3
 npm i --no-save puppeteer-core     # or: PUPPETEER_CORE=/path/to/puppeteer-core
 node scripts/perf/make-fixture.js 6 640 360 scripts/perf/fixtures/sample-6s.mp4 http://localhost:4300/privacy
 node scripts/perf/bench.js http://localhost:4300/ after scripts/perf/fixtures/sample-6s.mp4
+node scripts/perf/matrix.js http://localhost:4300/ iso scripts/perf/fixtures/sample-6s.mp4    # ONLY=webm,gif to filter
 node scripts/perf/motion.js after=http://localhost:4300/
 ```
 
@@ -252,12 +431,20 @@ node scripts/perf/motion.js after=http://localhost:4300/
 - three export→cancel cycles with worker counts
 - an export after cancelling
 
-It writes `bench-<label>.json`. Exports fetch the FFmpeg core from jsDelivr,
-so they need network access. These scenarios are not part of CI.
+`matrix.js` checks behaviour rather than timings:
+- which core was fetched
+- COEP-blocked and Datadog requests
+- cancel during engine load
+- MP4 with sharpness and volume, WebM and GIF
 
-Local builds with Datadog keys in `.env.local` send real RUM events. Set
-`NEXT_PUBLIC_DATADOG_ENV=local-perf` (or leave the keys unset) when
-benchmarking.
+They write `bench-<label>.json` / `matrix-<label>.json` (git-ignored).
+Exports fetch the FFmpeg core from jsDelivr, so they need network access.
+These scenarios are not part of CI.
+
+Benchmarks on `localhost` send no RUM events, even with keys in
+`.env.local`, because RUM never starts there. To deliberately record a
+local run, build with `NEXT_PUBLIC_DATADOG_ENV=local-perf` and filter on
+`env:local-perf` in Datadog.
 
 ## Known bottlenecks and limitations
 
@@ -272,10 +459,16 @@ benchmarking.
 - **Large-file benchmarks were not run.** The ~100 MB and ~500 MB scenarios
   need representative real footage; `make-fixture.js` records in real time
   and isn't suited to that. These remain goals.
-- **Duplicated FFmpeg logic.** `ffmpeg.ts` and `ffmpeg.worker.ts` each have
-  their own `buildVideoFilter`/`buildArguments`. Only the worker's copy runs,
-  but unit tests exercise the main-thread copy. Consolidating them would stop
-  fixes landing in the wrong copy, as happened with #1289.
+- **GIF output is huge and slow.** It runs at the source frame rate and
+  the full output size, with no cap: 130 MB and about 80 s for a 6 s clip
+  at 1080p. Capping GIF to about 15 fps and 480–720 px wide is a product
+  decision left for a follow-up.
+- **WebM quality** with realtime VP8 hasn't been compared visually. The
+  file is smaller than "good" mode at the same CRF. Revisit VP9 when
+  `@ffmpeg/core` is upgraded.
+- **The stall timeout is 60 s of silence.** FFmpeg normally logs about
+  twice a second, but a pathological filter on a very slow device could in
+  theory trip it.
 - **Cancellation terminates the worker.** It is reliable, but the next
   export recompiles the engine (~2.5 s from HTTP cache).
 - **Blob URLs from engine load are held for the worker's lifetime** (~32 MB);

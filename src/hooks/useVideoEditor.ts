@@ -13,7 +13,7 @@ import {
 } from "@/lib/types";
 import { DEFAULT_RECIPE, SPEED_STEPS } from "@/lib/constants";
 import { getPresetById } from "@/lib/presets";
-import { loadFFmpeg, exportVideo, terminateFFmpeg, FFmpegLoadError } from "@/lib/ffmpeg";
+import { loadFFmpeg, exportVideo, terminateFFmpeg, getEngineMode, FFmpegLoadError, ExportStalledError } from "@/lib/ffmpeg";
 import {
   trackAction,
   trackDuration,
@@ -21,6 +21,7 @@ import {
   durationBucket,
   resolutionBucket,
   failureCategory,
+  addTelemetryRedaction,
 } from "@/lib/telemetry";
 import { suggestPreset } from "@/lib/presetSuggestion";
 import { validateDimensions, getDownscaledDimensions } from "@/utils/video-validation";
@@ -56,6 +57,11 @@ function outputDimensions(recipe: EditRecipe) {
 
 /** User-facing message for a failed export; never echoes raw FFmpeg output. */
 export function describeExportError(err: unknown): string {
+  if (err instanceof ExportStalledError) {
+    return err.mode === "multi"
+      ? "Export stopped responding, so it was stopped. Reframe has switched to its compatible (single-threaded) engine — select Retry export."
+      : "Export stopped responding, so it was stopped. Try again, or use a shorter clip or a smaller output size.";
+  }
   if (err instanceof FFmpegLoadError) {
     return "The video engine couldn't start. Check your connection, then try again.";
   }
@@ -66,6 +72,8 @@ export function describeExportError(err: unknown): string {
       return "This video format is not supported. Try converting it to MP4 (H.264) first.";
     case "memory":
       return "The browser ran out of memory. Try a shorter clip, a smaller output size, or close other tabs.";
+    case "crash":
+      return "The video engine crashed while encoding. Your settings are kept — try again, or choose a different format.";
     default:
       return "Export failed. Your settings are kept — try again, or try a different format.";
   }
@@ -647,6 +655,7 @@ export function useVideoEditor() {
       if (exportCancelledRef.current) return;
       trackAction("export_failure", {
         ...exportContext,
+        engine: err instanceof ExportStalledError ? err.mode : getEngineMode() ?? "none",
         stage: attempt.stage,
         category: failureCategory(err),
         durationMs: Math.round(performance.now() - attempt.startedAt),
@@ -771,6 +780,17 @@ export function useVideoEditor() {
       terminateFFmpeg();
     };
   }, []);
+
+  // Keep user-specific strings (file names, captions) out of anything the
+  // RUM SDK collects on its own, such as console errors.
+  useEffect(() => {
+    addTelemetryRedaction(
+      file?.name,
+      musicFile?.name,
+      overlayFile?.name,
+      ...(recipe.textOverlays ?? []).map((overlay) => overlay.text)
+    );
+  }, [file, musicFile, overlayFile, recipe.textOverlays]);
 
   const resetSettings = useCallback(() => {
     setRecipe(DEFAULT_RECIPE);

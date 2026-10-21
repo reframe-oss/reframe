@@ -55,3 +55,4 @@ chromatic.log
 scripts/perf/lh/
 scripts/perf/fixtures/
 bench-*.json
+matrix-*.json

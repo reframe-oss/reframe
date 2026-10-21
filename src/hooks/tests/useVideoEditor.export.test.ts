@@ -1,13 +1,15 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { useVideoEditor } from "../useVideoEditor";
-import { loadFFmpeg, exportVideo, terminateFFmpeg } from "@/lib/ffmpeg";
+import { loadFFmpeg, exportVideo, terminateFFmpeg, ExportStalledError } from "@/lib/ffmpeg";
 
-vi.mock("@/lib/ffmpeg", () => ({
+// Real error classes, mocked engine.
+vi.mock("@/lib/ffmpeg", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ffmpeg")>()),
   loadFFmpeg: vi.fn(),
   exportVideo: vi.fn(),
   terminateFFmpeg: vi.fn(),
-  FFmpegLoadError: class FFmpegLoadError extends Error {},
+  getEngineMode: vi.fn(() => "multi"),
 }));
 vi.mock("@/lib/sessionDB", () => ({
   saveSessionFile: vi.fn().mockResolvedValue(undefined),
@@ -87,6 +89,20 @@ describe("useVideoEditor export lifecycle", () => {
     expect(result.current.status).toBe("done");
     expect(result.current.error).toBeNull();
     expect(result.current.result?.size).toBe(1000);
+  });
+
+  it("a stalled multi-threaded export ends in an actionable error, not a frozen 0%", async () => {
+    const { result } = await editorWithFile();
+    vi.mocked(exportVideo).mockRejectedValueOnce(new ExportStalledError("multi"));
+    await act(() => result.current.handleExport());
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toMatch(/single-threaded/i);
+    expect(result.current.error).toMatch(/retry export/i);
+    expect(terminateFFmpeg).toHaveBeenCalled();
+
+    vi.mocked(exportVideo).mockResolvedValueOnce(okResult);
+    await act(() => result.current.handleExport());
+    expect(result.current.status).toBe("done");
   });
 
   it("starts the encode phase at 0% even though engine load reported 100%", async () => {
