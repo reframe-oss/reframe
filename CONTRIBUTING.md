@@ -224,6 +224,22 @@ Environment variables guide: https://nextjs.org/docs/app/guides/environment-vari
 
 ---
 
+### 9. Webpack Requirement for Next.js 16 (`--webpack`)
+The `dev` and `build` scripts in `package.json` explicitly include the `--webpack` flag:
+
+```json
+"dev": "next dev --webpack",
+"build": "next build --webpack"
+```
+
+**Why this is required:**
+Next.js 16 defaults to Turbopack. However, `next.config.ts` configures a custom Webpack fallback (`config.resolve.fallback = { fs: false }`) which is strictly required for FFmpeg.wasm (`@ffmpeg/ffmpeg`) to load WebAssembly files properly. Turbopack ignores this Webpack configuration block.
+
+**Important:**
+Do not remove `--webpack` from the scripts in `package.json`. Removing this flag causes Next.js to run with Turbopack, which will silently bypass the required Webpack fallback and break FFmpeg WebAssembly loading.
+
+---
+
 ## Finding Issues
 
 We have **300+ open issues** across all skill levels:
