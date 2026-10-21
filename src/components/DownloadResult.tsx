@@ -3,10 +3,8 @@
 import { useState, useEffect } from "react";
 import { ExportResult } from "@/lib/types";
 import { formatBytes } from "@/lib/utils";
-import { Download, RotateCcw, Share2, AlertCircle, Volume2, VolumeX } from "lucide-react";
-import LottiePlayer from "./LottiePlayer";
+import { Download, RotateCcw, Share2, AlertCircle, Volume2, VolumeX, Check, ArrowUp } from "lucide-react";
 import { NativeShareButton } from "./NativeShareButton";
-import successAnim from "@/lib/lottie/success.json";
 import { cn } from "@/lib/utils";
 
 const SHARE_TWEET_TEXT =
@@ -56,21 +54,29 @@ export default function DownloadResult({ result, onReset, soundOnCompletion, onT
     }
   };
 
-  // The success animation plays once; with reduced motion it shows its first frame.
-  const [reduceMotion] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
+  // Back to the preview, with focus, so keyboard users land where they edit.
+  const handleKeepEditing = () => {
+    const target = document.getElementById("video-heading");
+    if (!target) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: reduce ? "instant" : "smooth", block: "start" });
+    const preview = document.querySelector<HTMLElement>('[aria-label^="Video preview"]');
+    preview?.focus({ preventScroll: true });
+  };
 
   return (
-    <div className="panel space-y-4 p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 shrink-0">
-            <LottiePlayer animationData={successAnim} loop={false} autoplay={!reduceMotion} />
-          </div>
+    <div className="panel enter space-y-5 p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-4">
+          <span
+            aria-hidden="true"
+            className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--success)] text-[var(--success)]"
+          >
+            <Check size={16} />
+          </span>
           <div>
-            <p className="text-base font-semibold text-[var(--text)]">Export complete</p>
-            <p className="tabular text-xs text-[var(--muted)]">
+            <p className="serif text-3xl leading-tight text-[var(--text)]">Export complete</p>
+            <p className="tabular mt-1 text-xs text-[var(--muted)]">
               {result.format.toUpperCase()} · {result.width} × {result.height} · {formatBytes(result.size)}
               {typeof result.exportDurationMs === "number" &&
                 ` · exported in ${formatExportDuration(result.exportDurationMs)}`}
@@ -156,6 +162,10 @@ export default function DownloadResult({ result, onReset, soundOnCompletion, onT
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
+        <button type="button" onClick={handleKeepEditing} className="btn btn-ghost btn-sm">
+          <ArrowUp size={13} aria-hidden="true" />
+          Keep editing
+        </button>
         <button
           type="button"
           title="Clear this video and its settings"

@@ -89,16 +89,16 @@ export default function TipCarousel() {
   const IconComponent = activeTip.icon; 
 
   return (
-    <div className="mt-5 border-t border-[var(--border)] pt-4 text-left">
+    <div data-tip-carousel="" className="mt-5 border-t border-[var(--border)] pt-4 text-left">
       <div
         className={`min-h-[92px] transition-opacity duration-base ${isFading ? "opacity-0" : "opacity-100"}`}
         aria-live="off"
       >
-        <div className="flex items-center gap-1.5 text-xs font-medium text-film-500">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--selected)]">
           <IconComponent size={13} aria-hidden="true" />
           {activeTip.category}
         </div>
-        <h3 className="mt-1 text-sm font-semibold text-[var(--text)]">{activeTip.title}</h3>
+        <h3 className="serif mt-1.5 text-lg leading-snug text-[var(--text)]">{activeTip.title}</h3>
         <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">{activeTip.description}</p>
       </div>
 
@@ -114,8 +114,9 @@ export default function TipCarousel() {
           >
             <span
               aria-hidden="true"
-              className={`block h-1.5 w-1.5 rounded-full transition-colors duration-fast ${
-                idx === activeIdx ? "bg-[var(--accent)]" : "bg-[var(--border-strong)]"
+              // Active tip: a short bar rather than a red dot (red is reserved).
+              className={`block h-[3px] rounded-full transition-[width,background-color] duration-base ${
+                idx === activeIdx ? "w-4 bg-[var(--text)]" : "w-1.5 bg-[var(--border-strong)]"
               }`}
             />
           </button>

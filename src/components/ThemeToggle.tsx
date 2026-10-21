@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Contrast } from "lucide-react";
+import { Contrast, Moon, Sun } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
-import { cn } from "@/lib/utils";
 
 function useMounted() {
   const [mounted, setMounted] = useState(false);
@@ -16,7 +15,8 @@ function useMounted() {
   return mounted;
 }
 
-const iconButton = "btn btn-ghost btn-icon";
+// Hairline circles, matching weight and size in the header.
+const iconButton = "btn btn-secondary btn-icon btn-sm";
 
 export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
@@ -46,16 +46,7 @@ export function ThemeToggle() {
       title={label}
       className={iconButton}
     >
-      {isDark ? (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
-      ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-        </svg>
-      )}
+      {isDark ? <Moon size={14} aria-hidden="true" /> : <Sun size={14} aria-hidden="true" />}
     </button>
   );
 }
@@ -77,9 +68,9 @@ export function ContrastToggle() {
       aria-pressed={isMore}
       aria-label="High contrast"
       title={isMore ? "Turn off high contrast" : "Turn on high contrast"}
-      className={cn(iconButton, isMore && "text-[var(--accent-text)]")}
+      className={iconButton}
     >
-      <Contrast size={16} aria-hidden="true" />
+      <Contrast size={14} aria-hidden="true" />
     </button>
   );
 }

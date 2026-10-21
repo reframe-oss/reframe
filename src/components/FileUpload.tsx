@@ -21,23 +21,29 @@ function UploadRequirements() {
       <h2 id="upload-requirements-title" className="sr-only">
         Before you upload
       </h2>
-      <dl className="grid gap-x-6 gap-y-3 text-xs sm:grid-cols-3">
+      <dl className="grid gap-x-8 gap-y-5 text-xs sm:grid-cols-3">
         <div>
-          <dt className="font-medium text-[var(--text)]">Formats</dt>
-          <dd className="mt-0.5 leading-5 text-[var(--muted)]">
+          <dt className="marker">
+            <span aria-hidden="true">(</span>Formats<span aria-hidden="true">)</span>
+          </dt>
+          <dd className="mt-2 max-w-[34ch] leading-5 text-[var(--muted)]">
             {SUPPORTED_FORMATS}. MP4 with H.264 video and AAC audio is the most reliable.
           </dd>
         </div>
         <div>
-          <dt className="font-medium text-[var(--text)]">File size</dt>
-          <dd className="mt-0.5 leading-5 text-[var(--muted)]">
+          <dt className="marker">
+            <span aria-hidden="true">(</span>File size<span aria-hidden="true">)</span>
+          </dt>
+          <dd className="mt-2 max-w-[34ch] leading-5 text-[var(--muted)]">
             Up to {formatBytes(MAX_FILE_SIZE)}. Export loads the whole file into browser memory, so files
             over {formatBytes(WARNING_FILE_SIZE)} can fail on devices with little RAM.
           </dd>
         </div>
         <div>
-          <dt className="font-medium text-[var(--text)]">Output</dt>
-          <dd className="mt-0.5 leading-5 text-[var(--muted)]">
+          <dt className="marker">
+            <span aria-hidden="true">(</span>Output<span aria-hidden="true">)</span>
+          </dt>
+          <dd className="mt-2 max-w-[34ch] leading-5 text-[var(--muted)]">
             MP4, WebM, MKV or GIF, sized for each platform or to your own dimensions.
           </dd>
         </div>
@@ -64,7 +70,7 @@ function FileInfo({ currentFile, duration, fileError, onChangeClick }: FileInfoP
       <div className="flex items-center gap-3">
         <div
           aria-hidden="true"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-[var(--surface-2)] text-[var(--text-secondary)]"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[var(--text-secondary)]"
         >
           <Film size={16} />
         </div>
@@ -134,39 +140,60 @@ function DropZone({
       onDrop={onDrop}
       onClick={onClick}
       onKeyDown={onKeyDown}
+      // A dark "screen" waiting for footage, in every theme. The inset hairline
+      // frame tightens and turns red while a file is dragged over it.
       className={cn(
-        "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-panel border border-dashed px-6 py-14 text-center",
-        "transition-[background-color,border-color] duration-fast",
-        dragging
-          ? "border-[var(--accent)] bg-[var(--accent-muted)]"
-          : "border-[var(--border-strong)] bg-[var(--surface-2)] hover:border-[var(--text-secondary)]"
+        "group relative flex min-h-[300px] cursor-pointer flex-col items-center justify-center gap-5 overflow-hidden rounded-[4px] border border-[var(--viewer-frame)] bg-[var(--stage)] px-6 py-14 text-center sm:min-h-[360px]",
+        "focus-visible:outline-offset-4"
       )}
     >
+      {/* The zone itself is visible from the first frame (it holds the main
+          call to action and is the page's LCP element); only this inner
+          hairline frame draws in. */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          "frame-inset pointer-events-none absolute rounded-[2px] border transition-[inset,border-color] duration-base ease-out",
+          dragging
+            ? "inset-2 border-[var(--accent)]"
+            : "inset-4 border-white/15 group-hover:inset-3 group-hover:border-white/30"
+        )}
+      />
       <div
         aria-hidden="true"
-        className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--text-secondary)] shadow-[var(--shadow)]"
+        className={cn(
+          "flex h-12 w-12 items-center justify-center rounded-full border text-[var(--viewer-text)] transition-transform duration-base ease-out",
+          dragging ? "-translate-y-1 border-[var(--accent)]" : "border-white/30 group-hover:-translate-y-0.5"
+        )}
       >
         <Upload size={18} />
       </div>
-      <div>
-        <p id="upload-zone-title" className="text-base font-medium text-[var(--text)]">
+      <div className="relative">
+        <p id="upload-zone-title" className="display text-2xl text-[var(--viewer-text)] sm:text-3xl">
           {dragging ? "Drop to open this video" : "Choose a video or drag it here"}
         </p>
-        <p id="upload-zone-hint" className="mt-1 text-sm text-[var(--muted)]">
-          {SUPPORTED_FORMATS} up to {formatBytes(MAX_FILE_SIZE)}{" "}
-          <span className="hidden sm:inline">
-            · <kbd className="kbd">Ctrl</kbd> <kbd className="kbd">O</kbd>
-          </span>
+        <p id="upload-zone-hint" className="mt-2 text-sm text-[var(--viewer-muted)]">
+          {SUPPORTED_FORMATS} up to {formatBytes(MAX_FILE_SIZE)}
         </p>
       </div>
+      {/* Visual affordance only: the whole zone is the button, so this can't
+          be a nested <button>. */}
+      <span
+        aria-hidden="true"
+        className="relative inline-flex min-h-[2.25rem] items-center gap-3 rounded-pill bg-[var(--viewer-text)] px-4 text-sm font-medium text-[var(--viewer)] transition-transform duration-fast group-active:scale-[0.97]"
+      >
+        Choose video
+        <span className="hidden text-xs opacity-70 sm:inline">Ctrl O</span>
+      </span>
 
+      {/* Errors sit on the dark screen, so they use the dark-theme error tint. */}
       {error && (
-        <p role="alert" className="callout callout-error mt-1 text-xs">
+        <p role="alert" className="relative max-w-md rounded-control border border-[var(--viewer-error)] px-3 py-2 text-xs text-[var(--viewer-text)]">
           {error}
         </p>
       )}
       {fileError && (
-        <p role="alert" className="text-sm text-[var(--error)]">
+        <p role="alert" className="relative max-w-md text-sm text-[var(--viewer-error)]">
           {fileError}
         </p>
       )}
@@ -289,11 +316,12 @@ export default function FileUpload({
       {pageDragging && (
         <div
           aria-live="polite"
-          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+          className="animate-fade-in pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
         >
-          <div className="flex flex-col items-center gap-3 rounded-panel border-2 border-dashed border-white/70 px-10 py-8 text-center text-white">
-            <Film size={28} aria-hidden="true" />
-            <p className="text-xl font-semibold">Drop to open this video</p>
+          <div className="absolute inset-6 rounded-[4px] border border-white/40" aria-hidden="true" />
+          <div className="flex flex-col items-center gap-4 text-center text-[var(--viewer-text)]">
+            <Film size={26} aria-hidden="true" />
+            <p className="display text-4xl">Drop to open this video</p>
           </div>
         </div>
       )}
@@ -318,7 +346,7 @@ export default function FileUpload({
             onChangeClick={() => inputRef.current?.click()}
           />
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-8">
             <DropZone
               dragging={dragging}
               error={error}

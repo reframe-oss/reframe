@@ -113,8 +113,15 @@ async function runExport(page, { cancelAtPercent } = {}) {
     await page.evaluate(() => document.querySelector("video").pause());
 
     // Sliders: 30 keyboard steps on brightness, 40 ms apart (a quick drag).
-    const visible = await page.$eval("#brightness-slider", (el) => el.offsetParent !== null).catch(() => false);
-    if (!visible) await clickByText(page, "adjust colour");
+    // checkVisibility also catches a collapsed (visibility:hidden) disclosure,
+    // which offsetParent alone does not.
+    const visible = await page.$eval("#brightness-slider", (el) =>
+      el.checkVisibility ? el.checkVisibility({ visibilityProperty: true, opacityProperty: true }) : el.offsetParent !== null
+    ).catch(() => false);
+    if (!visible) {
+      await clickByText(page, "adjust colour");
+      await sleep(400); // let the disclosure finish opening
+    }
     await page.evaluate(() => { window.__ev = []; window.__rs = 0; window.__lt = []; });
     await page.focus("#brightness-slider");
     await page.keyboard.press("Home");

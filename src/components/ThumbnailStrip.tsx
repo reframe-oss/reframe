@@ -158,7 +158,9 @@ function ThumbnailStrip({
   return (
     <section aria-label="Frame previews" className="w-full">
       <div className="flex items-center gap-3 pb-2">
-        <h3 className="text-xs font-medium text-[var(--text-secondary)]">Frames</h3>
+        <h3 className="marker text-sm">
+          <span aria-hidden="true">(</span>Frames<span aria-hidden="true">)</span>
+        </h3>
         {generating && (
           <div className="flex flex-1 items-center gap-2" aria-live="polite">
             <div
@@ -198,7 +200,7 @@ function ThumbnailStrip({
                 <div
                   key={i}
                   aria-hidden="true"
-                  className="h-[54px] w-24 shrink-0 rounded-md bg-[var(--surface-2)]"
+                  className="h-[54px] w-24 shrink-0 rounded-[3px] bg-[var(--surface-2)]"
                 />
               ))}
             {frames.map((thumb, i) => {
@@ -214,8 +216,9 @@ function ThumbnailStrip({
                   aria-current={isActive ? "true" : undefined}
                   title={label}
                   className={cn(
-                    "group relative h-[54px] w-24 shrink-0 overflow-hidden rounded-md border-2 bg-[var(--viewer)]",
+                    "group relative h-[54px] w-24 shrink-0 overflow-hidden rounded-[3px] border-2 bg-[var(--viewer)]",
                     "transition-[border-color] duration-fast",
+                    // Red marks the playhead frame, as it marks the playhead elsewhere.
                     isActive ? "border-[var(--accent)]" : "border-transparent hover:border-[var(--border-strong)]"
                   )}
                 >
@@ -227,7 +230,9 @@ function ThumbnailStrip({
                     unoptimized
                     draggable={false}
                     className={cn(
-                      "h-full w-full object-cover",
+                      // Hover-only zoom on the thumbnail image; nothing animates
+                      // during playback except the active border colour.
+                      "h-full w-full object-cover transition-transform duration-base ease-out group-hover:scale-[1.06]",
                       !inTrimRange && "opacity-35 grayscale"
                     )}
                   />

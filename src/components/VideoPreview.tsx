@@ -280,15 +280,17 @@ export default function VideoPreview({
     }
   };
 
-  const toolButton = (pressed: boolean) =>
-    cn("btn btn-ghost btn-sm", pressed && "bg-[var(--accent-muted)] text-[var(--text)]");
+  // Pressed state comes from `.btn[aria-pressed="true"]` (warm brown outline).
+  const toolButton = (pressed: boolean) => cn("btn btn-sm", pressed ? "btn-secondary" : "btn-ghost");
 
   return (
     <>
       <div
         ref={previewContainerRef}
         role="group"
-        className="relative w-full overflow-hidden rounded-[10px] bg-[var(--viewer)] aspect-video"
+        // The frame wipes open once when a video is first shown (clip-path on
+        // this wrapper only; the <video> itself is never animated).
+        className="frame-reveal relative aspect-video w-full overflow-hidden rounded-[4px] border border-[var(--viewer-frame)] bg-[var(--viewer)]"
         tabIndex={0}
         onKeyDown={handleKeyDown}
         aria-label="Video preview (press Space to play/pause)"
@@ -412,7 +414,7 @@ export default function VideoPreview({
 
       {/* Viewer toolbar: below the picture so controls never cover the video. */}
       {!isLoading && (
-        <div role="toolbar" aria-label="Preview tools" className="mt-2 flex flex-wrap items-center gap-1">
+        <div role="toolbar" aria-label="Preview tools" className="mt-3 flex flex-wrap items-center gap-1.5">
           {recipe && (
             <>
               <button

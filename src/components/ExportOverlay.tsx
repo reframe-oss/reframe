@@ -106,74 +106,78 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
         aria-labelledby="export-overlay-title"
         aria-describedby="export-overlay-desc"
         tabIndex={-1}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 animate-fade-in"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-fade-in"
       >
-        <div className="panel w-full max-w-sm p-6 shadow-[var(--shadow-overlay)]">
+        <div className="panel enter max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 shadow-[var(--shadow-overlay)] sm:p-7">
           <div ref={focusAnchorRef} tabIndex={-1} className="sr-only" aria-hidden="true" />
 
-          <h2 id="export-overlay-title" className="text-lg font-semibold">
+          {/* Two real stages, so they're numbered: (1) engine, (2) encode. */}
+          <p className="marker" aria-hidden="true">
+            ({isLoading ? "1" : "2"} of 2)
+          </p>
+          <h2 id="export-overlay-title" className="serif mt-2 text-3xl leading-tight">
             {isLoading ? "Starting the video engine" : "Exporting"}
           </h2>
-          <p id="export-overlay-desc" className="mt-1 text-sm text-[var(--muted)]">
+          <p id="export-overlay-desc" className="mt-2 text-sm leading-6 text-[var(--muted)]">
             {isLoading
               ? "Downloading FFmpeg (about 30 MB) the first time. After that it loads from your browser cache."
               : "Your video is processed on this device. Keep this tab open until it finishes."}
           </p>
 
+          <div className="mt-6">
+            {isLoading ? (
+              // The engine download doesn't report byte progress, so this is
+              // an honest indeterminate state rather than a fake percentage.
+              <>
+                <div className="progress-track progress-indeterminate" aria-hidden="true" />
+                <p className="mt-3 text-sm text-[var(--text-secondary)]">Loading engine…</p>
+              </>
+            ) : (
+              <>
+                {/* Large serif figure with a small italic unit, as in the reference. */}
+                <p aria-hidden="true" className="flex items-baseline gap-1.5 text-[var(--text)]">
+                  <span className="display text-6xl [font-variant-numeric:lining-nums_tabular-nums]">{clamped}</span>
+                  <span className="marker text-3xl text-[var(--text-secondary)]">%</span>
+                  <span className="tabular ml-auto text-xs text-[var(--muted)]">{formatElapsed(elapsedMs)} elapsed</span>
+                </p>
+                <div
+                  className="progress-track mt-4"
+                  role="progressbar"
+                  aria-valuenow={clamped}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuetext={`${clamped}%, ${formatElapsed(elapsedMs)} elapsed`}
+                  aria-label="Export progress"
+                >
+                  <div className="progress-fill" style={{ transform: `scaleX(${clamped / 100})` }} />
+                </div>
+              </>
+            )}
+            {/* Announces the stage only. Percentages are announced in 10% steps
+                by the editor's live region, not on every update. */}
+            <span className="sr-only" role="status">
+              {isLoading ? "Loading video engine" : "Exporting video"}
+            </span>
+          </div>
+
           {summary && (
-            <dl className="mt-4 grid grid-cols-3 gap-3 rounded-control bg-[var(--surface-2)] p-3 text-xs">
-              <div>
+            <dl className="mt-6 grid grid-cols-3 divide-x divide-[var(--border)] border-y border-[var(--border)] py-3 text-xs">
+              <div className="pr-3">
                 <dt className="text-[var(--muted)]">Format</dt>
                 <dd className="mt-0.5 font-medium">{summary.format}</dd>
               </div>
-              <div>
+              <div className="px-3">
                 <dt className="text-[var(--muted)]">Size</dt>
                 <dd className="tabular mt-0.5 font-medium">{summary.resolution}</dd>
               </div>
-              <div>
+              <div className="pl-3">
                 <dt className="text-[var(--muted)]">Quality</dt>
                 <dd className="mt-0.5 font-medium">{summary.quality}</dd>
               </div>
             </dl>
           )}
 
-          <div className="mt-5 space-y-2" aria-live="polite">
-            {isLoading ? (
-              // The engine download doesn't report byte progress, so this is
-              // an honest indeterminate state rather than a fake percentage.
-              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                <span
-                  aria-hidden="true"
-                  className="h-4 w-4 shrink-0 rounded-full border-2 border-[var(--border-strong)] border-t-[var(--accent)] animate-spin"
-                />
-                Loading engine…
-              </div>
-            ) : (
-              <>
-                <div
-                  className="progress-track"
-                  role="progressbar"
-                  aria-valuenow={clamped}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label="Export progress"
-                >
-                  <div className="progress-fill" style={{ transform: `scaleX(${clamped / 100})` }} />
-                </div>
-                <div className="tabular flex items-center justify-between text-xs text-[var(--muted)]">
-                  <span className="font-medium text-[var(--text)]">{clamped}%</span>
-                  <span>{formatElapsed(elapsedMs)} elapsed</span>
-                </div>
-              </>
-            )}
-            <span className="sr-only">
-              {isLoading
-                ? "Loading video engine"
-                : `Exporting: ${clamped}%, ${formatElapsed(elapsedMs)} elapsed`}
-            </span>
-          </div>
-
-          <div className="mt-5 flex items-center justify-between gap-3">
+          <div className="mt-6 flex items-center justify-between gap-3">
             <span className="text-xs text-[var(--muted)]">
               <kbd className="kbd">Esc</kbd> to cancel
             </span>

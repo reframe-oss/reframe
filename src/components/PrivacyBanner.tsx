@@ -55,10 +55,13 @@ export default function PrivacyBanner() {
       role="note"
       aria-label="Privacy information"
       data-privacy-banner=""
-      className="relative flex items-start gap-3 rounded-panel border border-[var(--border)] bg-[var(--surface)] p-4 pr-11"
+      // Hairlines above and below instead of a card; same footprint as before
+      // so the pre-paint hide/show never shifts layout.
+      className="enter relative flex items-start gap-3 border-y border-[var(--border)] py-4 pl-1 pr-11"
+      style={{ "--enter-delay": "320ms" } as React.CSSProperties}
     >
       <ShieldCheck
-        size={20}
+        size={18}
         aria-hidden="true"
         className="mt-0.5 shrink-0 text-[var(--success)]"
       />

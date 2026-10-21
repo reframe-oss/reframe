@@ -47,6 +47,9 @@ describe("ThumbnailStrip", () => {
       </Profiler>
     );
     await screen.findByText(/4 frames/);
+    // Let the initial playhead sync commit before taking the baseline;
+    // findByText can resolve before that effect has flushed.
+    await act(async () => {});
     const before = commits;
 
     // 20 timeupdates inside the first frame's range: no commits at all.

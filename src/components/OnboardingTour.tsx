@@ -142,10 +142,11 @@ function Spotlight({ rect }: SpotlightProps) {
         y={r.top}
         width={r.width}
         height={r.height}
-        rx={8}
+        rx={4}
         fill="none"
-        stroke="rgba(99,102,241,0.8)"
-        strokeWidth={2}
+        stroke="var(--ivory)"
+        strokeOpacity={0.85}
+        strokeWidth={1.5}
       />
     </svg>
   );
@@ -197,29 +198,28 @@ function Tooltip({
       role="dialog"
       aria-modal="true"
       aria-label={`Onboarding step ${stepIndex + 1} of ${totalSteps}: ${step.title}`}
-      className="fixed z-[9999] w-80 rounded-panel shadow-[var(--shadow-overlay)] border
+      className="enter fixed z-[9999] w-80 rounded-panel shadow-[var(--shadow-overlay)] border
         bg-[var(--surface)]
         border-[var(--border)]
-        text-[var(--text)]
-        transition-colors duration-fast"
+        text-[var(--text)]"
       style={{ ...style }}
       tabIndex={-1}
     >
       {/* Progress bar */}
-      <div className="h-1 rounded-t-xl overflow-hidden bg-[var(--border)]">
+      <div className="h-[3px] rounded-t-panel overflow-hidden bg-[var(--border)]">
         <div
-          className="h-full bg-[var(--accent)]"
+          className="h-full bg-[var(--text)]"
           style={{ width: `${((stepIndex + 1) / totalSteps) * 100}%` }}
         />
       </div>
 
       <div className="p-5">
         {/* Step counter */}
-        <p className="text-xs font-semibold text-film-500 mb-1">
-          Step {stepIndex + 1} of {totalSteps}
+        <p className="marker mb-2">
+          ({stepIndex + 1} of {totalSteps})
         </p>
 
-        <h2 className="text-base font-semibold mb-1">{step.title}</h2>
+        <h2 className="serif text-2xl leading-tight mb-2">{step.title}</h2>
         <p className="text-sm text-[var(--muted)] leading-relaxed mb-4">
           {step.description}
         </p>
@@ -227,7 +227,7 @@ function Tooltip({
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={onSkip}
-            className="text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors underline underline-offset-2"
+            className="link text-xs text-[var(--muted)] hover:text-[var(--text)]"
           >
             Skip tour
           </button>
@@ -236,12 +236,9 @@ function Tooltip({
             ref={(el) => {
               el?.focus();
             }}
-            className="px-4 py-2 rounded-lg text-sm font-medium
-              bg-[var(--accent)] hover:bg-[var(--accent-hover)]
-              text-[var(--on-accent)] transition-colors focus-visible:outline focus-visible:outline-2
-              focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+            className="btn btn-solid btn-sm"
           >
-            {isLast ? "Done" : "Next →"}
+            {isLast ? "Done" : "Next"}
           </button>
         </div>
       </div>

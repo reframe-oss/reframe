@@ -24,7 +24,7 @@ export default function FramingControl({ recipe, onChange }: Props) {
             aria-pressed={active}
             className="choice flex min-h-[44px] min-w-[44px] flex-1 items-center gap-3 px-3 py-2.5 text-left"
           >
-            <Icon size={16} aria-hidden="true" className={cn("shrink-0", active ? "text-film-500" : "text-[var(--muted)]")} />
+            <Icon size={16} aria-hidden="true" className={cn("shrink-0", active ? "text-[var(--selected)]" : "text-[var(--muted)]")} />
             <div>
               <p className="text-sm font-medium text-[var(--text)]">
                 {mode === "fit" ? "Fit" : "Fill"}

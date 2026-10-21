@@ -42,10 +42,11 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { loadOverlayState, persistOverlayState } from "@/lib/editorPersistence";
 
 /**
- * Collapsible tool section. Closed panels are removed with the `hidden`
- * attribute rather than animated (animating height forces layout on every
- * frame); only the chevron rotates. The optional summary shows the current
- * value while collapsed, so the panel doesn't have to be opened to check it.
+ * Collapsible tool section. The panel animates open and closed through grid
+ * rows (see `.disclosure` in globals.css), so nothing is measured in JS; once
+ * closed, its content is visibility:hidden and leaves the tab order. The
+ * optional summary shows the current value while collapsed, so the panel
+ * doesn't have to be opened to check it.
  */
 function AccordionSection({
   id,
@@ -73,9 +74,12 @@ function AccordionSection({
           aria-expanded={isOpen}
           aria-controls={`${id}-panel`}
           onClick={onToggle}
-          className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-fast hover:bg-[var(--surface-2)]"
+          className="group flex min-h-[50px] w-full items-center gap-3 px-1 py-2.5 text-left"
         >
-          <span aria-hidden="true" className="text-[var(--muted)]">
+          <span
+            aria-hidden="true"
+            className="text-[var(--muted)] transition-colors duration-fast group-hover:text-[var(--text)]"
+          >
             {icon}
           </span>
           <span className="flex-1 text-sm font-medium text-[var(--text)]">{title}</span>
@@ -83,24 +87,59 @@ function AccordionSection({
             <span className="tabular truncate text-xs text-[var(--muted)]">{summary}</span>
           )}
           <ChevronDown
-            size={16}
+            size={15}
             aria-hidden="true"
             className={cn(
-              "shrink-0 text-[var(--muted)] transition-transform duration-base",
+              "shrink-0 text-[var(--muted)] transition-transform duration-panel ease-standard group-hover:text-[var(--text)]",
               isOpen && "rotate-180"
             )}
           />
         </button>
       </h3>
-      <div
-        id={`${id}-panel`}
-        role="region"
-        aria-labelledby={`${id}-header`}
-        hidden={!isOpen}
-        className="px-4 pb-4 pt-1"
-      >
-        {children}
+      <div className="disclosure" data-open={isOpen}>
+        <div
+          id={`${id}-panel`}
+          role="region"
+          aria-labelledby={`${id}-header`}
+          className="disclosure-inner"
+        >
+          <div className="px-1 pb-5 pt-1">{children}</div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+/** "(2)  Edit" — the reference's parenthetical marker beside a serif title. */
+function SectionHead({
+  id,
+  marker,
+  title,
+  children,
+  visuallyHidden,
+}: {
+  id: string;
+  marker: string;
+  title: string;
+  children?: React.ReactNode;
+  visuallyHidden?: boolean;
+}) {
+  if (visuallyHidden) {
+    return (
+      <h2 id={id} className="sr-only">
+        {title}
+      </h2>
+    );
+  }
+  return (
+    <div className="section-head">
+      <span className="marker" aria-hidden="true">
+        ({marker})
+      </span>
+      <h2 id={id} className="serif text-2xl leading-none">
+        {title}
+      </h2>
+      {children && <div className="ml-auto flex items-center gap-1">{children}</div>}
     </div>
   );
 }
@@ -122,21 +161,21 @@ const SHORTCUTS: { keys: string[]; label: string }[] = [
 /** Collapsible list of keyboard shortcuts (also toggled with "?"). */
 function KeyboardShortcutsPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
-    <div className="panel overflow-hidden">
+    <div className="border-b border-[var(--border)]">
       <button
         type="button"
         aria-expanded={open}
         aria-controls="keyboard-shortcuts-list"
         onClick={onToggle}
-        className="flex min-h-[44px] w-full items-center gap-2 px-4 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors duration-fast hover:bg-[var(--surface-2)]"
+        className="group flex min-h-[46px] w-full items-center gap-2 px-1 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors duration-fast hover:text-[var(--text)]"
       >
-        <Keyboard size={15} aria-hidden="true" className="text-[var(--muted)]" />
+        <Keyboard size={15} aria-hidden="true" className="text-[var(--muted)] group-hover:text-[var(--text)]" />
         <span className="flex-1">Keyboard shortcuts</span>
         <kbd className="kbd">?</kbd>
       </button>
 
       {open && (
-        <ul id="keyboard-shortcuts-list" className="space-y-2 border-t border-[var(--border)] px-4 py-3">
+        <ul id="keyboard-shortcuts-list" className="enter grid gap-x-8 gap-y-2 px-1 pb-4 pt-1 sm:grid-cols-2" style={{ "--enter-delay": "0ms" } as React.CSSProperties}>
           {SHORTCUTS.map(({ keys, label }) => (
             <li key={label + keys.join()} className="flex items-center justify-between gap-3">
               <span className="text-xs text-[var(--muted)]">{label}</span>
@@ -357,7 +396,7 @@ export default function VideoEditor() {
 
       <div
         className={cn(
-          "mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 lg:py-8",
+          "mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
           // Reserve space on mobile so the fixed export bar never covers content.
           file && "max-lg:pb-28"
         )}
@@ -365,26 +404,36 @@ export default function VideoEditor() {
         {file ? (
           <h1 className="sr-only">Reframe editor</h1>
         ) : (
-          <header className="mb-6 max-w-2xl">
-            <h1 className="text-2xl font-semibold sm:text-3xl">
-              Resize, trim and export video in your browser
+          // Editorial opening: the headline rises line by line out of a mask,
+          // as the reference's titles do. Copy stays plain and functional.
+          <header className="mb-8 grid gap-5 sm:mb-12 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end lg:gap-8">
+            <h1 className="display text-[2.125rem] sm:text-5xl xl:text-6xl">
+              <span className="line-mask">
+                <span>Resize, trim and export</span>
+              </span>
+              <span className="line-mask" style={{ "--enter-delay": "90ms" } as React.CSSProperties}>
+                <span>video in your browser</span>
+              </span>
             </h1>
-            <p className="mt-2 text-base text-[var(--text-secondary)]">
+            <p
+              className="enter max-w-sm text-sm leading-6 text-[var(--text-secondary)]"
+              style={{ "--enter-delay": "260ms" } as React.CSSProperties}
+            >
               Reformat a clip for any platform without an account, an upload or a watermark.
               Everything runs on this device.
             </p>
           </header>
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
           {/* ── Workspace: preview first, then the tools that change it ── */}
-          <div className="min-w-0 space-y-4">
+          <div className="min-w-0 space-y-8">
             {!file && <PrivacyBanner />}
 
-            <section aria-labelledby="video-heading" className="panel p-3 sm:p-4">
-              <h2 id="video-heading" className="sr-only">
-                Video
-              </h2>
+            {/* No entrance on this section: it holds the primary action (and
+                the page's largest paint), so it is shown from the first frame. */}
+            <section aria-labelledby="video-heading" className="space-y-4">
+              <SectionHead id="video-heading" marker="1" title="Source" visuallyHidden={!file} />
               <FileUpload
                 onFileSelect={handleFileSelect}
                 currentFile={file}
@@ -394,7 +443,7 @@ export default function VideoEditor() {
 
               {file && (
                 <>
-                  <div className="mt-3">
+                  <div>
                     <VideoPreview
                       file={file}
                       recipe={recipe}
@@ -405,7 +454,7 @@ export default function VideoEditor() {
                     />
                   </div>
 
-                  <div className="mt-4 border-t border-[var(--border)] pt-3">
+                  <div className="border-t border-[var(--border)] pt-3">
                     <ThumbnailStrip
                       videoSrc={videoSrc}
                       duration={duration}
@@ -480,13 +529,13 @@ export default function VideoEditor() {
                 aria-labelledby="edit-heading"
                 inert={isProcessing}
                 className={cn(
-                  "panel divide-y divide-[var(--border)] overflow-hidden",
+                  "enter transition-opacity duration-base",
                   isProcessing && "opacity-60"
                 )}
+                style={{ "--enter-delay": "120ms" } as React.CSSProperties}
               >
-                <h2 id="edit-heading" className="sr-only">
-                  Edit
-                </h2>
+                <SectionHead id="edit-heading" marker="2" title="Edit" />
+                <div className="divide-y divide-[var(--border)] border-b border-[var(--border)]">
                 <AccordionSection
                   id="trim"
                   icon={<Scissors size={15} />}
@@ -570,6 +619,7 @@ export default function VideoEditor() {
                     setOverlayOpacity={setOverlayOpacity}
                   />
                 </AccordionSection>
+                </div>
               </section>
             )}
 
@@ -580,18 +630,29 @@ export default function VideoEditor() {
           {/* On desktop the panel is capped at the viewport height: settings
               scroll inside it and the summary + Export button stay pinned, so
               the primary action is always visible. */}
-          <aside aria-labelledby="output-heading" className="lg:sticky lg:top-[72px]">
+          <aside
+            aria-labelledby="output-heading"
+            className="enter lg:sticky lg:top-[76px]"
+            style={{ "--enter-delay": "200ms" } as React.CSSProperties}
+          >
             <section
               inert={exportDisabled}
               className={cn(
-                "panel flex flex-col overflow-hidden lg:max-h-[calc(100vh-96px)]",
+                "panel flex flex-col overflow-hidden transition-opacity duration-base lg:max-h-[calc(100vh-100px)]",
                 exportDisabled && "opacity-60"
               )}
             >
-              <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
-                <h2 id="output-heading" className="text-base font-semibold">
-                  Output
-                </h2>
+              <div className="flex items-baseline justify-between gap-2 border-b border-[var(--border)] px-4 pb-3 pt-4">
+                <div className="flex items-baseline gap-3">
+                  {file && (
+                    <span className="marker" aria-hidden="true">
+                      (3)
+                    </span>
+                  )}
+                  <h2 id="output-heading" className="serif text-2xl leading-none">
+                    Output
+                  </h2>
+                </div>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -611,7 +672,7 @@ export default function VideoEditor() {
                 </p>
               )}
 
-              <div className="min-h-0 flex-1 divide-y divide-[var(--border)] overflow-y-auto overscroll-contain">
+              <div className="min-h-0 flex-1 divide-y divide-[var(--border)] overflow-y-auto overscroll-contain px-3">
                 <AccordionSection
                   id="resize"
                   icon={<Layers size={15} />}
@@ -633,7 +694,7 @@ export default function VideoEditor() {
                   </div>
                 </AccordionSection>
 
-                <div className="px-4 py-4">
+                <div className="px-1 py-4">
                   <FormatSelector recipe={recipe} onChange={updateRecipe} />
                 </div>
 
@@ -651,20 +712,20 @@ export default function VideoEditor() {
                 </AccordionSection>
               </div>
 
-              <div className="shrink-0 space-y-3 border-t border-[var(--border)] bg-[var(--surface-2)] px-4 py-4">
+              <div className="shrink-0 space-y-4 border-t border-[var(--border)] px-4 py-4">
                 {file && (
-                  <dl className="grid grid-cols-3 gap-2 text-xs">
-                    <div>
+                  <dl className="grid grid-cols-3 divide-x divide-[var(--border)] text-xs">
+                    <div className="pr-3">
                       <dt className="text-[var(--muted)]">Format</dt>
-                      <dd className="font-medium">{output.summary.format}</dd>
+                      <dd className="mt-0.5 font-medium">{output.summary.format}</dd>
                     </div>
-                    <div>
+                    <div className="px-3">
                       <dt className="text-[var(--muted)]">Size</dt>
-                      <dd className="tabular font-medium">{output.summary.resolution}</dd>
+                      <dd className="tabular mt-0.5 font-medium">{output.summary.resolution}</dd>
                     </div>
-                    <div>
+                    <div className="pl-3">
                       <dt className="text-[var(--muted)]">Quality</dt>
-                      <dd className="font-medium">{qualityLabel(recipe.quality)}</dd>
+                      <dd className="mt-0.5 font-medium">{qualityLabel(recipe.quality)}</dd>
                     </div>
                   </dl>
                 )}
@@ -692,7 +753,7 @@ export default function VideoEditor() {
                   <button
                     type="button"
                     onClick={resetSettings}
-                    className="rounded underline-offset-2 hover:text-[var(--text)] hover:underline"
+                    className="link rounded text-[var(--muted)] hover:text-[var(--text)]"
                     title="Reset settings and forget the saved video"
                   >
                     Clear saved session
@@ -706,7 +767,7 @@ export default function VideoEditor() {
 
       {/* Mobile-only export bar — keeps Export reachable without scrolling to the sidebar. */}
       {file && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 [padding-bottom:calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--bg)] px-4 py-3 [padding-bottom:calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden">
           <div className="mx-auto flex max-w-xl items-center gap-3">
             <div className="min-w-0 flex-1 text-xs">
               <p className="truncate font-medium">

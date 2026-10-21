@@ -16,15 +16,15 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // One interface typeface: the platform UI font (SF Pro on Apple devices,
-      // Segoe UI on Windows, Roboto on Android). It costs no network request.
-      // `heading` and `display` were used throughout the components but never
-      // defined, so they silently did nothing; they now resolve to the same
-      // family and only weight/size distinguish headings.
+      // Two families. The platform UI font (SF Pro / Segoe UI / Roboto) for
+      // every control, label and readout; an editorial serif (Cormorant
+      // Garamond, self-hosted by next/font) for headings and a few numerals.
+      // `heading` stays sans: it is used on small control labels.
       fontFamily: {
         sans: ["var(--font-sans)"],
         heading: ["var(--font-sans)"],
-        display: ["var(--font-sans)"],
+        display: ["var(--font-serif)"],
+        serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
       },
       fontSize: {
@@ -37,6 +37,10 @@ const config: Config = {
         xl: ["1.25rem", { lineHeight: "1.75rem" }], // 20px
         "2xl": ["1.625rem", { lineHeight: "2rem", letterSpacing: "-0.015em" }], // 26px
         "3xl": ["2.125rem", { lineHeight: "2.5rem", letterSpacing: "-0.02em" }], // 34px
+        // Serif display sizes (headlines and the export percentage).
+        "4xl": ["2.75rem", { lineHeight: "1.02", letterSpacing: "-0.02em" }], // 44px
+        "5xl": ["3.75rem", { lineHeight: "1", letterSpacing: "-0.025em" }], // 60px
+        "6xl": ["4.75rem", { lineHeight: "0.98", letterSpacing: "-0.03em" }], // 76px
       },
       colors: {
         background: "var(--background)",
@@ -61,14 +65,19 @@ const config: Config = {
       borderRadius: {
         control: "var(--radius-control)",
         panel: "var(--radius-panel)",
+        pill: "var(--radius-pill)",
       },
       transitionDuration: {
         fast: "var(--dur-fast)",
         base: "var(--dur-base)",
         slow: "var(--dur-slow)",
+        panel: "var(--dur-panel)",
+        enter: "var(--dur-enter)",
       },
       transitionTimingFunction: {
         standard: "var(--ease-standard)",
+        out: "var(--ease-out)",
+        "in-out": "var(--ease-in-out)",
       },
       keyframes: {
         shimmer: {

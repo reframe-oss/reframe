@@ -42,7 +42,7 @@ function RatioBox({
     <div
       className={cn(
         "border-2 flex-shrink-0 rounded-sm",
-        active ? "border-[var(--accent)]" : "border-[var(--muted)] opacity-60",
+        active ? "border-[var(--selected)]" : "border-[var(--muted)] opacity-60",
       )}
       style={{ width: w, height: h }}
     />
@@ -228,7 +228,7 @@ export default function PresetSelector({ recipe, onChange }: Props) {
             className={cn(
               "shrink-0",
               recipe.preset === "custom"
-                ? "text-film-500"
+                ? "text-[var(--selected)]"
                 : "text-[var(--muted)]",
             )}
           />

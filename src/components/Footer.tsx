@@ -19,11 +19,11 @@ import {
 export default function Footer() {
   return (
     <footer className="w-full border-t border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-6 py-12 mt-16">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-y-12 md:gap-x-12">
+      <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-y-12 md:gap-x-12 lg:px-2">
         {/* Brand Section */}
         <div className="md:col-span-5 space-y-6">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Reframe</h2>
+            <h2 className="display text-4xl">Reframe</h2>
             <p className="text-xs text-[var(--muted)] mt-1">
               Browser Video Studio
             </p>
@@ -43,7 +43,7 @@ export default function Footer() {
             ].map((tag) => (
               <span
                 key={tag.label}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-2xs font-semibold text-[var(--text-secondary)] hover:border-[var(--border-strong)] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-pill border border-[var(--border)] text-2xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)] transition-colors"
               >
                 {tag.icon}
                 {tag.label}
@@ -54,9 +54,7 @@ export default function Footer() {
 
         {/* Navigation */}
         <div className="md:col-span-3 space-y-5">
-          <h3 className="text-xs font-medium text-[var(--muted)]">
-            Navigation
-          </h3>
+          <h3 className="marker"><span aria-hidden="true">(</span>Navigation<span aria-hidden="true">)</span></h3>
 
           <nav className="flex flex-col gap-3 text-sm">
             <a
@@ -64,7 +62,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="GitHub repository"
-              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] hover:underline underline-offset-2 transition-colors w-fit  rounded"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
             >
               <Github size={14} />
               GitHub
@@ -74,7 +72,7 @@ export default function Footer() {
             <Link
               href="/contact"
               aria-label="Contact page"
-              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] hover:underline underline-offset-2 transition-colors w-fit  rounded"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
             >
               <Mail size={14} />
               Contact
@@ -83,7 +81,7 @@ export default function Footer() {
             <Link
               href="/privacy"
               aria-label="Privacy policy"
-              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] hover:underline underline-offset-2 transition-colors w-fit  rounded"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
             >
               <Lock size={14} />
               Privacy Policy
@@ -97,7 +95,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Code of Conduct"
-              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] hover:underline underline-offset-2 transition-colors w-fit  rounded"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
             >
               <HeartHandshake size={14} />
               Code of Conduct
@@ -111,10 +109,10 @@ export default function Footer() {
           {/* Newsletter */}
 
           <div className="space-y-3">
-            <h3 className="text-xs font-medium text-[var(--muted)]">Updates</h3>
+            <h3 className="marker"><span aria-hidden="true">(</span>Updates<span aria-hidden="true">)</span></h3>
 
             <form
-              className="flex items-center w-full sm:w-80 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)] transition"
+              className="flex items-center w-full sm:w-80 bg-[var(--surface)] border border-[var(--border)] rounded-pill px-4 focus-within:border-[var(--focus)] focus-within:ring-1 focus-within:ring-[var(--accent)] transition"
               onSubmit={(e) => e.preventDefault()}
               aria-label="Newsletter signup"
             >
@@ -130,7 +128,7 @@ export default function Footer() {
                 type="submit"
                 aria-label="Subscribe to updates"
                 onMouseDown={(e) => e.preventDefault()}
-                className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition p-2  rounded ml-1"
+                className="text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors p-2 rounded-full ml-1"
               >
                 <ArrowRight size={16} />
               </button>
@@ -140,9 +138,7 @@ export default function Footer() {
           {/* Community */}
 
           <div className="space-y-3">
-            <h3 className="text-xs font-medium text-[var(--muted)]">
-              Community
-            </h3>
+            <h3 className="marker"><span aria-hidden="true">(</span>Community<span aria-hidden="true">)</span></h3>
 
             <div className="flex items-center gap-3 flex-wrap">
               {[
@@ -173,7 +169,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={social.label}
-                  className="relative group p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] transition-colors "
+                  className="relative group p-2.5 rounded-full border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] transition-colors "
                 >
                   <span className="opacity-70 group-hover:opacity-100">{social.icon}</span>
                 </a>
@@ -184,12 +180,12 @@ export default function Footer() {
       </div>
 
       {/* Bottom Bar */}
-      <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[var(--muted)]">
+      <div className="max-w-[1440px] mx-auto mt-16 pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[var(--muted)]">
         <p>© {new Date().getFullYear()} Reframe · MIT License</p>
 
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
             Processing happens locally
           </div>
 

@@ -28,8 +28,10 @@ http.createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, "http://x").pathname);
   let file = path.join(root, p);
   if (!file.startsWith(root)) { res.writeHead(403).end(); return; }
-  if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
-  if (!fs.existsSync(file) && fs.existsSync(file + ".html")) file += ".html";
+  // Static export writes both `contact.html` and a `contact/` directory of
+  // RSC segments; like Vercel, prefer the .html file for a bare path.
+  if (fs.existsSync(file + ".html")) file += ".html";
+  else if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
   if (!fs.existsSync(file)) { res.writeHead(404, headers).end("not found"); return; }
   const ext = path.extname(file);
   const body = fs.readFileSync(file);

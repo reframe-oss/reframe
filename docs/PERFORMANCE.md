@@ -446,6 +446,82 @@ Benchmarks on `localhost` send no RUM events, even with keys in
 local run, build with `NEXT_PUBLIC_DATADOG_ENV=local-perf` and filter on
 `env:local-perf` in Datadog.
 
+## Editorial redesign: measured cost (2026-10-21)
+
+The "screening room" redesign adds two things that cost bytes or time:
+- **Self-hosted Cormorant Garamond.** next/font serves it from this origin,
+  so there is no runtime Google request and COEP is unaffected. It uses
+  `display: swap` with a metric-adjusted fallback.
+  - The upright Latin file is preloaded (37 KB).
+  - The italic (39 KB) is fetched on use, for the parenthetical labels.
+- **CSS-only motion.** A masked headline rise, staggered region fades, a
+  drop-zone frame that settles in, a frame wipe for the preview on mount,
+  and grid-row disclosures.
+  - No animation library.
+  - Nothing animates during playback except the active thumbnail's border
+    colour.
+  - Reduced motion removes all of it.
+
+Lighthouse mobile, local production build, median of 5, same machine and
+session. Before = `33b2c5a`.
+
+| | Before | After |
+|---|---|---|
+| Performance | 100 | 100 |
+| FCP | 877 ms | 880 ms |
+| LCP | 1,102 ms | 1,402 ms |
+| TBT | 12 ms | 12 ms |
+| CLS | 0 | 0 |
+| Speed index | 2,678 | 2,207 |
+| Accessibility / best practices | 100 / 100 | 100 / 100 |
+| Transfer | 203 KB | 281 KB (+78 KB = the two font files) |
+
+**Lesson recorded for future changes.** The first version of the redesign
+measured **LCP 2,184 ms**. The LCP element (the drop-zone title) was hidden
+by entrance animations until they finished:
+- a clip-path wipe on the drop zone
+- an opacity fade on its section
+
+Lighthouse reported about 750 ms of "element render delay". The primary
+action is now painted from the first frame, and only decorative elements
+(the headline lines, the hairline frame, secondary sections) animate.
+**Don't put opacity, clip-path or masked entrances on the LCP element or its
+ancestors.**
+
+Interaction benchmark (`bench.js`, same 6 s clip, after vs before the
+redesign):
+
+| | Isolated | Not isolated |
+|---|---|---|
+| 30 slider steps: task time | 136 → 136 ms | 152 → 129 ms |
+| Style recalcs | 38 → 30 | 38 → 31 |
+| Slow events (>16 ms) | 22 → 16 | 25 → 19 |
+| Worst event | 48 → 24 ms | 24 → 24 ms |
+| URL writes | 2 → 2 | 2 → 2 |
+| 5 s playback: script time | 4 → 5 ms | 5 → 4 ms |
+| Playback style recalcs | 34 → 40 | 30 → 41 |
+| MP4 720p / 1080p / portrait encode | 1.24 / 2.56 / 1.62 s | 5.71 / 11.47 / 7.43 s |
+| Long tasks during export | 0 | 0 |
+| Cancel → idle | 9 ms | 7–11 ms |
+| Workers | 34 | 2 |
+
+Export times are within run-to-run noise of the previous table. `matrix.js`
+passes in both modes: cancel during load, MP4 with sharpness and volume,
+WebM and GIF.
+
+`bench.js` now opens a collapsed panel using `checkVisibility()`. The new
+disclosures keep closed content in the DOM as `visibility:hidden`, so the
+old `offsetParent` check silently skipped the slider scenario.
+
+Motion audit (`motion.js`, landing page): 56 of 450 elements have a
+transition (48 before; the extra ones are interactive controls). That drops
+to 0 under reduced motion, and there are 0 infinite animations.
+
+Screenshots (light, dark, high contrast; 1280×720, 1366×768, tablet,
+mobile) were taken with a scratch Puppeteer script, not a test. No console
+errors or failed requests were seen, there was no horizontal overflow, and
+Export was visible at every size.
+
 ## Known bottlenecks and limitations
 
 - **Memory.**

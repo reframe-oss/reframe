@@ -29,7 +29,7 @@ export default function RotateControl({ recipe, onChange }: Props) {
               size={15}
               aria-hidden="true"
               style={{ transform: `rotate(${deg}deg)`, transformOrigin: "center" }}
-              className={cn(active ? "text-film-500" : "text-[var(--muted)]")}
+              className={cn(active ? "text-[var(--selected)]" : "text-[var(--muted)]")}
             />
             {deg}°
           </button>
