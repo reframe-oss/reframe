@@ -71,6 +71,22 @@ type CancelledPayload = { type: "cancelled"; id?: string };
 
 type WorkerResponse = ProgressPayload | ReadyPayload | ResultPayload | ErrorPayload | CancelledPayload;
 
+/**
+ * Encoder thread cap for the multi-threaded core. Left on "auto", libx264 and
+ * libvpx size their thread pools from the CPU count (≈1.5× cores plus
+ * lookahead threads), which exceeds the pthread pool @ffmpeg/core-mt is built
+ * with; the encoder then blocks forever waiting for a thread that can't be
+ * spawned. Measured on an 11-core machine (Chrome 155): exports hung at 0%
+ * without a cap and completed with 4 threads. 0 = don't pass -threads
+ * (single-threaded core, where the flag has no benefit).
+ */
+const MT_ENCODER_THREADS =
+  typeof self !== "undefined" && self.crossOriginIsolated ? 4 : 0;
+
+function threadArgs(): string[] {
+  return MT_ENCODER_THREADS > 0 ? ["-threads", String(MT_ENCODER_THREADS)] : [];
+}
+
 let ffmpeg: FFmpeg | null = null;
 let ffmpegLoaded = false;
 let activeExportAbortController: AbortController | null = null;
@@ -320,15 +336,20 @@ interface PositionCoords {
     if (shouldKeepAudio) args.push("-c:a", "aac", "-b:a", "128k");
   }
 
-  if (recipe.speed !== 1) {
-    const sourceDuration = (recipe.trimEnd ?? videoDuration) - recipe.trimStart;
-    // Skip -t when sourceDuration <= 0 (happens when video metadata fails to
-    // load and videoDuration falls back to 0). Passing -t 0 to FFmpeg produces
-    // a zero-length output file; omitting it lets FFmpeg encode the full stream.
-    if (sourceDuration > 0) {
-      const outputDuration = sourceDuration / recipe.speed;
-      args.push("-t", outputDuration.toFixed(6));
-    }
+  args.push(...threadArgs());
+
+  // Explicit output duration on every export, not only when speed changes:
+  // it stops encoder flush overshoot and, with looped background music
+  // (`-stream_loop -1`) on a silent video, prevents an export that never ends.
+  // (The same fix in ffmpeg.ts's copy of buildArguments never reached this
+  // worker, which is the code path that actually runs.)
+  const sourceDuration = (recipe.trimEnd ?? videoDuration) - recipe.trimStart;
+  // Skip -t when sourceDuration <= 0 (happens when video metadata fails to
+  // load and videoDuration falls back to 0). Passing -t 0 to FFmpeg produces
+  // a zero-length output file; omitting it lets FFmpeg encode the full stream.
+  if (sourceDuration > 0) {
+    const outputDuration = sourceDuration / recipe.speed;
+    args.push("-t", outputDuration.toFixed(6));
   }
 
   args.push(outputName);
@@ -449,9 +470,15 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
 
   const videoDuration = request.videoDuration;
 
+  // FFmpeg emits progress per frame; post only when the whole percentage
+  // changes so the main thread isn't flooded with identical updates.
+  let lastPercent = -1;
   const handleProgress = ({ progress }: { progress: number }) => {
     if (activeExportId !== sessionId) return;
-    postMessage({ type: "progress", percent: Math.min(99, Math.round(progress * 100)) });
+    const percent = Math.max(0, Math.min(99, Math.round(progress * 100)));
+    if (percent === lastPercent) return;
+    lastPercent = percent;
+    postMessage({ type: "progress", percent });
   };
 
   let logListener: ((event: { message: string }) => void) | null = null;
@@ -477,14 +504,14 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
         : [];
 
       const pass1Code = await ffmpeg.exec(
-        ["-i", inputName, "-vf", vfWithPalette, ...gifDurationArgs, "-y", paletteName],
+        ["-i", inputName, "-vf", vfWithPalette, ...gifDurationArgs, ...threadArgs(), "-y", paletteName],
         undefined,
         { signal: activeExportAbortController?.signal }
       );
       if (pass1Code !== 0) throw new Error("GIF palette generation failed");
 
       const pass2Code = await ffmpeg.exec(
-        ["-i", inputName, "-i", paletteName, "-lavfi", vfWithPaletteUse, ...gifDurationArgs, "-y", outputName],
+        ["-i", inputName, "-i", paletteName, "-lavfi", vfWithPaletteUse, ...gifDurationArgs, ...threadArgs(), "-y", outputName],
         undefined,
         { signal: activeExportAbortController?.signal }
       );

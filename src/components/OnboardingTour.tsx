@@ -197,25 +197,25 @@ function Tooltip({
       role="dialog"
       aria-modal="true"
       aria-label={`Onboarding step ${stepIndex + 1} of ${totalSteps}: ${step.title}`}
-      className="fixed z-[9999] w-80 rounded-xl shadow-2xl border
+      className="fixed z-[9999] w-80 rounded-panel shadow-[var(--shadow-overlay)] border
         bg-[var(--surface)]
         border-[var(--border)]
         text-[var(--text)]
-        transition-all duration-200"
+        transition-colors duration-fast"
       style={{ ...style }}
       tabIndex={-1}
     >
       {/* Progress bar */}
       <div className="h-1 rounded-t-xl overflow-hidden bg-[var(--border)]">
         <div
-          className="h-full bg-indigo-500 transition-all duration-300"
+          className="h-full bg-[var(--accent)]"
           style={{ width: `${((stepIndex + 1) / totalSteps) * 100}%` }}
         />
       </div>
 
       <div className="p-5">
         {/* Step counter */}
-        <p className="text-xs font-semibold tracking-widest uppercase text-indigo-500 mb-1">
+        <p className="text-xs font-semibold text-film-500 mb-1">
           Step {stepIndex + 1} of {totalSteps}
         </p>
 
@@ -237,9 +237,9 @@ function Tooltip({
               el?.focus();
             }}
             className="px-4 py-2 rounded-lg text-sm font-medium
-              bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700
-              text-white transition-colors focus-visible:outline focus-visible:outline-2
-              focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+              bg-[var(--accent)] hover:bg-[var(--accent-hover)]
+              text-[var(--on-accent)] transition-colors focus-visible:outline focus-visible:outline-2
+              focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
           >
             {isLast ? "Done" : "Next →"}
           </button>

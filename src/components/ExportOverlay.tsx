@@ -3,15 +3,23 @@
 import FocusTrap from "focus-trap-react";
 import { useEffect, useRef, useCallback, useState } from "react";
 import { ExportStatus } from "@/lib/types";
-import LottiePlayer from "./LottiePlayer";
-import spinnerAnim from "@/lib/lottie/spinner.json";
 import TipCarousel from "./TipCarousel";
+
+export interface ExportSummary {
+  /** e.g. "MP4" */
+  format: string;
+  /** e.g. "1080 × 1920" */
+  resolution: string;
+  /** e.g. "Balanced (CRF 23)" */
+  quality: string;
+}
 
 interface Props {
   status: ExportStatus;
   progress: number;
   exportStartedAt?: number | null;
   onCancel?: () => void;
+  summary?: ExportSummary;
 }
 
 function formatElapsed(ms: number): string {
@@ -21,7 +29,7 @@ function formatElapsed(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-export default function ExportOverlay({ status, progress, exportStartedAt, onCancel }: Props) {
+export default function ExportOverlay({ status, progress, exportStartedAt, onCancel, summary }: Props) {
   const visible = status === "loading-engine" || status === "exporting";
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const focusAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -80,6 +88,7 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
   if (!visible) return null;
 
   const isLoading = status === "loading-engine";
+  const clamped = Math.max(0, Math.min(100, progress));
 
   return (
     <FocusTrap
@@ -94,79 +103,86 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby="export-overlay-title"
+        aria-describedby="export-overlay-desc"
         tabIndex={-1}
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--bg)]/95 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 animate-fade-in"
       >
-        <div
-          className="text-center space-y-6 max-w-xs px-6 animate-fade-in"
-          aria-live="polite"
-        >
-          <div
-            ref={focusAnchorRef}
-            tabIndex={-1}
-            className="sr-only"
-            aria-hidden="true"
-          />
-          <div className="mx-auto w-20 h-20">
-            <LottiePlayer
-              animationData={spinnerAnim}
-              loop
-              autoplay
-              aria-hidden="true"
-            />
-          </div>
-          <div className="export-text">
-            <h2 className="font-heading font-bold text-xl tracking-tight text-[var(--text)]">
-              {isLoading ? "Loading engine" : "Exporting"}
-            </h2>
-            <p className="text-sm text-[var(--muted)] mt-1">
-              {isLoading
-                ? "Downloading the video engine. This only happens once."
-                : "Processing your video locally."}
-            </p>
-            <p className="text-xs font-heading font-semibold text-film-600 mt-2 uppercase tracking-wide">
-              Do not close or refresh this tab
-            </p>
-          </div>
-          <span className="sr-only">
-            {status === "loading-engine"
-              ? `Loading video engine: ${progress}%`
-              : `Exporting: ${progress}%, ${formatElapsed(elapsedMs)} elapsed`}
-          </span>
-            <div className="w-full space-y-2">
-              <div className="h-1 w-full bg-film-100 rounded-full overflow-hidden">
+        <div className="panel w-full max-w-sm p-6 shadow-[var(--shadow-overlay)]">
+          <div ref={focusAnchorRef} tabIndex={-1} className="sr-only" aria-hidden="true" />
+
+          <h2 id="export-overlay-title" className="text-lg font-semibold">
+            {isLoading ? "Starting the video engine" : "Exporting"}
+          </h2>
+          <p id="export-overlay-desc" className="mt-1 text-sm text-[var(--muted)]">
+            {isLoading
+              ? "Downloading FFmpeg (about 30 MB) the first time. After that it loads from your browser cache."
+              : "Your video is processed on this device. Keep this tab open until it finishes."}
+          </p>
+
+          {summary && (
+            <dl className="mt-4 grid grid-cols-3 gap-3 rounded-control bg-[var(--surface-2)] p-3 text-xs">
+              <div>
+                <dt className="text-[var(--muted)]">Format</dt>
+                <dd className="mt-0.5 font-medium">{summary.format}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">Size</dt>
+                <dd className="tabular mt-0.5 font-medium">{summary.resolution}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">Quality</dt>
+                <dd className="mt-0.5 font-medium">{summary.quality}</dd>
+              </div>
+            </dl>
+          )}
+
+          <div className="mt-5 space-y-2" aria-live="polite">
+            {isLoading ? (
+              // The engine download doesn't report byte progress, so this is
+              // an honest indeterminate state rather than a fake percentage.
+              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <span
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 rounded-full border-2 border-[var(--border-strong)] border-t-[var(--accent)] animate-spin"
+                />
+                Loading engine…
+              </div>
+            ) : (
+              <>
                 <div
+                  className="progress-track"
                   role="progressbar"
-                  aria-valuenow={progress}
+                  aria-valuenow={clamped}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-label={isLoading ? "Engine download progress" : "Export progress"}
-                  className="h-full bg-film-600 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4 text-xs font-heading font-semibold text-[var(--muted)]">
-                <span>{progress}%</span>
-                {!isLoading && (
-                  <span>{formatElapsed(elapsedMs)} elapsed</span>
-                )}
-              </div>
-              <TipCarousel />
-              {!isLoading && (
-              <div className="flex flex-col items-center gap-3 mt-4">
-                <button
-                  type="button"
-                  onClick={() => onCancel?.()}
-                  className="inline-flex items-center justify-center rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-4 py-2 text-sm font-semibold text-[var(--error)] transition-colors hover:bg-[var(--error-hover)] active:scale-[0.98]"
+                  aria-label="Export progress"
                 >
-                  Cancel Export
-                </button>
-                <p className="text-[var(--text)] text-xs">
-                  Press Escape to cancel
-                </p>
-              </div>
-              )}
-            </div>
+                  <div className="progress-fill" style={{ transform: `scaleX(${clamped / 100})` }} />
+                </div>
+                <div className="tabular flex items-center justify-between text-xs text-[var(--muted)]">
+                  <span className="font-medium text-[var(--text)]">{clamped}%</span>
+                  <span>{formatElapsed(elapsedMs)} elapsed</span>
+                </div>
+              </>
+            )}
+            <span className="sr-only">
+              {isLoading
+                ? "Loading video engine"
+                : `Exporting: ${clamped}%, ${formatElapsed(elapsedMs)} elapsed`}
+            </span>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between gap-3">
+            <span className="text-xs text-[var(--muted)]">
+              <kbd className="kbd">Esc</kbd> to cancel
+            </span>
+            <button type="button" onClick={() => onCancel?.()} className="btn btn-secondary">
+              Cancel export
+            </button>
+          </div>
+
+          {!isLoading && <TipCarousel />}
         </div>
       </div>
     </FocusTrap>

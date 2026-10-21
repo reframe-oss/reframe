@@ -1,98 +1,151 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto:wght@400;700&family=Poppins:wght@400;700&family=Montserrat:wght@400;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── Light mode tokens ── */
+/*
+ * Reframe design tokens.
+ *
+ * The five core names (--bg, --surface, --border, --text, --muted) are a
+ * public contract used by every component — never rename them. Everything
+ * else here refines that base: a secondary surface for inset controls, a
+ * stronger border for inputs, a film-red accent used sparingly, a blue focus
+ * colour that never reads as an error, and status colours.
+ */
+
+/* ── Light (default) ── */
 :root {
-  --bg: #ffffff;
-  --surface: #f1f5f9;
-  --border: #cbd5e1;
-  --text: #0f172a;
-  --muted: #64748b;
-  --accent: #3b82f6;
-  --accent-hover: #1d4ed8;
-  --accent-muted: rgba(59, 130, 246, 0.12);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  --bg: #eeeff1;
+  --surface: #ffffff;
+  --surface-2: #f5f6f7;
+  --border: #dcdee2;
+  --border-strong: #c3c7ce;
+  --text: #16181c;
+  --text-secondary: #3d4148;
+  --muted: #5f646d;
+
+  /* Film red from the logo, darkened so white text on it passes AA (4.9:1). */
+  --accent: #d42f3c;
+  --accent-hover: #b8222e;
+  --accent-muted: rgba(212, 47, 60, 0.09);
+  --accent-text: #b3202c;
+  --on-accent: #ffffff;
+  --film-600: #d42f3c;
+  --film-400: #e85560;
+
+  --focus: #2f6fed;
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus);
+
+  --success: #1d7a45;
+  --success-bg: #e8f5ed;
+  --warning: #915200;
+  --warning-bg: #fdf3e2;
+  --error: #b42318;
+  --error-bg: #fdecea;
+  --error-border: #f4b8b1;
+  --error-hover: #fad9d5;
+
+  /* The viewer stays dark in every theme, like a reference monitor. */
+  --viewer: #0c0d0f;
+
   --radius: 10px;
-  --shadow: 0 2px 12px rgba(15, 23, 42, 0.12);
-  --film-600: #e63946;
-  --film-400: #ff6b6b;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --error-bg: #fee2e2;
-  --error-border: #fca5a5;
-  --error-hover: #fecaca;
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --shadow: 0 1px 2px rgba(22, 24, 28, 0.06), 0 1px 1px rgba(22, 24, 28, 0.04);
+  --shadow-overlay: 0 12px 32px rgba(22, 24, 28, 0.18);
+
+  --dur-fast: 120ms;
+  --dur-base: 160ms;
+  --dur-slow: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  color-scheme: light;
 }
 
-/* ── Dark mode tokens ── */
+/* ── Dark ── */
 .dark {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --border: #2e3147;
-  --text: #f0f0f5;
-  --muted: #8b8fa8;
-  --accent: #4f6ef7;
-  --accent-hover: #3a57d4;
-  --accent-muted: rgba(79, 110, 247, 0.12);
-  --radius: 10px;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  --warning: #fbbf24;
-  --error: #f87171;
-  --error-bg: #7f1d1d;
-  --error-border: #991b1b;
-  --error-hover: #991b1b;
+  --bg: #121316;
+  --surface: #1a1c20;
+  --surface-2: #22252a;
+  --border: #2c2f35;
+  --border-strong: #41454d;
+  --text: #ecedef;
+  --text-secondary: #c4c8cf;
+  --muted: #9aa0aa;
+
+  --accent: #d42f3c;
+  --accent-hover: #e2414d;
+  --accent-muted: rgba(255, 107, 116, 0.12);
+  --accent-text: #ff7a82;
+  --on-accent: #ffffff;
+  --film-600: #d42f3c;
+  --film-400: #ff7a82;
+
+  --focus: #6ea2ff;
+
+  --success: #5ccf8c;
+  --success-bg: rgba(92, 207, 140, 0.12);
+  --warning: #f2b45a;
+  --warning-bg: rgba(242, 180, 90, 0.12);
+  --error: #ff8a80;
+  --error-bg: rgba(255, 138, 128, 0.12);
+  --error-border: rgba(255, 138, 128, 0.35);
+  --error-hover: rgba(255, 138, 128, 0.2);
+
+  --viewer: #08090a;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-overlay: 0 16px 40px rgba(0, 0, 0, 0.55);
+
+  color-scheme: dark;
 }
 
-/* ── High contrast mode tokens ── */
+/* ── High contrast (set by ThemeProvider when the user asks for more contrast) ── */
 [data-theme="high-contrast"] {
   --bg: #000000;
   --surface: #000000;
-  --border: #FFFFFF;
+  --surface-2: #000000;
+  --border: #ffffff;
+  --border-strong: #ffffff;
 
-  --text: #FFFFFF;
-  --muted: #FFFFFF;
+  --text: #ffffff;
+  --text-secondary: #ffffff;
+  --muted: #ffffff;
 
-  --accent: #FFFF00;
-  --accent-hover: #FFFF00;
+  /* Yellow fill needs black text; --on-accent makes that automatic. */
+  --accent: #ffff00;
+  --accent-hover: #ffff66;
   --accent-muted: rgba(255, 255, 0, 0.22);
-  --radius: 10px;
+  --accent-text: #ffff00;
+  --on-accent: #000000;
+  --film-600: #ffff00;
+  --film-400: #ffff00;
+
+  --focus: #00ffff;
+
+  --success: #66ff66;
+  --success-bg: #000000;
+  --warning: #ffcc00;
+  --warning-bg: #000000;
+  --error: #ff6666;
+  --error-bg: #000000;
+  --error-border: #ff6666;
+  --error-hover: #330000;
+
+  --viewer: #000000;
   --shadow: none;
+  --shadow-overlay: none;
 
-  --error: #FF6666;
-  --success: #66FF66;
-
-  --film-600: #FF6666;
-  --film-400: #66FF66;
+  color-scheme: dark;
 }
 
-/* Ensure export overlay text is readable in high-contrast by forcing dark text */
-[data-theme="high-contrast"] .export-text,
-[data-theme="high-contrast"] .export-text * {
-  color: #000000 !important;
-}
-
-/* Make the main export button readable in high-contrast mode */
-[data-theme="high-contrast"] #export-button {
-  background: #7ee081 !important;
-  color: #000000 !important;
-  border: 2px solid #ffffff !important;
-}
-
-[data-theme="high-contrast"] #export-button:hover,
-[data-theme="high-contrast"] #export-button:focus-visible {
-  background: #69d66d !important;
-  color: #000000 !important;
-}
-
-[data-theme="high-contrast"] #export-button svg {
-  color: #000000 !important;
-}
-
-/* ── Base styles ── */
+/* ── Base ── */
 html {
   min-height: 100%;
-  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -100,8 +153,10 @@ body {
   min-height: 100vh;
   background-color: var(--bg);
   color: var(--text);
-  line-height: 1.6;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
 }
 
 img,
@@ -120,52 +175,267 @@ h4,
 h5,
 h6 {
   color: var(--text);
-  font-weight: 700;
-}
-
-p,
-li {
-  color: color-mix(in srgb, var(--text) 95%, transparent);
-}
-
-button {
-  transition: all 0.2s ease;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 input,
 select,
 textarea {
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   color: var(--text);
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-muted);
+  border-color: var(--focus);
   outline: none;
 }
 
-/* Smooth transitions for all themed elements */
-*,
-*::before,
-*::after {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: ease;
-  transition-duration: 200ms;
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
 }
 
+/* One focus treatment for everything keyboard-reachable. */
 :focus-visible {
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--accent-muted);
-  border-radius: var(--radius);
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
-detail > summary {
+::selection {
+  background: color-mix(in srgb, var(--focus) 30%, transparent);
+}
+
+details > summary {
   list-style: none;
 }
 details > summary::-webkit-details-marker {
   display: none;
+}
+
+/* Timecodes and numeric readouts keep a fixed width while they change. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Theme switches crossfade colours for one short window only. ThemeProvider
+ * adds this class for ~200ms around a toggle, so ordinary interaction never
+ * pays for a transition on every element (the old `*, *::before, *::after`
+ * rule animated colour changes on every node, including during playback).
+ */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition-property: background-color, border-color, color, fill, stroke !important;
+  transition-duration: 160ms !important;
+  transition-timing-function: ease !important;
+}
+
+/* Returning visitors who dismissed the privacy notice: hide it before first paint. */
+html[data-privacy-dismissed] [data-privacy-banner] {
+  display: none;
+}
+
+/* ── Shared component classes ── */
+@layer components {
+  /* Buttons: one shape, three emphasis levels, explicit transitions. */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-control border text-sm font-medium;
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    transition:
+      background-color var(--dur-fast) var(--ease-standard),
+      border-color var(--dur-fast) var(--ease-standard),
+      color var(--dur-fast) var(--ease-standard),
+      transform var(--dur-fast) var(--ease-standard);
+  }
+  .btn:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: scale(0.98);
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .btn-lg {
+    min-height: 2.75rem;
+    padding: 0 1.25rem;
+    font-size: 0.9375rem;
+  }
+  .btn-sm {
+    min-height: 1.875rem;
+    padding: 0 0.625rem;
+    font-size: 0.75rem;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+  }
+  .btn-primary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+  .btn-secondary {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .btn-secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--surface-2);
+  }
+  .btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .btn-danger {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error);
+  }
+  .btn-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--error-hover);
+  }
+  /* Icon-only buttons must still carry an aria-label (and usually a title). */
+  .btn-icon {
+    padding: 0;
+    width: 2.25rem;
+  }
+  .btn-icon.btn-sm {
+    width: 1.875rem;
+  }
+
+  /*
+   * Selectable option tiles (presets, formats, rotation, framing). The pressed
+   * state is the accent outline; hover only shifts the border.
+   */
+  .choice {
+    @apply rounded-control border text-sm;
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text-secondary);
+    transition:
+      background-color var(--dur-fast) var(--ease-standard),
+      border-color var(--dur-fast) var(--ease-standard),
+      color var(--dur-fast) var(--ease-standard);
+  }
+  .choice:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .choice[aria-pressed="true"],
+  .choice[aria-checked="true"],
+  .choice[data-active="true"] {
+    background: var(--accent-muted);
+    border-color: var(--accent);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
+  /* Text inputs */
+  .field {
+    @apply w-full rounded-control border text-sm;
+    min-height: 2.25rem;
+    padding: 0 0.75rem;
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--text);
+    transition: border-color var(--dur-fast) var(--ease-standard);
+  }
+  .field::placeholder {
+    color: var(--muted);
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--error);
+  }
+
+  /* Labels: sentence case, medium weight, no tracking. */
+  .label {
+    @apply text-xs font-medium;
+    color: var(--text-secondary);
+  }
+  .hint {
+    @apply text-xs;
+    color: var(--muted);
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+  }
+
+  .kbd {
+    @apply inline-flex items-center justify-center rounded border text-2xs font-medium;
+    min-width: 1.375rem;
+    height: 1.25rem;
+    padding: 0 0.3125rem;
+    background: var(--surface-2);
+    border-color: var(--border);
+    border-bottom-width: 2px;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+  }
+
+  /* Status callouts */
+  .callout {
+    @apply flex items-start gap-3 rounded-control border p-3 text-sm;
+  }
+  .callout-error {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--text);
+  }
+  .callout-warning {
+    background: var(--warning-bg);
+    border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+    color: var(--text);
+  }
+  .callout-info {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  /* Determinate progress: the fill scales on the GPU instead of animating width. */
+  .progress-track {
+    @apply relative h-1.5 w-full overflow-hidden rounded-full;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .progress-fill {
+    @apply absolute inset-0 origin-left rounded-full;
+    background: var(--accent);
+    transition: transform var(--dur-slow) linear;
+  }
+}
+
+/*
+ * Reduced motion: drop decorative movement and long transitions, but keep
+ * instant state feedback (colour changes still apply, they just don't fade).
+ * Progress bars keep updating; they simply stop easing between values.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
 }

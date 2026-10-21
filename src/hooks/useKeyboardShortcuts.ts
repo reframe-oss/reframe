@@ -1,6 +1,6 @@
 import { EditRecipe, ExportStatus } from "@/lib/types";
 import { PRESETS } from "@/lib/presets";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 interface UseKeyboardShortcutsProps {
   file: File | null;
@@ -11,7 +11,8 @@ interface UseKeyboardShortcutsProps {
   status: ExportStatus;
   cancelExport: () => void;
   onToggleShortcutsModal: () => void;
-  currentTime: number;
+  /** Reads the playhead at key-press time (no per-frame re-subscription). */
+  getCurrentTime: () => number;
   duration: number;
 }
 
@@ -24,19 +25,16 @@ export function useKeyboardShortcuts({
   status,
   cancelExport,
   onToggleShortcutsModal,
-  currentTime,
+  getCurrentTime,
   duration,
 }: UseKeyboardShortcutsProps) {
-  const currentTimeRef = useRef(currentTime);
-  useEffect(() => {
-    currentTimeRef.current = currentTime;
-  }, [currentTime]);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
         target.isContentEditable
       ) return;
 
@@ -72,11 +70,11 @@ export function useKeyboardShortcuts({
           break;
         case "i":
         case "I":
-          updateRecipe({trimStart: Math.floor(currentTimeRef.current)});
+          updateRecipe({ trimStart: Math.floor(getCurrentTime()) });
           break;
         case "o":
         case "O":
-          updateRecipe({trimEnd: Math.floor(currentTimeRef.current)});
+          updateRecipe({ trimEnd: Math.floor(getCurrentTime()) });
           break;
 
         default:
@@ -91,5 +89,5 @@ export function useKeyboardShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [file, recipe, resetSettings, updateRecipe, handleExport, status, cancelExport, onToggleShortcutsModal, currentTime, duration]);
+  }, [file, recipe, resetSettings, updateRecipe, handleExport, status, cancelExport, onToggleShortcutsModal, getCurrentTime, duration]);
 }

@@ -50,3 +50,8 @@ chromatic.log
 
 # Local Netlify folder
 .netlify
+
+# Local performance measurement output (docs/PERFORMANCE.md)
+scripts/perf/lh/
+scripts/perf/fixtures/
+bench-*.json

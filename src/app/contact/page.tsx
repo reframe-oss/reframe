@@ -85,7 +85,7 @@ export default function ContactClient() {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)] px-6 py-10">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] px-6 py-10">
       <div className="mx-auto max-w-3xl">
         <div className="mb-10">
           <Link
@@ -106,7 +106,7 @@ export default function ContactClient() {
             placeholder="Name"
             className="w-full p-3 border rounded"
           />
-          {errors.name && <p className="text-red-400">{errors.name}</p>}
+          {errors.name && <p className="text-[var(--error)]">{errors.name}</p>}
 
           <input
             name="email"
@@ -115,7 +115,7 @@ export default function ContactClient() {
             placeholder="Email"
             className="w-full p-3 border rounded"
           />
-          {errors.email && <p className="text-red-400">{errors.email}</p>}
+          {errors.email && <p className="text-[var(--error)]">{errors.email}</p>}
 
           <textarea
             name="message"
@@ -125,11 +125,11 @@ export default function ContactClient() {
             className="w-full p-3 border rounded"
           />
           {errors.message && (
-            <p className="text-red-400">{errors.message}</p>
+            <p className="text-[var(--error)]">{errors.message}</p>
           )}
 
           {errors.submit && (
-            <p className="text-red-400">{errors.submit}</p>
+            <p className="text-[var(--error)]">{errors.submit}</p>
           )}
 
           {success && (
@@ -138,12 +138,12 @@ export default function ContactClient() {
 
           <button
             disabled={loading}
-            className="w-full p-3 bg-[var(--accent)] text-white rounded"
+            className="w-full p-3 bg-[var(--accent)] text-[var(--on-accent)] rounded"
           >
             {loading ? "Sending..." : "Send Message"}
           </button>
         </form>
       </div>
-    </main>
+    </div>
   );
 }

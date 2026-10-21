@@ -177,7 +177,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
   };
 
   const inputClass =
-    "w-full text-sm px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--bg)] font-heading focus:outline-none focus:ring-2 focus:ring-film-400 text-[var(--text)] transition-shadow [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+    "w-full text-sm px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--bg)] focus:outline-none focus:ring-2 focus:ring-film-400 text-[var(--text)] transition-shadow [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
   return (
     <div id="trim-control" className="space-y-3">
@@ -197,9 +197,9 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             if (e.key === "ArrowRight") onChange({ trimStart: Math.min((recipe.trimEnd ?? duration) - 0.1, recipe.trimStart + 0.1) });
           }}
         >
-          <div className="absolute inset-x-0 h-1.5 rounded-full bg-[var(--border)]" />
+          <div className="absolute inset-x-0 h-1.5 rounded-full bg-[var(--surface-2)] shadow-[inset_0_0_0_1px_var(--border)]" />
           <div
-            className="absolute h-1.5 rounded-full bg-film-400 opacity-60"
+            className="absolute h-1.5 rounded-full bg-[var(--accent)]"
             style={{
               left: `${(recipe.trimStart / duration) * 100}%`,
               right: `${((duration - (recipe.trimEnd ?? duration)) / duration) * 100}%`,
@@ -212,7 +212,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             aria-valuemin={0}
             aria-valuemax={duration}
             tabIndex={0}
-            className="absolute w-4 h-4 rounded-full bg-white border-2 border-film-400 shadow cursor-grab active:cursor-grabbing -translate-x-1/2 focus:outline-none focus:ring-2 focus:ring-film-400"
+            className="absolute h-5 w-5 -translate-x-1/2 cursor-grab rounded-full border-2 border-[var(--accent)] bg-[var(--surface)] shadow-[var(--shadow)] active:cursor-grabbing"
             style={{ left: `${(recipe.trimStart / duration) * 100}%` }}
             onMouseDown={() => { dragging.current = "start"; }}
             onTouchStart={() => { dragging.current = "start"; }}
@@ -228,7 +228,7 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             aria-valuemin={0}
             aria-valuemax={duration}
             tabIndex={0}
-            className="absolute w-4 h-4 rounded-full bg-white border-2 border-film-400 shadow cursor-grab active:cursor-grabbing -translate-x-1/2 focus:outline-none focus:ring-2 focus:ring-film-400"
+            className="absolute h-5 w-5 -translate-x-1/2 cursor-grab rounded-full border-2 border-[var(--accent)] bg-[var(--surface)] shadow-[var(--shadow)] active:cursor-grabbing"
             style={{ left: `${((recipe.trimEnd ?? duration) / duration) * 100}%` }}
             onMouseDown={() => { dragging.current = "end"; }}
             onTouchStart={() => { dragging.current = "end"; }}
@@ -243,9 +243,9 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
         <div className="flex-1">
           <label
             htmlFor="trim-start"
-            className="font-heading mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]"
+            className="font-heading mb-1.5 block text-2xs font-semibold text-[var(--muted)]"
           >
-            Start (sec)
+            Start (seconds)
           </label>
 
           <input
@@ -262,15 +262,13 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             aria-label="Trim start time in seconds"
             aria-invalid={invalidStart}
             aria-describedby={invalidStart ? "trim-start-error" : undefined}
-            className={`${inputClass} ${
-              invalidStart ? "border-[var(--error)]" : "border-[var(--border)]"
-            }`}
+            className={`${inputClass}`}
             placeholder="0"
           />
           {invalidStart && (
             <p
               id="trim-start-error"
-              className="font-heading animate-fade-in mt-1.5 flex items-center gap-1 text-[10px] text-red-500"
+              className="font-heading animate-fade-in mt-1.5 flex items-center gap-1 text-2xs text-[var(--error)]"
             >
               <AlertCircle size={10} className="shrink-0" />
               {startErrorMsg}
@@ -281,9 +279,9 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
         <div className="flex-1">
           <label
             htmlFor="trim-end"
-            className="font-heading mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]"
+            className="font-heading mb-1.5 block text-2xs font-semibold text-[var(--muted)]"
           >
-            End (sec)
+            End (seconds)
           </label>
 
           <input
@@ -300,15 +298,13 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
             aria-label="Trim end time in seconds"
             aria-invalid={invalidEnd}
             aria-describedby={invalidEnd ? "trim-end-error" : undefined}
-            className={`${inputClass} ${
-              invalidEnd ? "border-[var(--error)]" : "border-[var(--border)]"
-            }`}
+            className={`${inputClass}`}
             placeholder={duration > 0 ? `${duration.toFixed(1)}` : "full length"}
           />
           {invalidEnd && (
             <p
               id="trim-end-error"
-              className="font-heading animate-fade-in mt-1.5 flex items-center gap-1 text-[10px] text-red-500"
+              className="font-heading animate-fade-in mt-1.5 flex items-center gap-1 text-2xs text-[var(--error)]"
             >
               <AlertCircle size={10} className="shrink-0" />
               {endErrorMsg}
@@ -318,14 +314,14 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
       </div>
 
       {duration > 0 && (
-        <p className="text-sm text-[var(--muted)] font-heading mt-1">
+        <p className="tabular hint">
           Clip: {formatDuration(clipLength)} of{" "}
           {formatDuration(duration)}
         </p>
       )}
       {recipe.trimEnd !== null &&
         recipe.trimEnd - recipe.trimStart < MIN_CLIP_DURATION && (
-          <p className="text-[10px] text-[var(--error)] font-heading">
+          <p className="text-xs text-[var(--error)]">
             Clip must be at least 0.1 seconds long.
           </p>
       )}

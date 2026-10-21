@@ -112,7 +112,7 @@ export default function TextControls({
               <button
                 type="button"
                 onClick={() => handleRemoveText(overlay.id)}
-                className="w-5 h-5 flex items-center justify-center rounded text-red-400 hover:bg-red-500/10 transition-colors"
+                className="w-5 h-5 flex items-center justify-center rounded text-[var(--error)] hover:bg-[var(--error-bg)] transition-colors"
                 aria-label={`Remove text overlay ${idx + 1}`}
               >
                 <Trash2 size={13} />

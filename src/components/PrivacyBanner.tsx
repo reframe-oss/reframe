@@ -14,23 +14,25 @@ const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
  * banner does not reappear for 7 days.
  */
 export default function PrivacyBanner() {
-  // Start hidden so the server-rendered markup matches the first client paint
-  // (static export → no hydration mismatch); reveal after reading localStorage.
-  const [visible, setVisible] = useState(false);
+  // Rendered visible in the static HTML so first-time visitors see no layout
+  // shift (it used to mount hidden and appear after hydration, pushing the
+  // upload area down — the page's only measured CLS). For visitors who
+  // dismissed it, the inline script in layout.tsx sets
+  // html[data-privacy-dismissed] before first paint, and CSS hides it.
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    // Genuinely needs an effect: localStorage is unavailable during SSR, so
-    // this can't be computed as derived state without a hydration mismatch.
+    // Genuinely needs an effect: localStorage is unavailable during SSR.
+    // Removes the (already CSS-hidden) node for dismissed visitors.
     try {
       const raw = localStorage.getItem(DISMISS_KEY);
       const dismissedUntil = raw ? Number(raw) : 0;
-      if (!Number.isFinite(dismissedUntil) || Date.now() >= dismissedUntil) {
+      if (Number.isFinite(dismissedUntil) && Date.now() < dismissedUntil) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setVisible(true);
+        setVisible(false);
       }
     } catch {
-      // localStorage unavailable (private mode, blocked storage) — show anyway.
-      setVisible(true);
+      // localStorage unavailable (private mode, blocked storage) — keep showing.
     }
   }, []);
 
@@ -52,15 +54,16 @@ export default function PrivacyBanner() {
     <div
       role="note"
       aria-label="Privacy information"
-      className="relative flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 pr-11 animate-fade-in"
+      data-privacy-banner=""
+      className="relative flex items-start gap-3 rounded-panel border border-[var(--border)] bg-[var(--surface)] p-4 pr-11"
     >
       <ShieldCheck
         size={20}
         aria-hidden="true"
-        className="mt-0.5 shrink-0 text-[var(--accent)]"
+        className="mt-0.5 shrink-0 text-[var(--success)]"
       />
       <div className="min-w-0 text-sm leading-relaxed">
-        <p className="font-heading font-bold text-[var(--text)]">
+        <p className="font-medium text-[var(--text)]">
           Your videos never leave your device.
         </p>
         <p className="mt-0.5 text-[var(--muted)]">
@@ -72,7 +75,8 @@ export default function PrivacyBanner() {
         type="button"
         onClick={dismiss}
         aria-label="Dismiss privacy notice"
-        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--border)] hover:text-[var(--text)]"
+        title="Dismiss for 7 days"
+        className="btn btn-ghost btn-icon btn-sm absolute right-2 top-2"
       >
         <X size={16} aria-hidden="true" />
       </button>

@@ -1,9 +1,11 @@
 import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, MAX_FILE_SIZE } from "./types";
 import { getPresetById } from "./presets";
 import { buildTextFilter } from "./text-overlay";
-import { trackAction, trackTiming } from "./telemetry";
+import { trackAction, trackDuration, trackTiming } from "./telemetry";
 
-export class FFmpegLoadError extends Error {}
+export class FFmpegLoadError extends Error {
+  name = "FFmpegLoadError";
+}
 
 
 type SerializedFile = {
@@ -80,6 +82,22 @@ function createWorker(): Worker {
   });
 
   return ffmpegWorker;
+}
+
+/**
+ * Wraps a progress callback so it only fires when the rounded percentage
+ * changes. FFmpeg reports progress per encoded frame; forwarding every event
+ * re-rendered the editor hundreds of times per export for no visible change.
+ */
+export function dedupeProgress(onProgress?: (percent: number) => void) {
+  if (!onProgress) return undefined;
+  let last = -1;
+  return (percent: number) => {
+    const rounded = Math.max(0, Math.min(100, Math.round(percent)));
+    if (rounded === last) return;
+    last = rounded;
+    onProgress(rounded);
+  };
 }
 
 function resetWorker() {
@@ -180,7 +198,7 @@ export async function loadFFmpeg(
     ffmpegWorker!.postMessage({ type: "load" });
   }
 
-  pendingProgress = onProgress ?? null;
+  pendingProgress = dedupeProgress(onProgress) ?? null;
 
   if (signal?.aborted) {
     ffmpegWorker?.postMessage({ type: "cancel" });
@@ -202,8 +220,11 @@ export async function loadFFmpeg(
   const loadStart = performance.now();
   try {
     await workerReady;
-    const durationMs = Math.round(performance.now() - loadStart);
-    trackAction("ffmpeg_load_success", { durationMs });
+    const threading = typeof window !== "undefined" && window.crossOriginIsolated ? "multi" : "single";
+    // ffmpeg_init is the cold engine start only (download + compile); it is
+    // tracked separately from export duration and thumbnail generation.
+    trackDuration("ffmpeg_init", loadStart, { threading });
+    trackAction("ffmpeg_load_success", { durationMs: Math.round(performance.now() - loadStart), threading });
     trackTiming("ffmpeg_ready");
   } catch (err) {
     if (!(err instanceof DOMException && err.name === "AbortError")) {
@@ -232,9 +253,11 @@ export async function exportVideo(
   onProgress: (percent: number) => void,
   signal?: AbortSignal,
   musicOptions?: BackgroundMusicOptions,
-  overlayOptions?: ImageOverlayOptions
+  overlayOptions?: ImageOverlayOptions,
+  /** Duration already read by the editor; skips a second metadata load. */
+  knownDuration?: number
 ): Promise<ExportResult> {
-  await loadFFmpeg(signal, onProgress);
+  await loadFFmpeg(signal);
 
   if (!ffmpegWorker) {
     throw new Error("FFmpeg worker is not available.");
@@ -283,7 +306,7 @@ export async function exportVideo(
     ? { ...overlayOptions, file: null }
     : undefined;
 
-  pendingProgress = onProgress;
+  pendingProgress = dedupeProgress(onProgress) ?? null;
 
   const exportPromise = new Promise<ExportResult>((resolve, reject) => {
     pendingExport = { id: sessionId, resolve, reject };
@@ -311,7 +334,10 @@ export async function exportVideo(
       id: sessionId,
       file: filePayload,
       recipe,
-      videoDuration: await getVideoDuration(file),
+      videoDuration:
+        knownDuration && Number.isFinite(knownDuration) && knownDuration > 0
+          ? knownDuration
+          : await getVideoDuration(file),
       musicFile: musicFilePayload,
       musicOptions: sanitizedMusicOptions,
       overlayFile: overlayFilePayload,
@@ -330,13 +356,19 @@ export async function exportVideo(
 async function getVideoDuration(file: File): Promise<number> {
   return new Promise((resolve) => {
     const video = document.createElement("video");
-    video.preload = "metadata";
-    video.onloadedmetadata = () => {
-      URL.revokeObjectURL(video.src);
-      resolve(video.duration);
+    const url = URL.createObjectURL(file);
+    const finish = (value: number) => {
+      clearTimeout(timer);
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      resolve(Number.isFinite(value) ? value : 0);
     };
-    video.onerror = () => resolve(0);
-    video.src = URL.createObjectURL(file);
+    // 0 makes the worker omit -t, so a stalled metadata read degrades safely.
+    const timer = setTimeout(() => finish(0), 5000);
+    video.preload = "metadata";
+    video.onloadedmetadata = () => finish(video.duration);
+    video.onerror = () => finish(0);
+    video.src = url;
   });
 }
 
@@ -345,8 +377,19 @@ export function terminateFFmpeg() {
     ffmpegWorker.postMessage({ type: "terminate" });
     ffmpegWorker.terminate();
   }
+  // Settle a load that is still in flight so its caller never hangs.
+  workerReadyReject?.(new DOMException("Export cancelled", "AbortError"));
   cancelPendingExport(new DOMException("Export cancelled", "AbortError"));
   resetWorker();
+}
+
+/** Test/diagnostic helper: whether a worker or export is currently held. */
+export function getFFmpegClientState() {
+  return {
+    hasWorker: ffmpegWorker !== null,
+    hasPendingExport: pendingExport !== null,
+    hasPendingProgress: pendingProgress !== null,
+  };
 }
 
 function buildSessionId(): string {

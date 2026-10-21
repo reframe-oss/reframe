@@ -1,461 +1,249 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, useCallback } from "react";
-
-interface Thumbnail {
-  time: number;
-  dataUrl: string;
-}
+import { memo, useEffect, useRef, useState, type RefObject } from "react";
+import { cn } from "@/lib/utils";
+import {
+  computeThumbnailTimes,
+  generateThumbnails,
+  pickThumbnailInterval,
+  type ThumbnailFrame,
+} from "@/lib/thumbnails";
+import { trackAction, trackDuration } from "@/lib/telemetry";
 
 interface ThumbnailStripProps {
   videoSrc: string | null;
   duration: number;
-  currentTime: number;
+  /**
+   * The preview <video>. The strip listens to it directly for the playhead
+   * position instead of receiving `currentTime` as a prop — that prop used to
+   * re-render the whole editor on every `timeupdate` during playback.
+   */
+  videoRef?: RefObject<HTMLVideoElement | null>;
   trimStart?: number;
   trimEnd?: number;
   onSeek: (time: number) => void;
   intervalSeconds?: number;
 }
 
-export default function ThumbnailStrip({
+type GenerationState =
+  | { status: "idle" }
+  | { status: "generating"; completed: number; total: number }
+  | { status: "done"; skipped: number }
+  | { status: "error" };
+
+function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** Index of the last frame at or before `time` (frames are sorted by time). */
+export function findActiveFrameIndex(frames: { time: number }[], time: number): number {
+  let lo = 0;
+  let hi = frames.length - 1;
+  let found = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if ((frames[mid]?.time ?? Infinity) <= time) {
+      found = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return found;
+}
+
+function ThumbnailStrip({
   videoSrc,
   duration,
-  currentTime,
+  videoRef,
   trimStart = 0,
   trimEnd,
   onSeek,
-  intervalSeconds = 5,
+  intervalSeconds,
 }: ThumbnailStripProps) {
-  const [thumbnails, setThumbnails] = useState<Thumbnail[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const stripRef = useRef<HTMLDivElement>(null);
-  const offscreenVideoRef = useRef<HTMLVideoElement | null>(null);
-  const lastRunIdRef = useRef(0);
-  const objectUrlsRef = useRef<string[]>([]);
+  const [frames, setFrames] = useState<ThumbnailFrame[]>([]);
+  const [state, setState] = useState<GenerationState>({ status: "idle" });
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const activeIndexRef = useRef(-1);
+  const [attempt, setAttempt] = useState(0);
+  const framesRef = useRef<ThumbnailFrame[]>([]);
 
   const effectiveTrimEnd = trimEnd ?? duration;
+  const interval = intervalSeconds ?? pickThumbnailInterval(duration);
 
-  const revokeAllObjectUrls = useCallback(() => {
-    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    objectUrlsRef.current = [];
-  }, []);
-
-  const cancelThumbnailRun = useCallback(() => {
-    lastRunIdRef.current += 1;
-  }, []);
-
-  const generateThumbnails = useCallback(async () => {
+  // Generate frames. Re-runs only when the source, duration or interval
+  // changes — never on editing-slider changes.
+  useEffect(() => {
     if (!videoSrc || duration <= 0) return;
 
-    const runId = ++lastRunIdRef.current;
-    setIsGenerating(true);
-    revokeAllObjectUrls();
-    setThumbnails([]);
-    setProgress(0);
+    const controller = new AbortController();
+    const times = computeThumbnailTimes(duration, interval);
+    const startedAt = performance.now();
+    // Genuinely needs an effect: drives async canvas/video capture work.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFrames([]);
+    setState({ status: "generating", completed: 0, total: times.length });
 
-    const video = document.createElement("video");
-    offscreenVideoRef.current = video;
-
-    try {
-      video.src = videoSrc;
-      video.crossOrigin = "anonymous";
-      video.muted = true;
-      video.preload = "auto";
-
-      await new Promise<void>((resolve, reject) => {
-        video.onloadedmetadata = () => resolve();
-        video.onerror = () => reject(new Error("Video load failed"));
-        video.load();
+    generateThumbnails(videoSrc, times, {
+      signal: controller.signal,
+      onBatch: (batch, completed, total) => {
+        if (controller.signal.aborted) return;
+        setFrames(batch);
+        setState({ status: "generating", completed, total });
+      },
+    })
+      .then(({ frames: result, skipped }) => {
+        if (controller.signal.aborted) {
+          result.forEach((f) => URL.revokeObjectURL(f.url));
+          return;
+        }
+        framesRef.current = result;
+        setFrames(result);
+        setState({ status: "done", skipped });
+        trackDuration("thumbnails_generated", startedAt, {
+          frames: result.length,
+          skipped,
+        });
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setFrames([]);
+        setState({ status: "error" });
+        trackAction("thumbnails_failed", {
+          reason: err instanceof Error && /timed out/i.test(err.message) ? "timeout" : "decode",
+        });
       });
 
-      if (lastRunIdRef.current !== runId) return;
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const thumbW = 160;
-      const thumbH = 90;
-      canvas.width = thumbW;
-      canvas.height = thumbH;
-
-      const times: number[] = [];
-      const seenTimestamps = new Set<string>();
-
-      for (let t = 0; t <= duration; t += intervalSeconds) {
-        const roundedTime = Math.min(t, duration - 0.1);
-        const formatted = formatTime(roundedTime);
-        
-        if (!seenTimestamps.has(formatted)) {
-          seenTimestamps.add(formatted);
-          times.push(roundedTime);
-        }
-      }
-
-      // Check if the final second boundary is missing from the timeline display
-      const finalTime = duration - 0.1;
-      const finalFormatted = formatTime(finalTime);
-      if (!seenTimestamps.has(finalFormatted) && finalTime > (times[times.length - 1] ?? 0)) {
-        times.push(finalTime);
-      }
-
-      const captured: Thumbnail[] = [];
-
-      for (let i = 0; i < times.length; i++) {
-        if (lastRunIdRef.current !== runId) break;
-
-        const time = times[i] ?? 0;
-        await new Promise<void>((resolve) => {
-          const onSeeked = async () => {
-            video.removeEventListener("seeked", onSeeked);
-
-            if (lastRunIdRef.current !== runId) {
-              resolve();
-              return;
-            }
-
-            ctx.drawImage(video, 0, 0, thumbW, thumbH);
-
-            try {
-              const blob = await new Promise<Blob | null>((blobResolve) => {
-                canvas.toBlob((b) => blobResolve(b), "image/jpeg", 0.7);
-              });
-              if (blob && lastRunIdRef.current === runId) {
-                const url = URL.createObjectURL(blob);
-                objectUrlsRef.current.push(url);
-                captured.push({ time, dataUrl: url });
-
-                if (i === times.length - 1 || captured.length % 5 === 0) {
-                  setThumbnails([...captured]);
-                }
-              }
-            } catch (err) {
-              console.error("Failed to generate thumbnail blob", err);
-            }
-
-            setProgress(Math.round(((i + 1) / times.length) * 100));
-            resolve();
-          };
-          video.addEventListener("seeked", onSeeked);
-          video.currentTime = time;
-        });
-      }
-
-      if (lastRunIdRef.current === runId) {
-        setIsGenerating(false);
-      }
-    } finally {
-      video.src = "";
-      if (offscreenVideoRef.current === video) {
-        offscreenVideoRef.current = null;
-      }
-    }
-  }, [videoSrc, duration, intervalSeconds, revokeAllObjectUrls]);
-
-  useEffect(() => {
-    if (videoSrc && duration > 0) {
-      // Genuinely needs an effect: triggers async canvas/video capture work
-      // (seeking, drawing frames, Blob creation), not a derivable value.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      generateThumbnails();
-    }
     return () => {
-      cancelThumbnailRun();
-      revokeAllObjectUrls();
+      controller.abort();
+      // Release frames from the previous source; aborted in-flight batches
+      // are revoked by generateThumbnails itself.
+      framesRef.current.forEach((f) => URL.revokeObjectURL(f.url));
+      framesRef.current = [];
     };
-  }, [cancelThumbnailRun, generateThumbnails, revokeAllObjectUrls, videoSrc, duration]);
+  }, [videoSrc, duration, interval, attempt]);
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
-  const activeIndex = thumbnails.findIndex(
-    (t, i) =>
-      currentTime >= t.time &&
-      (i === thumbnails.length - 1 || currentTime < (thumbnails[i + 1]?.time ?? Infinity))
-  );
+  // Playhead: update state only when the active frame actually changes.
+  useEffect(() => {
+    const video = videoRef?.current;
+    if (!video || frames.length === 0) return;
+    // Compared against a ref so an unchanged index never calls setState
+    // (a functional updater returning the same value can still re-render).
+    const sync = () => {
+      const next = findActiveFrameIndex(frames, video.currentTime);
+      if (next === activeIndexRef.current) return;
+      activeIndexRef.current = next;
+      setActiveIndex(next);
+    };
+    sync();
+    video.addEventListener("timeupdate", sync);
+    video.addEventListener("seeked", sync);
+    return () => {
+      video.removeEventListener("timeupdate", sync);
+      video.removeEventListener("seeked", sync);
+    };
+  }, [videoRef, frames]);
 
   if (!videoSrc) return null;
 
+  const generating = state.status === "generating";
+  const percent =
+    state.status === "generating" && state.total > 0
+      ? Math.round((state.completed / state.total) * 100)
+      : 0;
+
   return (
-    <div className="thumbnail-strip-wrapper">
-      <div className="strip-header">
-        <span className="strip-label">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <rect x="0.5" y="0.5" width="11" height="11" rx="1.5" stroke="currentColor" />
-            <rect x="3" y="2.5" width="1.5" height="7" rx="0.5" fill="currentColor" />
-            <rect x="7.5" y="2.5" width="1.5" height="7" rx="0.5" fill="currentColor" />
-          </svg>
-          Frames
-        </span>
-        {isGenerating && (
-          <span className="strip-progress">
-            <span
-              className="progress-bar"
-              style={{ width: `${progress}%` }}
-            />
-            <span className="progress-text">{progress}%</span>
-          </span>
+    <section aria-label="Frame previews" className="w-full">
+      <div className="flex items-center gap-3 pb-2">
+        <h3 className="text-xs font-medium text-[var(--text-secondary)]">Frames</h3>
+        {generating && (
+          <div className="flex flex-1 items-center gap-2" aria-live="polite">
+            <div
+              className="progress-track h-1 max-w-[160px]"
+              role="progressbar"
+              aria-label="Generating frame previews"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+            >
+              <div className="progress-fill" style={{ transform: `scaleX(${percent / 100})` }} />
+            </div>
+            <span className="tabular text-2xs text-[var(--muted)]">{percent}%</span>
+          </div>
         )}
-        {!isGenerating && thumbnails.length > 0 && (
-          <span className="strip-meta">
-            {thumbnails.length} frames · every {intervalSeconds}s
+        {state.status === "done" && frames.length > 0 && (
+          <span className="tabular ml-auto text-2xs text-[var(--muted)]">
+            {frames.length} frames, every {Math.round(interval)}s
+            {state.skipped > 0 && ` (${state.skipped} skipped)`}
           </span>
         )}
       </div>
 
-      <div className="strip-scroll-area" ref={stripRef}>
-        {thumbnails.length === 0 && isGenerating && (
-          <div className="strip-skeleton">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="skeleton-thumb" style={{ animationDelay: `${i * 80}ms` }} />
-            ))}
-          </div>
-        )}
-
-        {thumbnails.length > 0 && (
-          <div className="strip-inner">
-            {thumbnails.map((thumb, i) => {
+      {state.status === "error" ? (
+        <div className="callout callout-info items-center justify-between text-xs">
+          <span>Frame previews couldn&apos;t be generated for this file. Playback and export still work.</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAttempt((a) => a + 1)}>
+            Try again
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]">
+          <div className="flex gap-1">
+            {frames.length === 0 &&
+              generating &&
+              Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  aria-hidden="true"
+                  className="h-[54px] w-24 shrink-0 rounded-md bg-[var(--surface-2)]"
+                />
+              ))}
+            {frames.map((thumb, i) => {
               const isActive = i === activeIndex;
-              const inTrimRange =
-                thumb.time >= trimStart && thumb.time <= effectiveTrimEnd;
-              const isHovered = hoveredIndex === i;
-
+              const inTrimRange = thumb.time >= trimStart && thumb.time <= effectiveTrimEnd;
+              const label = `Seek to ${formatTime(thumb.time)}`;
               return (
                 <button
                   key={thumb.time}
-                  className={`thumb-btn ${isActive ? "active" : ""} ${
-                    !inTrimRange ? "out-of-range" : ""
-                  } ${isHovered ? "hovered" : ""}`}
+                  type="button"
                   onClick={() => onSeek(thumb.time)}
-                  onMouseEnter={() => setHoveredIndex(i)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                  title={`Seek to ${formatTime(thumb.time)}`}
+                  aria-label={label}
+                  aria-current={isActive ? "true" : undefined}
+                  title={label}
+                  className={cn(
+                    "group relative h-[54px] w-24 shrink-0 overflow-hidden rounded-md border-2 bg-[var(--viewer)]",
+                    "transition-[border-color] duration-fast",
+                    isActive ? "border-[var(--accent)]" : "border-transparent hover:border-[var(--border-strong)]"
+                  )}
                 >
                   <Image
-                    src={thumb.dataUrl}
-                    alt={`Frame at ${formatTime(thumb.time)}`}
+                    src={thumb.url}
+                    alt=""
                     width={160}
                     height={90}
                     unoptimized
                     draggable={false}
+                    className={cn(
+                      "h-full w-full object-cover",
+                      !inTrimRange && "opacity-35 grayscale"
+                    )}
                   />
-                  <span className="thumb-time">{formatTime(thumb.time)}</span>
-                  {isActive && <span className="active-indicator" />}
+                  <span className="tabular pointer-events-none absolute bottom-0.5 left-1 rounded bg-black/60 px-1 text-[10px] leading-4 text-white">
+                    {formatTime(thumb.time)}
+                  </span>
                 </button>
               );
             })}
           </div>
-        )}
-      </div>
-
-      <style>{`
-        .thumbnail-strip-wrapper {
-          width: 100%;
-          background: var(--surface);
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          overflow: hidden;
-          font-family: 'SF Mono', 'Fira Code', monospace;
-          box-shadow: var(--shadow);
-        }
-
-        .strip-header {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 8px 14px;
-          background: var(--bg);
-          border-bottom: 1px solid var(--border);
-        }
-
-        .strip-label {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: var(--muted);
-        }
-
-        .strip-progress {
-          position: relative;
-          flex: 1;
-          height: 3px;
-          background: var(--border);
-          border-radius: 2px;
-          overflow: hidden;
-          display: flex;
-          align-items: center;
-        }
-
-        .progress-bar {
-          position: absolute;
-          left: 0;
-          top: 0;
-          height: 100%;
-          background: var(--accent);
-          border-radius: 2px;
-          transition: width 0.2s ease;
-        }
-
-        .progress-text {
-          position: absolute;
-          right: -28px;
-          font-size: 9px;
-          color: var(--muted);
-          white-space: nowrap;
-        }
-
-        .strip-meta {
-          margin-left: auto;
-          font-size: 10px;
-          color: var(--muted);
-        }
-
-        .strip-scroll-area {
-          overflow-x: auto;
-          overflow-y: hidden;
-          padding: 10px 10px 6px;
-          scrollbar-width: thin;
-          scrollbar-color: var(--border) transparent;
-        }
-
-        .strip-scroll-area::-webkit-scrollbar {
-          height: 4px;
-        }
-
-        .strip-scroll-area::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .strip-scroll-area::-webkit-scrollbar-thumb {
-          background: var(--border);
-          border-radius: 2px;
-        }
-
-        .strip-skeleton {
-          display: flex;
-          gap: 6px;
-        }
-
-        .skeleton-thumb {
-          width: 106px;
-          height: 60px;
-          border-radius: 6px;
-          background: linear-gradient(90deg, var(--bg) 25%, var(--surface) 50%, var(--bg) 75%);
-          background-size: 200% 100%;
-          animation: shimmer 1.4s infinite;
-          flex-shrink: 0;
-        }
-
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-
-        .strip-inner {
-          display: flex;
-          gap: 6px;
-          align-items: flex-end;
-        }
-
-        .thumb-btn {
-          position: relative;
-          padding: 0;
-          border: none;
-          background: none;
-          cursor: pointer;
-          border-radius: 6px;
-          overflow: hidden;
-          flex-shrink: 0;
-          width: 106px;
-          height: 60px;
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
-          outline: 2px solid transparent;
-          outline-offset: 1px;
-        }
-
-        .thumb-btn img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-          border-radius: 6px;
-          filter: brightness(0.85);
-          transition: filter 0.15s ease;
-        }
-
-        .thumb-btn:hover img,
-        .thumb-btn.hovered img {
-          filter: brightness(1.05);
-        }
-
-        .thumb-btn:hover,
-        .thumb-btn.hovered {
-          transform: translateY(-3px) scale(1.04);
-          box-shadow: var(--shadow);
-          outline-color: var(--accent);
-          z-index: 2;
-        }
-
-        .thumb-btn.active {
-          outline-color: var(--accent);
-          box-shadow: 0 0 0 2px var(--accent), var(--shadow);
-          z-index: 3;
-        }
-
-        .thumb-btn.active img {
-          filter: brightness(1.1);
-        }
-
-        .thumb-btn.out-of-range img {
-          filter: brightness(0.35) saturate(0.2);
-        }
-
-        .thumb-time {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          padding: 3px 4px 3px;
-          background: linear-gradient(transparent, var(--bg));
-          font-size: 9px;
-          color: var(--muted);
-          text-align: center;
-          letter-spacing: 0.04em;
-          pointer-events: none;
-          border-radius: 0 0 6px 6px;
-        }
-
-        .thumb-btn.active .thumb-time {
-          color: var(--text);
-        }
-
-        .active-indicator {
-          position: absolute;
-          top: 4px;
-          right: 4px;
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: var(--accent);
-          box-shadow: 0 0 6px var(--accent);
-          animation: pulse-dot 1.5s ease-in-out infinite;
-        }
-
-        @keyframes pulse-dot {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(0.7); }
-        }
-      `}</style>
-    </div>
+        </div>
+      )}
+    </section>
   );
 }
+
+// Memoised: the parent re-renders on every recipe change (slider drags), but
+// the strip only cares about the source, duration and trim range.
+export default memo(ThumbnailStrip);
