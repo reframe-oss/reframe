@@ -7,25 +7,29 @@ import { ThemeToggle, ContrastToggle } from "@/components/ThemeToggle";
 import ScrollToTop from "@/components/ScrollToTop";
 import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
-import { Cormorant_Garamond } from "next/font/google";
+import localFont from "next/font/local";
 
-// The editorial serif, self-hosted: next/font downloads it at build time and
-// serves it from this origin (no runtime request to Google, and COEP-safe),
-// with a size-adjusted fallback so the swap causes no layout shift. Upright
-// is preloaded for the headline; italic is only used for small labels.
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: "variable",
+// The editorial serif, served from this origin (COEP-safe, no request to
+// Google) with a size-adjusted fallback so the swap causes no layout shift.
+// The files are subset to the weights and characters the UI uses; rebuild
+// them with scripts/fonts/build-cormorant.sh. Upright is preloaded because
+// the drop-zone headline (the LCP element) uses it; italic is only used for
+// small labels.
+const cormorant = localFont({
+  src: "./fonts/cormorant-garamond-upright-400-500.woff2",
+  weight: "400 500",
   style: "normal",
   display: "swap",
+  adjustFontFallback: "Times New Roman",
   variable: "--font-cormorant",
 });
-const cormorantItalic = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: "variable",
+const cormorantItalic = localFont({
+  src: "./fonts/cormorant-garamond-italic-400.woff2",
+  weight: "400",
   style: "italic",
   display: "swap",
   preload: false,
+  adjustFontFallback: "Times New Roman",
   variable: "--font-cormorant-italic",
 });
 

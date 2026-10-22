@@ -514,7 +514,10 @@ export default function VideoEditor() {
             )}
 
             {status === "done" && result && (
-              <div role="status" className="animate-fade-in" ref={downloadRef}>
+              // Not a live region: the editor's polite region above already
+              // announces completion, and a status role here would read the
+              // whole panel (file name field included) a second time.
+              <div className="animate-fade-in" ref={downloadRef}>
                 <DownloadResult
                   result={result}
                   onReset={reset}
@@ -767,8 +770,9 @@ export default function VideoEditor() {
 
       {/* Mobile-only export bar — keeps Export reachable without scrolling to the sidebar. */}
       {file && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--bg)] px-4 py-3 [padding-bottom:calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden">
-          <div className="mx-auto flex max-w-xl items-center gap-3">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--bg)] px-4 py-3 [padding-bottom:calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 lg:hidden">
+          {/* Same gutters as the page, so on tablets the bar lines up with the content above. */}
+          <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1 text-xs">
               <p className="truncate font-medium">
                 {output.summary.format} · {output.summary.resolution}

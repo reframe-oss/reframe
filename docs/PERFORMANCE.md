@@ -419,6 +419,9 @@ node scripts/perf/make-fixture.js 6 640 360 scripts/perf/fixtures/sample-6s.mp4 
 node scripts/perf/bench.js http://localhost:4300/ after scripts/perf/fixtures/sample-6s.mp4
 node scripts/perf/matrix.js http://localhost:4300/ iso scripts/perf/fixtures/sample-6s.mp4    # ONLY=webm,gif to filter
 node scripts/perf/motion.js after=http://localhost:4300/
+
+# Rebuild the subset serif (needs fonttools + brotli; see the script header)
+PYTHON=/path/to/venv/bin/python scripts/fonts/build-cormorant.sh
 ```
 
 `bench.js` covers:
@@ -449,11 +452,9 @@ local run, build with `NEXT_PUBLIC_DATADOG_ENV=local-perf` and filter on
 ## Editorial redesign: measured cost (2026-10-21)
 
 The "screening room" redesign adds two things that cost bytes or time:
-- **Self-hosted Cormorant Garamond.** next/font serves it from this origin,
-  so there is no runtime Google request and COEP is unaffected. It uses
-  `display: swap` with a metric-adjusted fallback.
-  - The upright Latin file is preloaded (37 KB).
-  - The italic (39 KB) is fetched on use, for the parenthetical labels.
+- **Self-hosted Cormorant Garamond.** Served from this origin, so there is
+  no runtime Google request and COEP is unaffected. It uses `display: swap`
+  with a metric-adjusted fallback (see "Font audit" below for the files).
 - **CSS-only motion.** A masked headline rise, staggered region fades, a
   drop-zone frame that settles in, a frame wipe for the preview on mount,
   and grid-row disclosures.
@@ -476,9 +477,15 @@ session. Before = `33b2c5a`.
 | Accessibility / best practices | 100 / 100 | 100 / 100 |
 | Transfer | 203 KB | 281 KB (+78 KB = the two font files) |
 
+This table is the redesign as first committed (`e887f10`), with the
+Google Fonts files. The font audit below brings LCP down to 1,253 ms and
+transfer to 235 KB.
+
 **Lesson recorded for future changes.** The first version of the redesign
-measured **LCP 2,184 ms**. The LCP element (the drop-zone title) was hidden
-by entrance animations until they finished:
+measured **LCP 2,184 ms**. The LCP element sits in the drop zone and was
+hidden by entrance animations until they finished. On Lighthouse's mobile
+viewport it is the "Formats" requirement text (system sans); at 1440×900 it
+is the "Choose a video or drag it here" heading (serif). The animations were:
 - a clip-path wipe on the drop zone
 - an opacity fade on its section
 
@@ -522,6 +529,84 @@ mobile) were taken with a scratch Puppeteer script, not a test. No console
 errors or failed requests were seen, there was no horizontal overflow, and
 Export was visible at every size.
 
+### Font audit (2026-10-22)
+
+The UI sets Cormorant in three styles only: upright 400 (`.display`),
+upright 500 (`.serif`) and italic 400 (`.marker`). It uses it only for its
+own English copy, which is ASCII (checked in the browser across the empty,
+editor, export and done states). The Google Fonts files carried the whole
+300–700 weight axis and Latin-1 plus punctuation in each Latin slice. They
+are now replaced by subsets built with `scripts/fonts/build-cormorant.sh`:
+- The script pins a `google/fonts` commit and needs fonttools and brotli
+  (a dev-only tool, not a project dependency).
+- The output is committed in `src/app/fonts/` together with `OFL.txt`.
+- `layout.tsx` loads the subsets with `next/font/local`.
+
+| File | Before (Google, Latin slice) | After |
+|---|---|---|
+| Upright | variable 300–700, 229 chars, 37 KB, preloaded | variable 400–500, 105 chars, 18 KB, preloaded |
+| Italic | variable 300–700, 231 chars, 39 KB, `preload: false` | static 400, 105 chars, 12 KB, `preload: false` |
+
+What the subsets keep and drop:
+- **Characters:** printable ASCII plus nbsp, `·`, `×`, en and em dashes,
+  curly quotes and the ellipsis.
+- **Features:** `kern`, `liga`, `calt`, `lnum`, `tnum` and `pnum`, so lining
+  and tabular figures still work.
+- **What happens outside the subset:** any other character falls back, per
+  glyph, to the size-adjusted fallback serif, never to a missing-glyph box.
+  If the serif ever needs other languages, widen `UNICODES` in the script
+  and rebuild.
+
+Loading:
+- Only the upright file is preloaded, because the desktop LCP heading uses
+  it and it also renders the wordmark and section titles above the fold.
+- The italic is requested as soon as the CSS applies to the first marker,
+  about 110 ms after the upright file in the Lighthouse trace. Preloading it
+  as well would compete with the LCP font for bandwidth.
+- Both files use `display: swap` with Times New Roman fallback metrics that
+  next/font generated, and CLS stays at 0.
+
+Lighthouse mobile, local production build, median of 5. Both builds were
+measured back to back in one session; before = `e887f10` built in a clean
+worktree.
+
+| | Before | After |
+|---|---|---|
+| Performance | 100 | 100 |
+| FCP | 879 ms | 878 ms |
+| LCP | 1,404 ms | 1,253 ms |
+| TBT | 10 ms | 12 ms |
+| CLS | 0 | 0 |
+| Speed index | 2,486 | 2,245 |
+| Accessibility / best practices | 100 / 100 | 100 / 100 |
+| Transfer | 281 KB | 235 KB |
+
+Each build was run five times. Before ranged 1,401–1,416 ms; after ranged
+1,252–1,309 ms. The LCP element on this viewport is sans text, so the gain
+comes from less bandwidth contention under simulated throttling, not from
+the serif painting sooner. The cause wasn't isolated further. Speed index
+varies widely from run to run (2,109–3,010 ms across the two after-builds),
+so treat it as noise.
+
+Browser checks in the same audit (headless Chrome, scratch script):
+- **Reduced motion:** with `prefers-reduced-motion: reduce`, nothing runs
+  (0 animations, 0 elements with a transition) on the empty page, after a
+  video loads, or when a panel opens. All entrance elements are fully
+  visible.
+- **Closed panels:** a full Tab cycle through the loaded editor (69 stops)
+  never lands inside a closed panel. Opening "Adjust colour" makes its 8
+  controls reachable.
+- **Export announcements:** during a full export (engine load, then encode)
+  the live regions changed 4 times: "Loading video engine", "Exporting
+  video: 0%", "Exporting video" and "Export complete. Video ready to
+  download." Percentages are only announced in 10 % steps. Before this
+  audit, the download panel also had `role="status"` (inherited from
+  `main`), so completion was announced a second time and the whole panel
+  was read out, including the file-name field. That role has been removed.
+- **Not verified:** what real screen readers say. Because the export
+  dialog is modal, some may ignore the editor's live region outside it;
+  the dialog's own status line still announces the stage.
+
 ## Known bottlenecks and limitations
 
 - **Memory.**
@@ -551,3 +636,13 @@ Export was visible at every size.
   terminating the worker releases them.
 - **No field data yet.** The INP target in particular is unverified until
   RUM shows p75 values.
+- **The redesign has only been checked in Chromium.** Every check so far
+  was headless Chrome or Lighthouse. Still needed:
+  - Safari and Firefox
+  - real touch devices
+  - a screen reader (VoiceOver or NVDA)
+  - Chromatic review of the changed stories
+
+  The grid-row disclosure, `inert` and `checkVisibility()` (used only by
+  `bench.js`) are the browser-specific pieces to watch.
+- **Font coverage is English-only by design.** See "Font audit" above.
