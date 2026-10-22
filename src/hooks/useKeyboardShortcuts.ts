@@ -1,6 +1,7 @@
 import { EditRecipe, ExportStatus } from "@/lib/types";
 import { PRESETS } from "@/lib/presets";
 import { useEffect, useRef } from "react";
+import { isMacPlatform, isTextEntryTarget, matchHistoryShortcut } from "@/lib/historyShortcuts";
 
 interface UseKeyboardShortcutsProps {
   file: File | null;
@@ -13,6 +14,8 @@ interface UseKeyboardShortcutsProps {
   onToggleShortcutsModal: () => void;
   currentTime: number;
   duration: number;
+  undo?: () => void;
+  redo?: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -26,6 +29,8 @@ export function useKeyboardShortcuts({
   onToggleShortcutsModal,
   currentTime,
   duration,
+  undo,
+  redo,
 }: UseKeyboardShortcutsProps) {
   const currentTimeRef = useRef(currentTime);
   useEffect(() => {
@@ -33,6 +38,16 @@ export function useKeyboardShortcuts({
   }, [currentTime]);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Undo/redo works from sliders and buttons too, but never steals the
+      // browser's own text undo while the user is typing.
+      const historyAction = matchHistoryShortcut(e, isMacPlatform());
+      if (historyAction && file && !isTextEntryTarget(e.target)) {
+        e.preventDefault();
+        if (historyAction === "undo") undo?.();
+        else redo?.();
+        return;
+      }
+
       const target = e.target as HTMLElement;
       if (
         target.tagName === "INPUT" ||
@@ -91,5 +106,5 @@ export function useKeyboardShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [file, recipe, resetSettings, updateRecipe, handleExport, status, cancelExport, onToggleShortcutsModal, currentTime, duration]);
+  }, [file, recipe, resetSettings, updateRecipe, handleExport, status, cancelExport, onToggleShortcutsModal, currentTime, duration, undo, redo]);
 }
