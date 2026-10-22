@@ -114,6 +114,8 @@ Reframe uses a custom React hook (`useVideoEditor`) for state management instead
 - **Type safety** — Full TypeScript support
 - **Sufficient for scope** — App state is relatively simple and doesn't require complex state management
 
+All user-visible edits (the `EditRecipe` minus the completion-sound preference, plus the image overlay's position, size and opacity) live in one `EditState`. `useVideoEditor` holds it in a bounded undo history (`src/lib/editHistory.ts`), and the preview, the export and undo/redo all read that same state. Saving, recovery and project files are described in [PROJECTS.md](PROJECTS.md).
+
 ### Component Architecture
 
 Components are organized by feature:

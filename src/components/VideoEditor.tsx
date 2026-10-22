@@ -18,6 +18,8 @@ import ExportSettings from "./ExportSettings";
 import ExportOverlay from "./ExportOverlay";
 import DownloadResult from "./DownloadResult";
 import ImageOverlay from "./ImageOverlay";
+import HistoryControls from "./HistoryControls";
+import ProjectPanel, { RecoveryNotice } from "./ProjectPanel";
 import { getPresetById } from "@/lib/presets";
 
 import { cn } from "@/lib/utils";
@@ -36,7 +38,6 @@ import {
 } from "lucide-react";
 import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import { loadOverlayState, persistOverlayState } from "@/lib/editorPersistence";
 
 interface SectionProps {
   icon: React.ReactNode;
@@ -136,10 +137,43 @@ function Kbd({ children }: { children: React.ReactNode }) {
 }
 
 /** Collapsible panel that lists all keyboard shortcuts. */
-function KeyboardShortcutsPanel() {
+function KeyboardShortcutsPanel({ isMac }: { isMac: boolean }) {
   const [open, setOpen] = useState(false);
+  const mod = isMac ? "⌘" : "Ctrl";
 
   const shortcuts: { keys: React.ReactNode[]; label: string }[] = [
+    {
+      keys: [
+        <Kbd key="mod">{mod}</Kbd>,
+        <span key="plus" className="text-[var(--muted)] text-xs">
+          +
+        </span>,
+        <Kbd key="z">Z</Kbd>,
+      ],
+      label: "Undo",
+    },
+    {
+      keys: isMac
+        ? [
+            <Kbd key="shift">⇧</Kbd>,
+            <span key="plus1" className="text-[var(--muted)] text-xs">
+              +
+            </span>,
+            <Kbd key="mod">⌘</Kbd>,
+            <span key="plus2" className="text-[var(--muted)] text-xs">
+              +
+            </span>,
+            <Kbd key="z">Z</Kbd>,
+          ]
+        : [
+            <Kbd key="mod">Ctrl</Kbd>,
+            <span key="plus" className="text-[var(--muted)] text-xs">
+              +
+            </span>,
+            <Kbd key="y">Y</Kbd>,
+          ],
+      label: "Redo",
+    },
     {
       keys: [
         <Kbd key="ctrl">Ctrl</Kbd>,
@@ -160,7 +194,7 @@ function KeyboardShortcutsPanel() {
     },
     {
       keys: [<Kbd key="r">R</Kbd>],
-      label: "Reset all settings",
+      label: "Reset all settings (undoable)",
     },
     {
       keys: [<Kbd key="esc">Esc</Kbd>],
@@ -258,6 +292,16 @@ export default function VideoEditor() {
     cancelExport,
     reset,
     resetSettings,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    recovery,
+    discardRecovery,
+    storageStatus,
+    buildProjectFile,
+    importProjectFile,
+    deleteSavedData,
     videoRef,
     seekTo,
     overlayFile,
@@ -284,24 +328,12 @@ export default function VideoEditor() {
     onToggleShortcutsModal: () => {},
     currentTime,
     duration,
+    undo,
+    redo,
   });
 
   const [copied, setCopied] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
-  const initialOverlayState = useRef({
-    overlayPosition,
-    overlaySize,
-    overlayOpacity,
-  });
-  useEffect(() => {
-    if (!file) return;
-
-    persistOverlayState(localStorage, {
-      overlayPosition,
-      overlaySize,
-      overlayOpacity,
-    });
-  }, [overlayPosition, overlaySize, overlayOpacity, file]);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState({
     resize: true,
@@ -311,18 +343,6 @@ export default function VideoEditor() {
     audio: false,
     export: false,
   });
-  useEffect(() => {
-    const restored = loadOverlayState(localStorage, {
-      overlayPosition: initialOverlayState.current.overlayPosition,
-      overlaySize: initialOverlayState.current.overlaySize,
-      overlayOpacity: initialOverlayState.current.overlayOpacity,
-    });
-
-    if (restored.overlayPosition) setOverlayPosition(restored.overlayPosition);
-    if (typeof restored.overlaySize === "number") setOverlaySize(restored.overlaySize);
-    if (typeof restored.overlayOpacity === "number") setOverlayOpacity(restored.overlayOpacity);
-  }, [setOverlayOpacity, setOverlayPosition, setOverlaySize]);
-
   const toggleSection = (key: keyof typeof openSections) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   const downloadRef = useRef<HTMLDivElement>(null);
@@ -468,6 +488,9 @@ export default function VideoEditor() {
         </header>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
           <div className="space-y-4 min-w-0">
+            {!file && recovery && (
+              <RecoveryNotice recovery={recovery} onDiscard={discardRecovery} />
+            )}
             {!file && <PrivacyBanner />}
             <div className="bg-[var(--surface)] rounded-xl p-3 border border-[var(--border)] animate-fade-in">
               <FileUpload
@@ -514,6 +537,16 @@ export default function VideoEditor() {
               <p className="text-[var(--warning)] text-sm">
                 ⚠️ Large file - processing may take several minutes
               </p>
+            )}
+            {file && (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <HistoryControls
+                  canUndo={canUndo}
+                  canRedo={canRedo}
+                  onUndo={undo}
+                  onRedo={redo}
+                />
+              </div>
             )}
             {file && (
               <div
@@ -759,6 +792,15 @@ export default function VideoEditor() {
                 />
               </div>
             )}
+
+            <ProjectPanel
+              hasFile={!!file}
+              storageStatus={storageStatus}
+              disabled={isProcessing}
+              onBuildProjectFile={buildProjectFile}
+              onImportProject={importProjectFile}
+              onDeleteSavedData={deleteSavedData}
+            />
           </div>
 
           <div
@@ -818,12 +860,12 @@ export default function VideoEditor() {
                   onClick={resetSettings}
                   className="text-sm font-heading font-bold uppercase tracking-widest text-[var(--muted)] hover:text-film-600 transition-all opacity-60 hover:opacity-100"
                 >
-                  Clear saved session
+                  Reset settings
                 </button>
               </div>
             </div>
 
-            <KeyboardShortcutsPanel />
+            <KeyboardShortcutsPanel isMac={isMac} />
 
             {file && (
               <p className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--muted)] leading-relaxed">

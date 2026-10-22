@@ -85,6 +85,8 @@ Reframe is a **browser-based video editor** — everything happens on your devic
 - **Audio Control** — Keep or mute audio independently
 - **Speed Control** — 0.25x to 4x playback speed with smooth audio adjustment
 - **Quality Settings** — CRF slider for quality vs. file size trade-offs
+- **Undo / Redo** — every edit can be undone; a slider drag counts as one step
+- **Project recovery** — edits survive a refresh, and project files (`.reframe.json`) save and reopen your edits without the video. See [docs/PROJECTS.md](docs/PROJECTS.md)
 - **Smooth UX** — Lottie animations, live export progress, instant download
 
 Everything stays on your device. No servers. No tracking. No login.
@@ -95,6 +97,8 @@ Everything stays on your device. No servers. No tracking. No login.
 | Shortcut | Action |
 |----------|--------|
 | Ctrl+Enter / Cmd+Enter | Export video |
+| Ctrl+Z / Cmd+Z | Undo the last edit |
+| Ctrl+Y or Ctrl+Shift+Z / Shift+Cmd+Z | Redo |
 | Space | Play/pause video preview |
 | M | Toggle audio mute |
 | Escape | Cancel export |
@@ -439,7 +443,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide including development 
 
 ## Privacy
 
-Reframe processes all videos **100% client-side**. Your video files are never uploaded to any server. You can even use Reframe offline (after first load). The source code is fully open for inspection.
+Reframe processes all videos **100% client-side**. Your video files are never uploaded to any server. You can even use Reframe offline (after first load). Edit settings and a copy of the open video are kept in your own browser so a refresh doesn't lose work; **Delete saved data** in the editor removes them. The source code is fully open for inspection.
 ---
 
 ## Contributors
