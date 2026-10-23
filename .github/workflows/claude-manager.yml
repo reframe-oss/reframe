@@ -9,9 +9,14 @@ on:
     types: [created]
 
 jobs:
+  # Reviews and comments only. It never merges: a human maintainer performs
+  # every merge (CLAUDE.md, "PR Automation"). The token can't merge anyway
+  # (contents: read), and drafts are skipped so work in progress isn't
+  # reviewed. scripts/ci/check-pr-automation.mjs enforces all of this.
   claude-pr-review:
     if: |
       github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
       (github.event.pull_request.author_association == 'OWNER' ||
        github.event.pull_request.author_association == 'MEMBER' ||
        github.event.pull_request.author_association == 'COLLABORATOR')
@@ -30,7 +35,7 @@ jobs:
       - name: Wait for other checks to settle (30s)
         run: sleep 30
 
-      - name: Claude PR Review & Auto-merge
+      - name: Claude PR Review (comments only, never merges)
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -46,6 +51,10 @@ jobs:
             Title: ${{ github.event.pull_request.title }}
             Base branch: ${{ github.event.pull_request.base.ref }}
 
+            You review and comment only. Never merge, squash-merge, rebase-merge, approve or enable
+            auto-merge for this pull request, never push commits to it, and never mark it ready for
+            review. A human maintainer performs all merges.
+
             Steps:
             1. Fetch all CI check statuses for this PR using the GitHub API.
             2. Check the Vercel deployment check status specifically.
@@ -57,7 +66,7 @@ jobs:
                - cn() not converted to template literals
                - React hooks not placed after conditional returns
                - No new video-processing dependencies added
-            5. If ALL checks pass and code is correct: squash-merge the PR and post a comment explaining the merge.
+            5. If ALL checks pass and code is correct: post a comment summarising what you checked and that it is ready for a maintainer to review and merge. Do NOT merge it yourself.
             6. If ANY check failed or code has issues: post a detailed comment tagging @${{ github.event.pull_request.user.login }} with exactly what failed and how to fix it. Do NOT merge.
 
   claude-issue-triage:
