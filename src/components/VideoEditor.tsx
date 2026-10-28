@@ -683,16 +683,30 @@ export default function VideoEditor() {
                   <Section icon={<SlidersHorizontal size={12} />} title="Output format" delay={190}>
                     <FormatSelector recipe={recipe} onChange={updateRecipe} />
                   </Section>
-                  <AccordionSection
-                    id="export"
-                    icon={<SlidersHorizontal size={12} />}
-                    title="Export"
-                    isOpen={openSections.export}
-                    onToggle={() => toggleSection("export")}
-                    delay={200}
-                  >
-                    <ExportSettings recipe={recipe} duration={duration} onChange={updateRecipe} />
-                  </AccordionSection>
+                  <Section icon={<SlidersHorizontal size={12} />} title="Export quality" delay={200}>
+                   
+                    <ExportSettings
+  recipe={recipe}
+  duration={duration}
+  videoFile={file}
+  onChange={updateRecipe}
+/>
+                  </Section>
+                <AccordionSection
+  id="export"
+  icon={<SlidersHorizontal size={12} />}
+  title="Export"
+  isOpen={openSections.export}
+  onToggle={() => toggleSection("export")}
+  delay={200}
+>
+  <ExportSettings
+    recipe={recipe}
+    duration={duration}
+    videoFile={file}
+    onChange={updateRecipe}
+  />
+</AccordionSection>
                   <Section icon={<Layers size={12} />} title="Image overlay" delay={120}>
                     <ImageOverlay
                       overlayFile={overlayFile}

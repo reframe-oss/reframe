@@ -7,7 +7,7 @@
       "dependencies": {
         "@datadog/browser-rum": "^7.10.0",
         "@datadog/browser-rum-react": "^7.10.0",
-        "@ffmpeg/ffmpeg": "^0.12.10",
+        "@ffmpeg/ffmpeg": "^0.12.15",
         "@ffmpeg/util": "^0.12.2",
         "clsx": "^2.1.1",
         "focus-trap-react": "^12.0.1",
