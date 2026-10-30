@@ -23,6 +23,13 @@
   --error-bg: #fee2e2;
   --error-border: #fca5a5;
   --error-hover: #fecaca;
+  --neo-bg: #eceff5;
+  --neo-hi: rgba(255, 255, 255, 1);
+  --neo-lo: rgba(150, 165, 190, 0.8);
+  --skeu-top: #f8fafc;
+  --skeu-bottom: #cfd6e0;
+  --skeu-edge: rgba(255, 255, 255, 0.9);
+  --skeu-cut: rgba(15, 23, 42, 0.25);
 }
 
 /* ── Dark mode tokens ── */
@@ -42,6 +49,13 @@
   --error-bg: #7f1d1d;
   --error-border: #991b1b;
   --error-hover: #991b1b;
+  --neo-bg: #242836;
+  --neo-hi: rgba(255, 255, 255, 0.09);
+  --neo-lo: rgba(0, 0, 0, 0.8);
+  --skeu-top: #2b3042;
+  --skeu-bottom: #141722;
+  --skeu-edge: rgba(255, 255, 255, 0.12);
+  --skeu-cut: rgba(0, 0, 0, 0.7);
 }
 
 /* ── High contrast mode tokens ── */
@@ -64,6 +78,13 @@
 
   --film-600: #FF6666;
   --film-400: #66FF66;
+  --neo-bg: #000000;
+  --neo-hi: transparent;
+  --neo-lo: transparent;
+  --skeu-top: #000000;
+  --skeu-bottom: #000000;
+  --skeu-edge: transparent;
+  --skeu-cut: transparent;
 }
 
 /* Ensure export overlay text is readable in high-contrast by forcing dark text */
@@ -98,7 +119,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--bg);
+  background-color: var(--neo-bg);
   color: var(--text);
   line-height: 1.6;
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -140,6 +161,14 @@ textarea {
   color: var(--text);
 }
 
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
+select,
+textarea {
+  background: var(--neo-bg);
+  border-color: transparent;
+  box-shadow: inset 3px 3px 7px var(--neo-lo), inset -3px -3px 7px var(--neo-hi);
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -168,4 +197,102 @@ detail > summary {
 }
 details > summary::-webkit-details-marker {
   display: none;
+}
+
+/* ── Neomorphism + skeuomorphism ── */
+.neo-raised {
+  background: var(--neo-bg);
+  border: 1px solid transparent;
+  box-shadow: 12px 12px 26px var(--neo-lo), -12px -12px 26px var(--neo-hi);
+}
+
+.neo-inset {
+  background: var(--neo-bg);
+  border: 1px solid transparent;
+  box-shadow: inset 6px 6px 12px var(--neo-lo), inset -6px -6px 12px var(--neo-hi);
+}
+
+.neo-pressable {
+  background: var(--neo-bg);
+  box-shadow: 6px 6px 13px var(--neo-lo), -6px -6px 13px var(--neo-hi);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.neo-pressable:hover { transform: translateY(-1px); }
+.neo-pressable:active {
+  transform: translateY(0);
+  box-shadow: inset 4px 4px 9px var(--neo-lo), inset -4px -4px 9px var(--neo-hi);
+}
+
+/* Brushed-metal title plate with screws and letterpress text */
+.skeu-plate {
+  position: relative;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 3px),
+    linear-gradient(160deg, var(--skeu-top), var(--skeu-bottom));
+  border: 1px solid var(--skeu-cut);
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 var(--skeu-edge),
+    inset 0 -3px 6px var(--skeu-cut),
+    0 2px 0 var(--skeu-edge),
+    12px 14px 28px var(--neo-lo),
+    -10px -10px 24px var(--neo-hi);
+}
+.skeu-plate::before,
+.skeu-plate::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background:
+    linear-gradient(45deg, transparent 44%, var(--skeu-cut) 44% 56%, transparent 56%),
+    radial-gradient(circle at 30% 30%, var(--skeu-top), var(--skeu-bottom));
+  box-shadow: inset 0 0 0 1px var(--skeu-cut), 0 1px 0 var(--skeu-edge);
+}
+.skeu-plate::before { left: 10px; }
+.skeu-plate::after { right: 10px; }
+
+.skeu-title {
+  text-shadow: 0 1px 0 var(--skeu-edge), 0 -1px 0 var(--skeu-cut);
+}
+
+.skeu-well {
+  background: var(--neo-bg);
+  border-radius: 12px;
+  box-shadow: inset 3px 3px 7px var(--neo-lo), inset -3px -3px 7px var(--neo-hi);
+}
+
+[data-theme="high-contrast"] .skeu-plate,
+[data-theme="high-contrast"] .neo-raised,
+[data-theme="high-contrast"] .neo-inset,
+[data-theme="high-contrast"] .neo-pressable {
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+/* Hanging sign: tilted from a pivot above, with two wires to the screws */
+.skeu-hang {
+  position: relative;
+  margin-top: 28px;
+  transform: rotate(-2.5deg);
+  transform-origin: 50% -28px;
+  transition: transform 0.6s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.skeu-hang:hover { transform: rotate(1.5deg); }
+.skeu-wire {
+  position: absolute;
+  bottom: calc(100% - 14px);
+  width: 2px;
+  height: 30px;
+  background: linear-gradient(90deg, var(--skeu-edge), var(--skeu-cut));
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+.skeu-wire-l { left: 14px; transform: rotate(14deg); }
+.skeu-wire-r { right: 14px; transform: rotate(-14deg); }
+@media (prefers-reduced-motion: reduce) {
+  .skeu-hang, .skeu-hang:hover { transition: none; }
+  .skeu-hang:hover { transform: rotate(-2.5deg); }
 }

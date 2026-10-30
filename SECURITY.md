@@ -46,3 +46,15 @@ Reframe processes all video files **100% client-side** using FFmpeg.wasm. Your f
 ## Disclosure Policy
 
 We follow **responsible disclosure**. Please give us reasonable time to address the issue before any public disclosure. We aim to resolve critical vulnerabilities within **14 days** of confirmation.
+
+## Dependency Security & Recurring Review Cadence
+
+Reframe uses automated **Snyk** scanning and **Dependabot** to continuously inspect and update third-party dependencies:
+
+- **Weekly Recurring Scans:** Snyk scans `main` every Monday at 06:00 UTC and on every push to detect high and critical severity CVEs.
+- **Weekly Dependabot Updates:** Dependabot checks and proposes dependency updates weekly on Mondays.
+- **Triage Cadence & Response SLA:**
+  - **Critical findings:** Triaged within **48 hours**; resolved or mitigated within **7 days**.
+  - **High findings:** Triaged within **5 business days**; resolved or mitigated within **14 days**.
+- **Process Guide:** Full procedures for local scans, checking Dependabot overlap, lockfile rules, and `.snyk` exception policies are documented in [docs/DEPENDENCY_REVIEW.md](docs/DEPENDENCY_REVIEW.md).
+

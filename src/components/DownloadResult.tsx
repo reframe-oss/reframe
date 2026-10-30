@@ -57,7 +57,7 @@ export default function DownloadResult({ result, onReset, soundOnCompletion, onT
   };
 
   return (
-    <div className="p-5 bg-[var(--surface)] border border-[var(--border)] rounded-xl space-y-4">
+    <div className="p-5 rounded-xl neo-raised space-y-4">
       <div className="flex items-center justify-between">
   <div className="flex items-center gap-4">
     <div className="w-12 h-12 shrink-0">

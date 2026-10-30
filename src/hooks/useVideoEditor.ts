@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, useReducer } from "react";
 import {
   EditRecipe,
   ExportResult,
@@ -11,6 +11,23 @@ import {
   MultiTrackEditorState,
   isValidRecipe,
 } from "@/lib/types";
+import { createHistory, deepEqual, historyReducer, type EditState } from "@/lib/editHistory";
+import {
+  DEFAULT_IMAGE_OVERLAY,
+  clearProjectRecord,
+  createProjectDocument,
+  fitEditToDuration,
+  loadProjectRecord,
+  matchesSource,
+  parseProject,
+  projectFileName,
+  saveProjectRecord,
+  serializeProject,
+  sourceInfoFromFile,
+  toEditState,
+  type ProjectDocument,
+  type SourceInfo,
+} from "@/lib/project";
 import { DEFAULT_RECIPE, SPEED_STEPS } from "@/lib/constants";
 import { getPresetById } from "@/lib/presets";
 import { loadFFmpeg, exportVideo, terminateFFmpeg, FFmpegLoadError } from "@/lib/ffmpeg";
@@ -27,16 +44,68 @@ import {
 } from "@/lib/timeline";
 import {
   getStoredSoundPreference,
+  loadOverlayState,
   loadPersistedRecipe,
   migrateRecipe as migratePersistedRecipe,
+  persistOverlayState,
   persistRecipe,
   persistSoundPreference,
   RECIPE_STORAGE_KEY,
   LEGACY_SETTINGS_KEY,
+  EDITOR_STATE_KEY,
 } from "@/lib/editorPersistence";
 import { saveSessionFile, loadSessionFile, clearSessionFile } from "@/lib/sessionDB";
 
 const DEFAULT_TITLE = "Reframe — Resize, trim, and export videos in your browser";
+const PROJECT_SAVE_DELAY_MS = 500;
+
+/** A saved project whose source video has to be chosen again. */
+export interface PendingRecovery {
+  source: SourceInfo;
+  /** "imported" when it came from a project file rather than this browser. */
+  origin: "session" | "imported";
+}
+
+export interface ProjectStorageStatus {
+  /** When the edit settings were last written to this browser. */
+  savedAt: number | null;
+  /** Whether the copy of the source video in IndexedDB is usable after a refresh. */
+  sourceCopy: "none" | "saving" | "saved" | "failed";
+  error: string | null;
+}
+
+export type ProjectImportResult = { ok: true; message: string } | { ok: false; error: string };
+
+const EMPTY_STORAGE_STATUS: ProjectStorageStatus = {
+  savedAt: null,
+  sourceCopy: "none",
+  error: null,
+};
+
+function withNewSource(edit: EditState, width: number, height: number): EditState {
+  const suggested = suggestPreset(width, height);
+  return {
+    ...edit,
+    recipe: {
+      ...edit.recipe,
+      trimStart: 0,
+      trimEnd: null,
+      ...(edit.recipe.preset === DEFAULT_RECIPE.preset ? { preset: suggested } : {}),
+    },
+  };
+}
+
+function clearSavedEditorData() {
+  try {
+    clearProjectRecord(localStorage);
+    localStorage.removeItem(RECIPE_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_SETTINGS_KEY);
+    localStorage.removeItem(EDITOR_STATE_KEY);
+  } catch {
+    // ignore
+  }
+  clearSessionFile().catch(console.error);
+}
 
 export function extractMetadata(
   file: File
@@ -171,6 +240,43 @@ function decodeRecipe(encoded: string): Partial<EditRecipe> | null {
   }
 }
 
+function isValidValue(key: keyof EditRecipe, val: any): boolean {
+  switch (key) {
+    case "preset":
+      return typeof val === "string";
+    case "customWidth":
+      return typeof val === "number" && !isNaN(val) && val >= 16 && val <= 7680;
+    case "customHeight":
+      return typeof val === "number" && !isNaN(val) && val >= 16 && val <= 7680;
+    case "framing":
+      return val === "fit" || val === "fill";
+    case "trimStart":
+      return typeof val === "number" && !isNaN(val) && val >= 0;
+    case "trimEnd":
+      return val === null || (typeof val === "number" && !isNaN(val) && val >= 0);
+    case "rotate":
+      return val === 0 || val === 90 || val === 180 || val === 270;
+    case "speed":
+      return (
+        typeof val === "number" &&
+        !isNaN(val) &&
+        [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].includes(val)
+      );
+    case "quality":
+      return typeof val === "number" && !isNaN(val) && val >= 18 && val <= 30;
+    case "format":
+      return val === "mp4" || val === "webm" || val === "mkv" || val === "gif";
+    case "brightness":
+      return typeof val === "number" && !isNaN(val) && val >= -1 && val <= 1;
+    case "contrast":
+      return typeof val === "number" && !isNaN(val) && val >= 0 && val <= 2;
+    case "saturation":
+      return typeof val === "number" && !isNaN(val) && val >= 0 && val <= 3;
+    default:
+      return true;
+  }
+}
+
 export function useVideoEditor() {
   const [file, setFile] = useState<File | null>(null);
   const [duration, setDuration] = useState<number>(0);
@@ -179,7 +285,22 @@ export function useVideoEditor() {
     height: number;
     duration: number;
   } | null>(null);
-  const [recipe, setRecipe] = useState<EditRecipe>({ ...DEFAULT_RECIPE });
+  // Every user-visible edit lives in one history of immutable snapshots, so
+  // the preview, the export and undo/redo all read the same state.
+  const [history, dispatchHistory] = useReducer(historyReducer, undefined, () =>
+    createHistory(toEditState(DEFAULT_RECIPE))
+  );
+  const edit = history.present;
+  const [soundOnCompletion, setSoundOnCompletion] = useState(DEFAULT_RECIPE.soundOnCompletion);
+  const recipe = useMemo<EditRecipe>(
+    () => ({ ...edit.recipe, soundOnCompletion }),
+    [edit.recipe, soundOnCompletion]
+  );
+  const [recovery, setRecovery] = useState<PendingRecovery | null>(null);
+  const recoveryRef = useRef<PendingRecovery | null>(null);
+  const [storageStatus, setStorageStatus] = useState<ProjectStorageStatus>(EMPTY_STORAGE_STATUS);
+  const pendingSaveRef = useRef<ProjectDocument | null>(null);
+  const userPickedFileRef = useRef(false);
   const [status, setStatus] = useState<ExportStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<ExportResult | null>(null);
@@ -196,9 +317,9 @@ export function useVideoEditor() {
   const [loopMusic, setLoopMusic] = useState(false);
 
   const [overlayFile, setOverlayFile] = useState<File | null>(null);
-  const [overlayPosition, setOverlayPosition] = useState<OverlayPosition>("bottom-right");
-  const [overlaySize, setOverlaySize] = useState(150);
-  const [overlayOpacity, setOverlayOpacity] = useState(100);
+  const overlayPosition = edit.imageOverlay.position;
+  const overlaySize = edit.imageOverlay.size;
+  const overlayOpacity = edit.imageOverlay.opacity;
   const [currentTime, setCurrentTime] = useState(0);
 
   // Phase 1 MVP: Multi-track timeline support
@@ -226,144 +347,169 @@ export function useVideoEditor() {
     [addTrack]
   );
 
-  const isValidValue = (key: keyof EditRecipe, val: any): boolean => {
-    switch (key) {
-      case "preset":
-        return typeof val === "string";
-      case "customWidth":
-        return typeof val === "number" && !isNaN(val) && val >= 16 && val <= 7680;
-      case "customHeight":
-        return typeof val === "number" && !isNaN(val) && val >= 16 && val <= 7680;
-      case "framing":
-        return val === "fit" || val === "fill";
-      case "trimStart":
-        return typeof val === "number" && !isNaN(val) && val >= 0;
-      case "trimEnd":
-        return val === null || (typeof val === "number" && !isNaN(val) && val >= 0);
-      case "rotate":
-        return val === 0 || val === 90 || val === 180 || val === 270;
-      case "speed":
-        return (
-          typeof val === "number" &&
-          !isNaN(val) &&
-          [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].includes(val)
-        );
-      case "quality":
-        return typeof val === "number" && !isNaN(val) && val >= 18 && val <= 30;
-      case "format":
-        return val === "mp4" || val === "webm" || val === "mkv" || val === "gif";
-      case "brightness":
-        return typeof val === "number" && !isNaN(val) && val >= -1 && val <= 1;
-      case "contrast":
-        return typeof val === "number" && !isNaN(val) && val >= 0 && val <= 2;
-      case "saturation":
-        return typeof val === "number" && !isNaN(val) && val >= 0 && val <= 3;
-      default:
-        return true;
-    }
-  };
+  const updateEdit = useCallback((update: (prev: EditState) => EditState) => {
+    dispatchHistory({ type: "edit", update, now: Date.now() });
+  }, []);
 
-  const updateRecipe = useCallback((patch: Partial<EditRecipe>) => {
-    setRecipe((prev) => {
+  const resetEdit = useCallback((update: (prev: EditState) => EditState) => {
+    dispatchHistory({ type: "reset", update });
+  }, []);
+
+  const updateRecovery = useCallback((next: PendingRecovery | null) => {
+    recoveryRef.current = next;
+    setRecovery(next);
+  }, []);
+
+  const updateRecipe = useCallback(
+    (patch: Partial<EditRecipe>) => {
+      const { soundOnCompletion: sound, ...editPatch } = patch;
+      // A preference, not an edit: kept out of undo history.
+      if (typeof sound === "boolean") setSoundOnCompletion(sound);
+
       const validated: Partial<EditRecipe> = {};
-      for (const [key, val] of Object.entries(patch)) {
+      for (const [key, val] of Object.entries(editPatch)) {
         if (isValidValue(key as keyof EditRecipe, val)) {
           (validated as any)[key] = val;
         }
       }
-      const next = { ...prev, ...validated };
-      // GIF has no audio — force keepAudio off
-      if (next.format === "gif") {
-        next.keepAudio = false;
-      }
-      return next;
-    });
-  }, []);
+      if (Object.keys(validated).length === 0) return;
+
+      updateEdit((prev) => {
+        const next = { ...prev.recipe, ...validated };
+        // GIF has no audio — force keepAudio off
+        if (next.format === "gif") {
+          next.keepAudio = false;
+        }
+        return { ...prev, recipe: next };
+      });
+    },
+    [updateEdit]
+  );
+
+  const setOverlayPosition = useCallback(
+    (position: OverlayPosition) =>
+      updateEdit((prev) => ({ ...prev, imageOverlay: { ...prev.imageOverlay, position } })),
+    [updateEdit]
+  );
+  const setOverlaySize = useCallback(
+    (size: number) =>
+      updateEdit((prev) => ({ ...prev, imageOverlay: { ...prev.imageOverlay, size } })),
+    [updateEdit]
+  );
+  const setOverlayOpacity = useCallback(
+    (opacity: number) =>
+      updateEdit((prev) => ({ ...prev, imageOverlay: { ...prev.imageOverlay, opacity } })),
+    [updateEdit]
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    let cancelled = false;
 
-    // Auto-restore saved video session
-    loadSessionFile()
-      .then(async (savedFile) => {
-        if (savedFile) {
-          try {
-            const { width, height, duration: dur } = await extractMetadata(savedFile);
-            setDuration(dur);
-            setVideoMetadata({ width, height, duration: dur });
-            setFile(savedFile);
-          } catch (e) {
-            console.error("Failed to restore video session:", e);
-            clearSessionFile().catch(console.error);
-          }
-        }
-      })
-      .catch(console.error);
-
+    let saved: ProjectDocument | null = null;
+    let baseline: EditState | null = null;
     try {
+      saved = loadProjectRecord(localStorage);
+      // Genuinely needs an effect: localStorage is a browser-only API.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSoundOnCompletion(getStoredSoundPreference(localStorage));
+
+      const storedOverlay = loadOverlayState(localStorage, {});
+      const imageOverlay = saved?.edit.imageOverlay ?? {
+        position: storedOverlay.overlayPosition ?? DEFAULT_IMAGE_OVERLAY.position,
+        size: storedOverlay.overlaySize ?? DEFAULT_IMAGE_OVERLAY.size,
+        opacity: storedOverlay.overlayOpacity ?? DEFAULT_IMAGE_OVERLAY.opacity,
+      };
+
       const params = new URLSearchParams(window.location.search);
       const encoded = params.get("settings");
-      if (encoded) {
-        const decoded = decodeRecipe(encoded);
-        if (decoded) {
-          // Genuinely needs an effect: window.location.search is a browser-
-          // only API, unavailable during SSR/render.
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setRecipe(migratePersistedRecipe(decoded));
-          return;
-        } else {
-          const url = new URL(window.location.href);
-          url.searchParams.delete("settings");
-          window.history.replaceState(null, "", url.toString());
-        }
+      const shared = encoded ? decodeRecipe(encoded) : null;
+      if (encoded && !shared) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("settings");
+        window.history.replaceState(null, "", url.toString());
       }
 
       const recipeKeys = Object.keys(DEFAULT_RECIPE) as Array<keyof EditRecipe>;
-      const hasRecipeParams = recipeKeys.some((key) => params.has(key));
-
-      if (hasRecipeParams) {
+      if (shared) {
+        // An explicit share link wins over anything saved here.
+        baseline = toEditState(migratePersistedRecipe(shared), imageOverlay);
+      } else if (saved) {
+        // The saved project is the most complete record of the last session;
+        // the URL only mirrors the simple recipe fields.
+        baseline = saved.edit;
+      } else if (recipeKeys.some((key) => params.has(key))) {
         const updatedPatch: Partial<EditRecipe> = {};
         recipeKeys.forEach((key) => {
           const paramVal = params.get(key);
-          if (paramVal !== null) {
-            const defaultType = typeof DEFAULT_RECIPE[key];
-            let parsedVal: any;
+          const defaultType = typeof DEFAULT_RECIPE[key];
+          if (paramVal === null || defaultType === "object") return;
+          let parsedVal: any;
 
-            if (defaultType === "number") {
-              parsedVal = parseFloat(paramVal);
-            } else if (defaultType === "boolean") {
-              parsedVal = paramVal === "true";
-            } else {
-              parsedVal = paramVal === "null" ? null : paramVal;
-            }
+          if (defaultType === "number") {
+            parsedVal = parseFloat(paramVal);
+          } else if (defaultType === "boolean") {
+            parsedVal = paramVal === "true";
+          } else {
+            parsedVal = paramVal === "null" ? null : paramVal;
+          }
 
-            if (isValidValue(key, parsedVal)) {
-              (updatedPatch as any)[key] = parsedVal;
-            }
+          if (isValidValue(key, parsedVal)) {
+            (updatedPatch as any)[key] = parsedVal;
           }
         });
-
-        if (Object.keys(updatedPatch).length > 0) {
-          setRecipe((prev) => ({
-            ...prev,
-            ...updatedPatch,
-          }));
-        }
+        baseline = toEditState({ ...DEFAULT_RECIPE, ...updatedPatch }, imageOverlay);
       } else {
-        setRecipe((current) =>
-          loadPersistedRecipe(
-            localStorage,
-            migratePersistedRecipe({
-              ...current,
-              soundOnCompletion: getStoredSoundPreference(localStorage),
-            })
-          )
+        baseline = toEditState(
+          loadPersistedRecipe(localStorage, migratePersistedRecipe({ ...DEFAULT_RECIPE })),
+          imageOverlay
         );
       }
-    } catch (e) {
-      // ignore
+    } catch {
+      // Storage unavailable (private mode, blocked site data): start fresh.
     }
-  }, []);
+    if (baseline) {
+      const restored = baseline;
+      resetEdit(() => restored);
+    }
+
+    // Auto-restore the saved copy of the source video, if there is one.
+    const savedSource = saved?.source ?? null;
+    const missingSource = () => {
+      if (!cancelled && savedSource && !userPickedFileRef.current) {
+        updateRecovery({ source: savedSource, origin: "session" });
+      }
+    };
+    loadSessionFile()
+      .then(async (savedFile) => {
+        if (cancelled || userPickedFileRef.current) return;
+        if (!savedFile) return missingSource();
+        try {
+          const meta = await extractMetadata(savedFile);
+          if (cancelled || userPickedFileRef.current) return;
+          setDuration(meta.duration);
+          setVideoMetadata(meta);
+          setFile(savedFile);
+          setStorageStatus((prev) => ({ ...prev, sourceCopy: "saved" }));
+          if (savedSource && !matchesSource(savedSource, savedFile)) {
+            // The stored copy belongs to a different project than the edits.
+            resetEdit((prev) => withNewSource(prev, meta.width, meta.height));
+          }
+        } catch (e) {
+          console.error("Failed to restore video session:", e);
+          clearSessionFile().catch(console.error);
+          missingSource();
+        }
+      })
+      .catch((e) => {
+        console.error("Failed to read saved video session:", e);
+        missingSource();
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resetEdit, updateRecovery]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -375,6 +521,8 @@ export function useVideoEditor() {
         const currentVal = recipe[key];
         const defaultVal = DEFAULT_RECIPE[key];
 
+        // Lists such as textOverlays can't round-trip through a query string.
+        if (typeof defaultVal === "object" && defaultVal !== null) return;
         if (currentVal !== defaultVal) {
           params.set(key, currentVal === null ? "null" : String(currentVal));
         }
@@ -399,13 +547,18 @@ export function useVideoEditor() {
     if (typeof window === "undefined") return;
     const timer = setTimeout(() => {
       try {
-        persistRecipe(localStorage, recipe);
+        // Defaults need no record, and writing one would undo deleteSavedData().
+        if (deepEqual(edit.recipe, toEditState(DEFAULT_RECIPE).recipe)) {
+          localStorage.removeItem(RECIPE_STORAGE_KEY);
+        } else {
+          persistRecipe(localStorage, recipe);
+        }
       } catch {
         // ignore
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [recipe]);
+  }, [recipe, edit.recipe]);
 
   const recommendedPreset = useMemo(() => {
     if (!videoMetadata) return null;
@@ -423,6 +576,7 @@ export function useVideoEditor() {
       setFileError("");
       return;
     }
+    userPickedFileRef.current = true;
 
     if (!selectedFile.type.startsWith("video/")) {
       setFileError("Please upload a video file only.");
@@ -486,24 +640,30 @@ export function useVideoEditor() {
         setDuration(dur);
         setVideoMetadata({ width, height, duration: dur });
         setFile(selectedFile);
-        saveSessionFile(selectedFile).catch(console.error);
+        setStorageStatus((prev) => ({ ...prev, sourceCopy: "saving" }));
+        saveSessionFile(selectedFile)
+          .then(() => setStorageStatus((prev) => ({ ...prev, sourceCopy: "saved" })))
+          .catch((e) => {
+            // Usually a storage quota: edits are still saved, but the video
+            // will have to be chosen again after a refresh.
+            console.error("Failed to save video session:", e);
+            setStorageStatus((prev) => ({ ...prev, sourceCopy: "failed" }));
+          });
 
         if (dimensionCheck === "warning") {
           console.warn(
             `[Reframe] High resolution video detected (${width}×${height}). Export may be slow.`
           );
         }
-        setRecipe((prev) => {
-          const suggestedPreset = suggestPreset(width, height);
-          const shouldApplySuggestion = prev.preset === DEFAULT_RECIPE.preset;
-
-          return {
-            ...prev,
-            trimStart: 0,
-            trimEnd: null,
-            ...(shouldApplySuggestion ? { preset: suggestedPreset } : {}),
-          };
-        });
+        // A new source starts a new history. Choosing the file a saved
+        // project was made from picks that project back up, trims included.
+        const pending = recoveryRef.current;
+        if (pending && matchesSource(pending.source, selectedFile)) {
+          resetEdit((prev) => fitEditToDuration(prev, dur));
+        } else {
+          resetEdit((prev) => withNewSource(prev, width, height));
+        }
+        updateRecovery(null);
       } catch (err) {
         setError(
           `Layer 4 Validation Failed: ${err instanceof Error ? err.message : "Unknown error"}`
@@ -511,7 +671,7 @@ export function useVideoEditor() {
         setStatus("error");
       }
     })();
-  }, []);
+  }, [resetEdit, updateRecovery]);
 
   const handleExport = useCallback(async () => {
     if (!file) return;
@@ -674,14 +834,14 @@ export function useVideoEditor() {
         return;
       }
 
-      setRecipe((prev) => ({ ...prev, keepAudio: !prev.keepAudio }));
+      updateEdit((prev) => ({ ...prev, recipe: { ...prev.recipe, keepAudio: !prev.recipe.keepAudio } }));
     };
 
     document.addEventListener("keydown", handleMuteShortcut);
     return () => {
       document.removeEventListener("keydown", handleMuteShortcut);
     };
-  }, [file]);
+  }, [file, updateEdit]);
 
   useEffect(() => {
     return () => {
@@ -697,16 +857,11 @@ export function useVideoEditor() {
     };
   }, []);
 
+  // Resets the edit settings as one undoable step. Saved data is left alone;
+  // deleteSavedData() is the explicit way to remove it.
   const resetSettings = useCallback(() => {
-    setRecipe(DEFAULT_RECIPE);
-    try {
-      localStorage.removeItem(RECIPE_STORAGE_KEY);
-      localStorage.removeItem(LEGACY_SETTINGS_KEY);
-      clearSessionFile().catch(console.error);
-    } catch {
-      // ignore
-    }
-  }, []);
+    updateEdit((prev) => toEditState(DEFAULT_RECIPE, prev.imageOverlay));
+  }, [updateEdit]);
 
   const cancelExport = useCallback(() => {
     exportCancelledRef.current = true;
@@ -724,24 +879,166 @@ export function useVideoEditor() {
     setFile(null);
     setVideoMetadata(null);
     setDuration(0);
-    setRecipe(DEFAULT_RECIPE);
+    resetEdit((prev) => toEditState(DEFAULT_RECIPE, prev.imageOverlay));
     setStatus("idle");
     setProgress(0);
     setResult(null);
     setError(null);
     setExportStartedAt(null);
+    pendingSaveRef.current = null;
+    updateRecovery(null);
+    setStorageStatus(EMPTY_STORAGE_STATUS);
     try {
+      clearProjectRecord(localStorage);
       localStorage.removeItem(RECIPE_STORAGE_KEY);
       localStorage.removeItem(LEGACY_SETTINGS_KEY);
       clearSessionFile().catch(console.error);
     } catch {
       // ignore
     }
-  }, [result]);
+  }, [result, resetEdit, updateRecovery]);
+
+  /** Removes everything this editor saved in the browser and starts over. */
+  const deleteSavedData = useCallback(() => {
+    if (result?.blobUrl) URL.revokeObjectURL(result.blobUrl);
+    pendingSaveRef.current = null;
+    clearSavedEditorData();
+    setFile(null);
+    setVideoMetadata(null);
+    setDuration(0);
+    setResult(null);
+    setStatus("idle");
+    setProgress(0);
+    setError(null);
+    setExportStartedAt(null);
+    setOverlayFile(null);
+    resetEdit(() => toEditState(DEFAULT_RECIPE));
+    updateRecovery(null);
+    setStorageStatus(EMPTY_STORAGE_STATUS);
+  }, [result, resetEdit, updateRecovery]);
+
+  const isBusy = status === "loading-engine" || status === "exporting";
+  const canUndo = history.past.length > 0 && !isBusy;
+  const canRedo = history.future.length > 0 && !isBusy;
+  // Undo is blocked mid-export: the running export has already captured its
+  // settings, and the result has to match what the controls showed.
+  const undoEdit = useCallback(() => {
+    if (!isBusy) dispatchHistory({ type: "undo" });
+  }, [isBusy]);
+  const redoEdit = useCallback(() => {
+    if (!isBusy) dispatchHistory({ type: "redo" });
+  }, [isBusy]);
+
+  const currentSource = useMemo(
+    () => (file && videoMetadata ? sourceInfoFromFile(file, videoMetadata) : null),
+    [file, videoMetadata]
+  );
+
+  // Persist the project (edits + source description) while a video is open.
+  const flushProjectSave = useCallback(() => {
+    const doc = pendingSaveRef.current;
+    if (!doc) return;
+    pendingSaveRef.current = null;
+    let ok = false;
+    try {
+      ok = saveProjectRecord(localStorage, doc);
+    } catch {
+      ok = false;
+    }
+    setStorageStatus((prev) =>
+      ok
+        ? { ...prev, savedAt: Date.parse(doc.savedAt), error: null }
+        : { ...prev, error: "Couldn't save your edits in this browser. Use “Save project file” to keep them." }
+    );
+  }, []);
 
   useEffect(() => {
-    persistSoundPreference(localStorage, recipe.soundOnCompletion);
-  }, [recipe.soundOnCompletion]);
+    if (!currentSource) return;
+    pendingSaveRef.current = createProjectDocument(edit, currentSource, new Date());
+    const timer = setTimeout(flushProjectSave, PROJECT_SAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [edit, currentSource, flushProjectSave]);
+
+  useEffect(() => {
+    if (!currentSource) return;
+    try {
+      persistOverlayState(localStorage, {
+        overlayPosition: edit.imageOverlay.position,
+        overlaySize: edit.imageOverlay.size,
+        overlayOpacity: edit.imageOverlay.opacity,
+      });
+    } catch {
+      // ignore
+    }
+  }, [edit.imageOverlay, currentSource]);
+
+  // A refresh or closed tab inside the debounce window must not lose the edit.
+  useEffect(() => {
+    window.addEventListener("pagehide", flushProjectSave);
+    return () => {
+      window.removeEventListener("pagehide", flushProjectSave);
+      flushProjectSave();
+    };
+  }, [flushProjectSave]);
+
+  /** The current project as a JSON file. Media is never included. */
+  const buildProjectFile = useCallback(() => {
+    const source = currentSource ?? recoveryRef.current?.source ?? null;
+    const doc = createProjectDocument(edit, source, new Date());
+    return { fileName: projectFileName(source), contents: serializeProject(doc) };
+  }, [currentSource, edit]);
+
+  const importProjectFile = useCallback(
+    (contents: string): ProjectImportResult => {
+      if (isBusy) return { ok: false, error: "Wait for the export to finish before opening a project." };
+      const parsed = parseProject(contents);
+      if (!parsed.ok) return { ok: false, error: parsed.error };
+      const { project } = parsed;
+
+      if (!currentSource) {
+        // Nothing open yet: hold the edits until the matching video is chosen.
+        resetEdit(() => project.edit);
+        if (project.source) updateRecovery({ source: project.source, origin: "imported" });
+        return {
+          ok: true,
+          message: project.source
+            ? `Project opened. Choose “${project.source.name}” to continue editing it.`
+            : "Project opened. Choose a video to apply its edits to.",
+        };
+      }
+
+      // Undoable, so opening the wrong file is one Cmd/Ctrl+Z away.
+      updateEdit(() => fitEditToDuration(project.edit, currentSource.duration));
+      updateRecovery(null);
+      if (project.source && !matchesSource(project.source, currentSource)) {
+        return {
+          ok: true,
+          message: `Edits applied. This project was made for “${project.source.name}”, so check the trim points.`,
+        };
+      }
+      return { ok: true, message: "Project opened and applied to this video." };
+    },
+    [currentSource, isBusy, resetEdit, updateEdit, updateRecovery]
+  );
+
+  /** Forgets a saved project whose video can't be found, keeping nothing. */
+  const discardRecovery = useCallback(() => {
+    try {
+      clearProjectRecord(localStorage);
+    } catch {
+      // ignore
+    }
+    resetEdit(() => toEditState(DEFAULT_RECIPE));
+    updateRecovery(null);
+  }, [resetEdit, updateRecovery]);
+
+  useEffect(() => {
+    try {
+      persistSoundPreference(localStorage, soundOnCompletion);
+    } catch {
+      // ignore
+    }
+  }, [soundOnCompletion]);
   const seekTo = useCallback((time: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = time;
@@ -756,8 +1053,8 @@ export function useVideoEditor() {
   });
 
   const toggleSound = useCallback(() => {
-    updateRecipe({ soundOnCompletion: !recipe.soundOnCompletion });
-  }, [recipe.soundOnCompletion, updateRecipe]);
+    setSoundOnCompletion((prev) => !prev);
+  }, []);
 
   return {
     file,
@@ -777,6 +1074,16 @@ export function useVideoEditor() {
     cancelExport,
     reset,
     resetSettings,
+    undo: undoEdit,
+    redo: redoEdit,
+    canUndo,
+    canRedo,
+    recovery,
+    discardRecovery,
+    storageStatus,
+    buildProjectFile,
+    importProjectFile,
+    deleteSavedData,
     musicFile,
     setMusicFile,
     musicVolume,
