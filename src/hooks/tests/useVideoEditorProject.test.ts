@@ -17,6 +17,7 @@ vi.mock("@/lib/ffmpeg", () => ({
   loadFFmpeg: vi.fn().mockResolvedValue(true),
   exportVideo: vi.fn().mockResolvedValue({ blobUrl: "blob:out", size: 1, width: 1, height: 1 }),
   terminateFFmpeg: vi.fn(),
+  getEngineMode: vi.fn(() => "multi"),
   formatBytes: (n: number) => `${n} B`,
   FFmpegLoadError: class extends Error {},
 }));

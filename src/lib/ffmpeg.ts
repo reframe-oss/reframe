@@ -1,9 +1,16 @@
 import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, MAX_FILE_SIZE } from "./types";
 import { getPresetById } from "./presets";
 import { buildTextFilter } from "./text-overlay";
-import { trackAction, trackTiming } from "./telemetry";
+import { trackTiming } from "./telemetry";
+import { startEngineLoad, type EngineMode } from "./exportTelemetry";
 
-export class FFmpegLoadError extends Error {}
+export class FFmpegLoadError extends Error {
+  name = "FFmpegLoadError";
+  /** Set when the worker script itself failed, for telemetry classification. */
+  constructor(message: string, readonly source?: "worker_script") {
+    super(message);
+  }
+}
 
 
 type SerializedFile = {
@@ -24,7 +31,7 @@ type WorkerExportRequest = {
   overlayOptions?: ImageOverlayOptions;
 };
 
-type WorkerLoadResponse = { type: "ready" };
+type WorkerLoadResponse = { type: "ready"; mode?: EngineMode };
 type WorkerProgressResponse = { type: "progress"; percent: number };
 type WorkerResultResponse = {
   type: "result";
@@ -57,6 +64,11 @@ let pendingExport: {
 } | null = null;
 let pendingProgress: ((percent: number) => void) | null = null;
 
+/** The core the current worker loaded, once it is ready. */
+let engineMode: EngineMode | null = null;
+/** Telemetry for the engine load in progress, if any (one outcome per worker). */
+let engineLoad: ReturnType<typeof startEngineLoad> | null = null;
+
 function createWorker(): Worker {
   if (typeof window === "undefined") {
     throw new Error("Web Workers are not available in this environment.");
@@ -68,7 +80,9 @@ function createWorker(): Worker {
   ffmpegWorker.onmessage = handleWorkerMessage;
   ffmpegWorker.onerror = (event) => {
     const message = event.message || "FFmpeg worker error";
-    const error = new FFmpegLoadError(message);
+    const error = new FFmpegLoadError(message, "worker_script");
+    if (workerReadyReject) engineLoad?.failed(error);
+    engineLoad = null;
     workerReadyReject?.(error);
     pendingExport?.reject(error);
     resetWorker();
@@ -83,6 +97,10 @@ function createWorker(): Worker {
 }
 
 function resetWorker() {
+  // A load that never finished was abandoned (cancelled), not failed.
+  engineLoad?.abandoned();
+  engineLoad = null;
+  engineMode = null;
   ffmpegWorker = null;
   workerReady = null;
   workerReadyResolve = null;
@@ -95,6 +113,9 @@ function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
   const data = event.data;
 
   if (data.type === "ready") {
+    engineMode = data.mode ?? "single";
+    engineLoad?.succeeded(engineMode);
+    engineLoad = null;
     workerReadyResolve?.();
     workerReadyResolve = null;
     workerReadyReject = null;
@@ -137,7 +158,10 @@ function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
       return;
     }
 
-    workerReadyReject?.(new FFmpegLoadError(data.message));
+    const loadError = new FFmpegLoadError(data.message);
+    if (workerReadyReject) engineLoad?.failed(loadError);
+    engineLoad = null;
+    workerReadyReject?.(loadError);
     workerReady = null;
     workerReadyResolve = null;
     workerReadyReject = null;
@@ -177,6 +201,8 @@ export async function loadFFmpeg(
 
   // 2. Use the captured flag to securely trigger the worker's internal load phase
   if (isFirstLoad) {
+    const isolated = typeof crossOriginIsolated !== "undefined" && crossOriginIsolated;
+    engineLoad = startEngineLoad(isolated ? "multi" : "single", isolated ? null : "not_isolated");
     ffmpegWorker!.postMessage({ type: "load" });
   }
 
@@ -199,20 +225,11 @@ export async function loadFFmpeg(
 
   signal?.addEventListener("abort", onAbort, { once: true });
 
-  const loadStart = performance.now();
   try {
+    // ffmpeg_load_success / ffmpeg_load_failure are reported once per worker
+    // by the message handlers, however many callers wait on the same load.
     await workerReady;
-    const durationMs = Math.round(performance.now() - loadStart);
-    trackAction("ffmpeg_load_success", { durationMs });
-    trackTiming("ffmpeg_ready");
-  } catch (err) {
-    if (!(err instanceof DOMException && err.name === "AbortError")) {
-      trackAction("ffmpeg_load_failure", {
-        durationMs: Math.round(performance.now() - loadStart),
-        reason: err instanceof Error ? err.name : "unknown",
-      });
-    }
-    throw err;
+    if (isFirstLoad) trackTiming("ffmpeg_ready");
   } finally {
     cleanup();
   }
@@ -338,6 +355,11 @@ async function getVideoDuration(file: File): Promise<number> {
     video.onerror = () => resolve(0);
     video.src = URL.createObjectURL(file);
   });
+}
+
+/** The core the worker loaded ("multi" or "single"), or null before it is ready. */
+export function getEngineMode(): EngineMode | null {
+  return engineMode;
 }
 
 export function terminateFFmpeg() {

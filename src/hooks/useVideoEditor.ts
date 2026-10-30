@@ -30,8 +30,15 @@ import {
 } from "@/lib/project";
 import { DEFAULT_RECIPE, SPEED_STEPS } from "@/lib/constants";
 import { getPresetById } from "@/lib/presets";
-import { loadFFmpeg, exportVideo, terminateFFmpeg, FFmpegLoadError } from "@/lib/ffmpeg";
-import { trackAction } from "@/lib/telemetry";
+import { loadFFmpeg, exportVideo, terminateFFmpeg, getEngineMode, FFmpegLoadError } from "@/lib/ffmpeg";
+import {
+  addTelemetryRedaction,
+  durationBucket,
+  HANDLED_ERROR_PREFIX,
+  resolutionBucket,
+  sizeBucket,
+} from "@/lib/telemetry";
+import { ExportAttempt, type ExportFailureCategory } from "@/lib/exportTelemetry";
 import { suggestPreset } from "@/lib/presetSuggestion";
 import { validateDimensions, getDownscaledDimensions } from "@/utils/video-validation";
 import {
@@ -309,6 +316,11 @@ export function useVideoEditor() {
   const [exportStartedAt, setExportStartedAt] = useState<number | null>(null);
   const exportAbortControllerRef = useRef<AbortController | null>(null);
   const exportCancelledRef = useRef(false);
+  /** The export attempt in progress, which reports its single outcome. */
+  const exportAttemptRef = useRef<ExportAttempt | null>(null);
+  // Category of the last failed export for this source, so the next attempt
+  // is reported as a retry; cleared by a success or a new source video.
+  const lastFailureRef = useRef<ExportFailureCategory | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [musicFile, setMusicFile] = useState<File | null>(null);
@@ -640,6 +652,7 @@ export function useVideoEditor() {
         setDuration(dur);
         setVideoMetadata({ width, height, duration: dur });
         setFile(selectedFile);
+        lastFailureRef.current = null;
         setStorageStatus((prev) => ({ ...prev, sourceCopy: "saving" }));
         saveSessionFile(selectedFile)
           .then(() => setStorageStatus((prev) => ({ ...prev, sourceCopy: "saved" })))
@@ -690,8 +703,26 @@ export function useVideoEditor() {
     exportAbortControllerRef.current = abortController;
     exportCancelledRef.current = false;
 
+    const preset = recipe.preset === "custom" ? null : getPresetById(recipe.preset);
+    const outW = preset ? preset.width : recipe.customWidth;
+    const outH = preset ? preset.height : recipe.customHeight;
+    const clipSeconds = ((recipe.trimEnd ?? duration) - recipe.trimStart) / recipe.speed;
+    // Low-cardinality only: never the file name, captions or exact values.
+    const attempt = new ExportAttempt(
+      {
+        format: recipe.format,
+        resolution: resolutionBucket(outW, outH),
+        input_size: sizeBucket(file.size),
+        clip_length: durationBucket(clipSeconds),
+        has_text: (recipe.textOverlays?.length ?? 0) > 0,
+        has_music: Boolean(musicFile),
+        has_image_overlay: Boolean(overlayFile),
+      },
+      lastFailureRef.current
+    );
+    exportAttemptRef.current = attempt;
+
     try {
-      trackAction("export_start");
       setStatus("loading-engine");
       setProgress(0);
       setError(null);
@@ -703,6 +734,7 @@ export function useVideoEditor() {
       if (exportCancelledRef.current) return;
 
       const startedAt = Date.now();
+      attempt.encoding(getEngineMode());
       setExportStartedAt(startedAt);
       setStatus("exporting");
 
@@ -731,12 +763,18 @@ export function useVideoEditor() {
         exportDurationMs: Date.now() - startedAt,
       });
       setStatus("done");
-      trackAction("export_success", { durationMs: Date.now() - startedAt });
+      attempt.succeeded(sizeBucket(exportResult.size));
+      lastFailureRef.current = null;
     } catch (err) {
+      // A cancellation was already reported by cancelExport; a settled
+      // attempt ignores further outcomes, so a late rejection adds nothing.
       if (exportCancelledRef.current) return;
-      trackAction("export_failure", { reason: err instanceof Error ? err.name : "unknown" });
+      const category = attempt.failed(err);
+      if (category) lastFailureRef.current = category;
 
-      console.error("export failed:", err);
+      // Reported above as export_failed; the prefix keeps RUM's automatic
+      // console-error collection from reporting it a second time.
+      console.error(`${HANDLED_ERROR_PREFIX} export failed:`, err);
       if (err instanceof FFmpegLoadError) {
         setError(err.message);
       } else if (err instanceof Error && err.message.includes("network")) {
@@ -751,6 +789,9 @@ export function useVideoEditor() {
     } finally {
       if (exportAbortControllerRef.current === abortController) {
         exportAbortControllerRef.current = null;
+      }
+      if (exportAttemptRef.current === attempt) {
+        exportAttemptRef.current = null;
       }
     }
   }, [
@@ -863,7 +904,21 @@ export function useVideoEditor() {
     updateEdit((prev) => toEditState(DEFAULT_RECIPE, prev.imageOverlay));
   }, [updateEdit]);
 
+  // Keep user-specific strings (file names, captions) out of anything the
+  // RUM SDK collects on its own, such as console errors.
+  useEffect(() => {
+    addTelemetryRedaction(
+      file?.name,
+      musicFile?.name,
+      overlayFile?.name,
+      recovery?.source.name,
+      ...(recipe.textOverlays ?? []).map((overlay) => overlay.text)
+    );
+  }, [file, musicFile, overlayFile, recovery, recipe.textOverlays]);
+
   const cancelExport = useCallback(() => {
+    exportAttemptRef.current?.cancelled();
+    exportAttemptRef.current = null;
     exportCancelledRef.current = true;
     exportAbortControllerRef.current?.abort();
     exportAbortControllerRef.current = null;
@@ -875,6 +930,7 @@ export function useVideoEditor() {
   }, []);
 
   const reset = useCallback(() => {
+    lastFailureRef.current = null;
     if (result?.blobUrl) URL.revokeObjectURL(result.blobUrl);
     setFile(null);
     setVideoMetadata(null);
@@ -900,6 +956,7 @@ export function useVideoEditor() {
 
   /** Removes everything this editor saved in the browser and starts over. */
   const deleteSavedData = useCallback(() => {
+    lastFailureRef.current = null;
     if (result?.blobUrl) URL.revokeObjectURL(result.blobUrl);
     pendingSaveRef.current = null;
     clearSavedEditorData();
