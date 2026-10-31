@@ -492,7 +492,12 @@ export default function VideoEditor() {
               <RecoveryNotice recovery={recovery} onDiscard={discardRecovery} />
             )}
             {!file && <PrivacyBanner />}
-            <div className="bg-[var(--surface)] rounded-xl p-3 border border-[var(--border)] animate-fade-in">
+            <div
+              className={cn(
+                "bg-[var(--surface)] rounded-xl p-3 border border-[var(--border)] animate-fade-in",
+                file && "lg:sticky lg:top-16 lg:z-30 lg:shadow-md"
+              )}
+            >
               <FileUpload
                 onFileSelect={handleFileSelect}
                 currentFile={file}
