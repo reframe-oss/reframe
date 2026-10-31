@@ -318,11 +318,17 @@ export default function TrimControl({ recipe, onChange, duration, file }: Props)
       </div>
 
       {duration > 0 && (
-        <p className="text-sm text-[var(--muted)] font-heading mt-1">
-          Clip: {formatDuration(clipLength)} of{" "}
-          {formatDuration(duration)}
-        </p>
+        <div className="flex flex-wrap justify-between items-center mt-1 gap-2">
+          <p className="text-sm text-[var(--muted)] font-heading">
+            Clip: {formatDuration(clipLength)} of{" "}
+            {formatDuration(duration)}
+          </p>
+          <p className="text-sm font-semibold font-heading text-film-600 bg-film-50 px-2 py-0.5 rounded border border-film-100 animate-fade-in" aria-live="polite">
+            Expected Export Duration: {((clipLength) / recipe.speed).toFixed(1)}s
+          </p>
+        </div>
       )}
+
       {recipe.trimEnd !== null &&
         recipe.trimEnd - recipe.trimStart < MIN_CLIP_DURATION && (
           <p className="text-[10px] text-[var(--error)] font-heading">
