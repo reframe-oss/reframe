@@ -18,7 +18,7 @@ import {
 
 export default function Footer() {
   return (
-    <footer className="w-full border-t border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-6 py-16 mt-20 transition-colors duration-300">
+    <footer className="w-full bg-[var(--neo-bg)] text-[var(--text)] shadow-[0_-8px_18px_var(--neo-lo)] px-6 py-16 mt-20 transition-colors duration-300">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-y-12 md:gap-x-12">
         {/* Brand Section */}
         <div className="md:col-span-5 space-y-6">
