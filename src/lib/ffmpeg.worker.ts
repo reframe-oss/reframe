@@ -222,7 +222,7 @@ function buildArguments(
   }
 
   const needsFilterComplex = hasOverlay || hasMusicTrack;
-  const shouldKeepAudio = recipe.keepAudio && (hasOriginalAudio || hasMusicTrack);
+  const shouldKeepAudio = (recipe.keepAudio && hasOriginalAudio) || hasMusicTrack;
 
   if (needsFilterComplex) {
     const filterParts: string[] = [];
@@ -263,7 +263,7 @@ interface PositionCoords {
     if (shouldKeepAudio) {
       if (hasMusicTrack) {
         const musicVol = (musicOptions!.musicVolume / 100).toFixed(2);
-        if (hasOriginalAudio) {
+        if (hasOriginalAudio && recipe.keepAudio) {
           const origVol = (musicOptions!.originalAudioVolume / 100).toFixed(2);
           const origChain = afParts.length > 0
             ? `[0:a]${afParts.join(",")},volume=${origVol}[orig]`
@@ -428,7 +428,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const fileBytes = serializeFileBuffer(request.file);
   await ffmpeg.writeFile(inputName, fileBytes, { signal: activeExportAbortController?.signal });
 
-  const hasMusicTrack = !!(request.musicFile && recipe.keepAudio);
+  const hasMusicTrack = !!request.musicFile;
   const musicInputName = `music_input_${sessionId}.mp3`;
   if (hasMusicTrack) {
     cleanupFiles.add(musicInputName);

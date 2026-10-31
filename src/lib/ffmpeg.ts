@@ -493,7 +493,7 @@ function buildAudioTrimFilter(recipe: EditRecipe): string {
   return `${trimFilter},asetpts=PTS-STARTPTS`;
 }
 
-function buildArguments(
+export function buildArguments(
   recipe: EditRecipe,
   format: "mp4" | "webm" | "mkv" | "gif",
   outputName: string,
@@ -529,7 +529,7 @@ function buildArguments(
   }
 
   const needsFilterComplex = hasOverlay || hasMusicTrack;
-  const shouldKeepAudio = recipe.keepAudio && (hasOriginalAudio || hasMusicTrack);
+  const shouldKeepAudio = (recipe.keepAudio && hasOriginalAudio) || hasMusicTrack;
 
   if (needsFilterComplex) {
     const filterParts: string[] = [];
@@ -570,7 +570,7 @@ interface PositionCoords {
     if (shouldKeepAudio) {
       if (hasMusicTrack) {
         const musicVol = (musicOptions!.musicVolume / 100).toFixed(2);
-        if (hasOriginalAudio) {
+        if (hasOriginalAudio && recipe.keepAudio) {
           const origVol  = (musicOptions!.originalAudioVolume / 100).toFixed(2);
           const origChain = afParts.length > 0
             ? `[0:a]${afParts.join(",")},volume=${origVol}[orig]`
