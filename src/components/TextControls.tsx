@@ -197,6 +197,7 @@ export default function TextControls({
                 <button
                   key={weight}
                   type="button"
+                  aria-pressed={selectedOverlay.fontWeight === weight}
                   onClick={() =>
                     handleUpdateText(selectedTextId!, { fontWeight: weight })
                   }

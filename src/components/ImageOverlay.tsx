@@ -145,6 +145,8 @@ export default function ImageOverlayPanel({
                   key={value}
                   type="button"
                   onClick={() => setOverlayPosition(value)}
+                  aria-label={`Position overlay at ${value.replace("-", " ")}`}
+                  aria-pressed={overlayPosition === value}
                   className={`rounded border py-0.5 text-center text-[10px] transition flex items-center justify-center gap-0.5 ${
                     overlayPosition === value
                       ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
@@ -167,6 +169,7 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlaySize(100)}
+                aria-pressed={isSmallSize}
                 className={`rounded border py-0.5 text-center text-[10px] transition ${
                   isSmallSize
                     ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
@@ -178,6 +181,7 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlaySize(250)}
+                aria-pressed={isMediumSize}
                 className={`rounded border py-0.5 text-center text-[10px] transition ${
                   isMediumSize
                     ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
@@ -189,6 +193,7 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlaySize(450)}
+                aria-pressed={isLargeSize}
                 className={`rounded border py-0.5 text-center text-[10px] transition ${
                   isLargeSize
                     ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
@@ -207,6 +212,7 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlayOpacity(25)}
+                aria-pressed={isFaintOpacity}
                 className={`rounded border py-0.5 text-center text-[10px] transition ${
                   isFaintOpacity
                     ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
@@ -218,6 +224,7 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlayOpacity(60)}
+                aria-pressed={isMediumOpacity}
                 className={`rounded border py-0.5 text-center text-[10px] transition ${
                   isMediumOpacity
                     ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
@@ -229,6 +236,7 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlayOpacity(100)}
+                aria-pressed={isSolidOpacity}
                 className={`rounded border py-0.5 text-center text-[10px] transition ${
                   isSolidOpacity
                     ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
