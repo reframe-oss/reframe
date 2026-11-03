@@ -1,11 +1,11 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { toBlobURL } from "@ffmpeg/util";
 import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions } from "./types";
-import { getPresetById } from "./presets";
 import {
   buildArguments,
   buildGifArguments,
   expectedOutputSeconds,
+  resolveOutputSize,
   resolveThreadCount,
   type EngineMode,
 } from "./ffmpegArgs";
@@ -203,20 +203,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
 
   const sessionId = request.id;
   const recipe = request.recipe;
-  let targetW: number;
-  let targetH: number;
-
-  if (recipe.preset === "custom") {
-    targetW = recipe.customWidth;
-    targetH = recipe.customHeight;
-  } else {
-    const preset = getPresetById(recipe.preset);
-    targetW = preset?.width ?? 1920;
-    targetH = preset?.height ?? 1080;
-  }
-
-  targetW = Math.round(targetW / 2) * 2;
-  targetH = Math.round(targetH / 2) * 2;
+  const { width: targetW, height: targetH } = resolveOutputSize(recipe);
 
   const ext = request.file.name.split(".").pop() ?? "mp4";
   const inputName = `input_${sessionId}.${ext}`;

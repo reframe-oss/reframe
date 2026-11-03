@@ -1,5 +1,6 @@
 import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions, OverlayPosition } from "./types";
 import { buildTextFilter } from "./text-overlay";
+import { getPresetById } from "./presets";
 
 // The FFmpeg command line for every export is built here and only here.
 // ffmpeg.worker.ts runs these commands; ffmpeg.ts re-exports the filter
@@ -10,6 +11,26 @@ import { buildTextFilter } from "./text-overlay";
 
 export type OutputFormat = "mp4" | "webm" | "mkv" | "gif";
 export type EngineMode = "multi" | "single";
+
+/**
+ * The pixel size an export is encoded at: the preset's size, or the custom
+ * size, rounded to even numbers (H.264/VP8 with 4:2:0 chroma need them). The
+ * worker, the UI and tests all use this, so what the editor shows is what
+ * FFmpeg is told.
+ */
+export function resolveOutputSize(recipe: Pick<EditRecipe, "preset" | "customWidth" | "customHeight">): { width: number; height: number } {
+  let width: number;
+  let height: number;
+  if (recipe.preset === "custom") {
+    width = recipe.customWidth;
+    height = recipe.customHeight;
+  } else {
+    const preset = getPresetById(recipe.preset);
+    width = preset?.width ?? 1920;
+    height = preset?.height ?? 1080;
+  }
+  return { width: Math.round(width / 2) * 2, height: Math.round(height / 2) * 2 };
+}
 
 /**
  * Upper bound on threads per FFmpeg stage (decode, filter, encode) for the

@@ -47,6 +47,8 @@ import {
   sizeBucket,
 } from "@/lib/telemetry";
 import { ExportAttempt, type ExportFailureCategory } from "@/lib/exportTelemetry";
+import { resolveOutputSize } from "@/lib/ffmpegArgs";
+import { applyProfile, type ProfileSettings } from "@/lib/exportProfiles";
 import { suggestPreset } from "@/lib/presetSuggestion";
 import { validateDimensions, getDownscaledDimensions } from "@/utils/video-validation";
 import {
@@ -130,12 +132,6 @@ function clearSavedEditorData() {
 
 /** Mirrors recipe changes into the URL at most this often (slider drags fire per pixel). */
 const URL_SYNC_DEBOUNCE_MS = 250;
-
-function outputDimensions(recipe: EditRecipe) {
-  if (recipe.preset === "custom") return { width: recipe.customWidth, height: recipe.customHeight };
-  const preset = getPresetById(recipe.preset);
-  return { width: preset?.width ?? 1920, height: preset?.height ?? 1080 };
-}
 
 /** User-facing message for a failed export; never echoes raw FFmpeg output. */
 export function describeExportError(err: unknown): string {
@@ -452,6 +448,12 @@ export function useVideoEditor() {
     [updateEdit]
   );
 
+  /** Applies an export profile's output settings as one undoable step. */
+  const applyExportProfile = useCallback(
+    (settings: ProfileSettings) => updateEdit((prev) => applyProfile(prev, settings)),
+    [updateEdit]
+  );
+
   const setOverlayPosition = useCallback(
     (position: OverlayPosition) =>
       updateEdit((prev) => ({ ...prev, imageOverlay: { ...prev.imageOverlay, position } })),
@@ -758,7 +760,7 @@ export function useVideoEditor() {
     exportAbortControllerRef.current = abortController;
     exportCancelledRef.current = false;
 
-    const output = outputDimensions(recipe);
+    const output = resolveOutputSize(recipe);
     const clipSeconds = ((recipe.trimEnd ?? duration) - recipe.trimStart) / recipe.speed;
     // Low-cardinality only: never the file name, captions or exact values.
     const attempt = new ExportAttempt(
@@ -1192,6 +1194,7 @@ export function useVideoEditor() {
     cancelExport,
     reset,
     resetSettings,
+    applyExportProfile,
     undo: undoEdit,
     redo: redoEdit,
     canUndo,

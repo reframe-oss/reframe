@@ -19,6 +19,12 @@ import ExportOverlay, { type ExportSummary } from "./ExportOverlay";
 import DownloadResult from "./DownloadResult";
 import ImageOverlay from "./ImageOverlay";
 import AdjustmentsControl, { hasAdjustments } from "./AdjustmentsControl";
+import ExportProfiles from "./ExportProfiles";
+import { useExportProfiles } from "@/hooks/useExportProfiles";
+import { BUILT_IN_PROFILES, profileMatches } from "@/lib/exportProfiles";
+import { resolveOutputSize } from "@/lib/ffmpegArgs";
+import { trackFeature } from "@/lib/featureTelemetry";
+import { deepEqual } from "@/lib/editHistory";
 import { getPresetById } from "@/lib/presets";
 import { pickThumbnailInterval } from "@/lib/thumbnails";
 
@@ -36,6 +42,7 @@ import {
   Download,
   ChevronDown,
   Keyboard,
+  Bookmark,
 } from "lucide-react";
 import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -224,6 +231,7 @@ export default function VideoEditor() {
     cancelExport,
     reset,
     resetSettings,
+    applyExportProfile,
     videoRef,
     seekTo,
     overlayFile,
@@ -250,6 +258,7 @@ export default function VideoEditor() {
     deleteSavedData,
   } = useVideoEditor();
 
+  const exportProfiles = useExportProfiles();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const toggleShortcuts = useCallback(() => setShortcutsOpen((v) => !v), []);
 
@@ -272,6 +281,7 @@ export default function VideoEditor() {
   const [shareCopied, setShareCopied] = useState(false);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState({
+    profile: false,
     resize: true,
     trim: false,
     rotation: false,
@@ -336,10 +346,12 @@ export default function VideoEditor() {
 
   const output = useMemo(() => {
     const preset = getPresetById(recipe.preset);
-    const width =
-      recipe.preset === "custom" ? recipe.customWidth : (preset?.width ?? recipe.customWidth);
-    const height =
-      recipe.preset === "custom" ? recipe.customHeight : (preset?.height ?? recipe.customHeight);
+    // The size FFmpeg actually encodes (even-rounded), not the raw input.
+    const { width, height } = resolveOutputSize({
+      preset: recipe.preset,
+      customWidth: recipe.customWidth,
+      customHeight: recipe.customHeight,
+    });
     const summary: ExportSummary = {
       format: recipe.format.toUpperCase(),
       resolution: `${width} × ${height}`,
@@ -682,6 +694,45 @@ export default function VideoEditor() {
               )}
 
               <div className="min-h-0 flex-1 divide-y divide-[var(--border)] overflow-y-auto overscroll-contain px-3">
+                <AccordionSection
+                  id="profile"
+                  icon={<Bookmark size={15} />}
+                  title="Profile"
+                  summary={
+                    [...BUILT_IN_PROFILES, ...exportProfiles.profiles].find((p) => profileMatches(recipe, p.settings))
+                      ?.name ?? "Custom settings"
+                  }
+                  isOpen={openSections.profile}
+                  onToggle={() => toggleSection("profile")}
+                >
+                  <ExportProfiles
+                    recipe={recipe}
+                    userProfiles={exportProfiles.profiles}
+                    status={exportProfiles.status}
+                    onApply={(settings) => {
+                      applyExportProfile(settings);
+                      const builtIn = BUILT_IN_PROFILES.find((p) => deepEqual(p.settings, settings));
+                      // Only the built-in slug or "custom": never a profile's name.
+                      trackFeature("export_profile", "apply", { profile: builtIn?.id ?? "custom" });
+                    }}
+                    onSave={(name, settings) => {
+                      const change = exportProfiles.save(name, settings);
+                      if (change.ok) trackFeature("export_profile", "save");
+                      return change;
+                    }}
+                    onRename={(id, name) => {
+                      const change = exportProfiles.rename(id, name);
+                      if (change.ok) trackFeature("export_profile", "rename");
+                      return change;
+                    }}
+                    onDelete={(id) => {
+                      const change = exportProfiles.remove(id);
+                      if (change.ok) trackFeature("export_profile", "delete");
+                      return change;
+                    }}
+                  />
+                </AccordionSection>
+
                 <AccordionSection
                   id="resize"
                   icon={<Layers size={15} />}
