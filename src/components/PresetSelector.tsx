@@ -191,6 +191,9 @@ export default function PresetSelector({ recipe, onChange }: Props) {
                 type="button"
                 onClick={() => handlePresetSelect(preset.id)}
                 title={`${preset.label} — ${preset.width}×${preset.height} — ${getOrientationLabel(preset.width, preset.height)}`}
+                // "1 : 1" reads as "one colon one"; two presets share 16 : 9, so
+                // the platform is part of the name too.
+                aria-label={`${preset.label.replaceAll(":", " is to ")} output ratio, ${preset.platform}`}
                 aria-pressed={active}
                 className="choice flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1.5 p-2.5 text-center"
               >

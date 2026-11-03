@@ -24,6 +24,21 @@ interface Props {
   notice?: string | null;
 }
 
+/**
+ * Time left, extrapolated from progress so far, or null while it would be a
+ * guess: before 3% or 3 s, and once it's nearly done.
+ */
+export function estimateRemainingMs(progress: number, elapsedMs: number): number | null {
+  if (progress < 3 || progress >= 99 || elapsedMs < 3000) return null;
+  return (elapsedMs * (100 - progress)) / progress;
+}
+
+function formatRemaining(ms: number): string {
+  const seconds = Math.ceil(ms / 1000);
+  if (seconds < 60) return `about ${Math.max(5, Math.ceil(seconds / 5) * 5)} s left`;
+  return `about ${Math.ceil(seconds / 60)} min left`;
+}
+
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -91,6 +106,8 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
 
   const isLoading = status === "loading-engine";
   const clamped = Math.max(0, Math.min(100, progress));
+  const remainingMs = estimateRemainingMs(clamped, elapsedMs);
+  const timeText = `${formatElapsed(elapsedMs)} elapsed${remainingMs === null ? "" : `, ${formatRemaining(remainingMs)}`}`;
 
   return (
     <FocusTrap
@@ -145,7 +162,7 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
                 <p aria-hidden="true" className="flex items-baseline gap-1.5 text-[var(--text)]">
                   <span className="display text-6xl [font-variant-numeric:lining-nums_tabular-nums]">{clamped}</span>
                   <span className="marker text-3xl text-[var(--text-secondary)]">%</span>
-                  <span className="tabular ml-auto text-xs text-[var(--muted)]">{formatElapsed(elapsedMs)} elapsed</span>
+                  <span className="tabular ml-auto text-right text-xs text-[var(--muted)]">{timeText}</span>
                 </p>
                 <div
                   className="progress-track mt-4"
@@ -153,7 +170,7 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
                   aria-valuenow={clamped}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-valuetext={`${clamped}%, ${formatElapsed(elapsedMs)} elapsed`}
+                  aria-valuetext={`${clamped}%, ${timeText}`}
                   aria-label="Export progress"
                 >
                   <div className="progress-fill" style={{ transform: `scaleX(${clamped / 100})` }} />

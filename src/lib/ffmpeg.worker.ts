@@ -37,7 +37,9 @@ export const SRI_HASHES: Record<string, string> = {
 type SerializedFile = {
   name: string;
   type: string;
-  data: ArrayBuffer;
+  /** The user's File, read here rather than on the page (see ffmpeg.ts). */
+  blob?: Blob;
+  data?: ArrayBuffer;
 };
 
 type ExportRequest = {
@@ -165,8 +167,10 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function serializeFileBuffer(file: SerializedFile): Uint8Array {
-  return new Uint8Array(file.data);
+async function readFileBytes(file: SerializedFile): Promise<Uint8Array> {
+  if (file.data) return new Uint8Array(file.data);
+  if (file.blob) return new Uint8Array(await file.blob.arrayBuffer());
+  return new Uint8Array(0);
 }
 
 function getOutputConfig(format: string, sessionId: string) {
@@ -222,14 +226,14 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const paletteName = `palette_${sessionId}.png`;
   const cleanupFiles = new Set<string>([inputName, outputName, fallbackOutputName, paletteName]);
 
-  const fileBytes = serializeFileBuffer(request.file);
+  const fileBytes = await readFileBytes(request.file);
   await ffmpeg.writeFile(inputName, fileBytes, { signal: activeExportAbortController?.signal });
 
   const hasMusicTrack = !!(request.musicFile && recipe.keepAudio);
   const musicInputName = `music_input_${sessionId}.mp3`;
   if (hasMusicTrack) {
     cleanupFiles.add(musicInputName);
-    await ffmpeg.writeFile(musicInputName, serializeFileBuffer(request.musicFile!), {
+    await ffmpeg.writeFile(musicInputName, await readFileBytes(request.musicFile!), {
       signal: activeExportAbortController?.signal,
     });
   }
@@ -239,7 +243,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const overlayInputName = `overlay_${sessionId}.${overlayExt}`;
   if (hasOverlay) {
     cleanupFiles.add(overlayInputName);
-    await ffmpeg.writeFile(overlayInputName, serializeFileBuffer(request.overlayFile!), {
+    await ffmpeg.writeFile(overlayInputName, await readFileBytes(request.overlayFile!), {
       signal: activeExportAbortController?.signal,
     });
   }
@@ -449,7 +453,11 @@ async function handleCommand(message: WorkerCommand) {
           postMessage({ type: "cancelled", id: message.id });
           return;
         }
-        postMessage({ ...result }, [result.data]);
+        // Wrap the output in a Blob here, off the main thread: building it on
+        // the main thread copied the whole file synchronously (over a second
+        // for a large export). A Blob crosses to the page by reference.
+        const { data, ...rest } = result;
+        postMessage({ ...rest, blob: new Blob([data], { type: result.mimeType }) });
       } catch (error) {
         if (activeExportAbortController?.signal.aborted) {
           postMessage({ type: "cancelled", id: message.id });

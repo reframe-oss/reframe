@@ -67,10 +67,17 @@ export function overrunLimitSeconds(expectedSeconds: number): number {
 }
 
 
+/**
+ * A file for the worker. `blob` is the user's File itself: it crosses to the
+ * worker by reference and the worker reads it, so the page never holds a
+ * copy of the bytes (a 300 MB read on the page caused multi-second GC pauses).
+ * `data` (raw bytes) is still accepted.
+ */
 type SerializedFile = {
   name: string;
   type: string;
-  data: ArrayBuffer;
+  blob?: Blob;
+  data?: ArrayBuffer;
 };
 
 type WorkerExportRequest = {
@@ -91,7 +98,10 @@ type WorkerProgressResponse = { type: "progress"; percent: number; outputSeconds
 type WorkerResultResponse = {
   type: "result";
   id: string;
-  data: ArrayBuffer;
+  /** The output, already wrapped by the worker (current workers). */
+  blob?: Blob;
+  /** The output as raw bytes (older workers and tests). */
+  data?: ArrayBuffer;
   mimeType: string;
   size: number;
   width: number;
@@ -219,7 +229,7 @@ function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
 
   if (data.type === "result") {
     if (pendingExport?.id !== data.id) return;
-    const blob = new Blob([data.data], { type: data.mimeType });
+    const blob = data.blob ?? new Blob([data.data ?? new ArrayBuffer(0)], { type: data.mimeType });
     const blobUrl = URL.createObjectURL(blob);
     pendingExport.resolve({
       blobUrl,
@@ -359,7 +369,7 @@ export async function exportVideo(
   } catch (err) {
     if (!(err instanceof ExportStalledError) || err.mode !== "multi" || signal?.aborted) throw err;
     // The stall set preferSingleThread, so this loads the single-threaded core.
-    // The file is read again: its first copy was transferred to the old worker.
+    // The worker reads the File itself, so the retry just sends it again.
     onEngineFallback?.(err.reason);
     onProgress(0);
     return exportOnce(file, recipe, onProgress, signal, musicOptions, overlayOptions, knownDuration);
@@ -387,11 +397,10 @@ async function exportOnce(
   }
 
   const sessionId = buildSessionId();
-  const arrayBuffer = await file.arrayBuffer();
   const filePayload: SerializedFile = {
     name: file.name,
     type: file.type || "video/mp4",
-    data: arrayBuffer,
+    blob: file,
   };
 
   if (musicOptions?.file && musicOptions.file.size > MAX_FILE_SIZE) {
@@ -402,7 +411,7 @@ async function exportOnce(
     ? {
         name: musicOptions.file.name,
         type: musicOptions.file.type || "audio/mpeg",
-        data: await musicOptions.file.arrayBuffer(),
+        blob: musicOptions.file,
       }
     : undefined;
 
@@ -414,7 +423,7 @@ async function exportOnce(
     ? {
         name: overlayOptions.file.name,
         type: overlayOptions.file.type || "image/png",
-        data: await overlayOptions.file.arrayBuffer(),
+        blob: overlayOptions.file,
       }
     : undefined;
 
@@ -479,9 +488,6 @@ async function exportOnce(
     resetWorker();
   }, 5_000);
 
-  const transfers: Transferable[] = [arrayBuffer];
-  if (musicFilePayload) transfers.push(musicFilePayload.data);
-  if (overlayFilePayload) transfers.push(overlayFilePayload.data);
 
   ffmpegWorker.postMessage(
     {
@@ -494,8 +500,7 @@ async function exportOnce(
       musicOptions: sanitizedMusicOptions,
       overlayFile: overlayFilePayload,
       overlayOptions: sanitizedOverlayOptions,
-    } as WorkerExportRequest,
-    transfers
+    } as WorkerExportRequest
   );
 
   try {
