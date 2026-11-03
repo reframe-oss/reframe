@@ -1,9 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Film, FolderOpen, Info } from "lucide-react";
-import LottiePlayer from "./LottiePlayer";
-import uploadAnim from "@/lib/lottie/upload.json";
+import { Film, Upload } from "lucide-react";
 import { cn, formatBytes, formatDuration } from "@/lib/utils";
 import { MAX_FILE_SIZE, WARNING_FILE_SIZE } from "@/lib/types";
 
@@ -14,78 +12,42 @@ interface Props {
   duration: number;
 }
 
+/** Matches the extension check in useVideoEditor.handleFileSelect. */
+const SUPPORTED_FORMATS = "MP4, MOV, WebM, MKV and AVI";
+
 function UploadRequirements() {
   return (
-    <section
-      aria-labelledby="upload-requirements-title"
-      className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow)]"
-    >
-      <div className="flex items-start gap-3">
-        <div
-          aria-hidden="true"
-          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-film-600"
-        >
-          <Info size={16} />
+    <section aria-labelledby="upload-requirements-title" className="px-1">
+      <h2 id="upload-requirements-title" className="sr-only">
+        Before you upload
+      </h2>
+      <dl className="grid gap-x-8 gap-y-5 text-xs sm:grid-cols-3">
+        <div>
+          <dt className="marker">
+            <span aria-hidden="true">(</span>Formats<span aria-hidden="true">)</span>
+          </dt>
+          <dd className="mt-2 max-w-[34ch] leading-5 text-[var(--muted)]">
+            {SUPPORTED_FORMATS}. MP4 with H.264 video and AAC audio is the most reliable.
+          </dd>
         </div>
-
-        <div className="min-w-0 flex-1">
-          <h3
-            id="upload-requirements-title"
-            className="font-heading text-sm font-semibold text-[var(--text)]"
-          >
-            Upload requirements
-          </h3>
-
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Check these details before choosing a video.
-          </p>
-
-          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-semibold text-[var(--text)]">
-                File size
-              </dt>
-              <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                Up to {formatBytes(MAX_FILE_SIZE)}. Files over{" "}
-                {formatBytes(WARNING_FILE_SIZE)} may process more slowly.
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-xs font-semibold text-[var(--text)]">
-                Supported formats
-              </dt>
-              <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                MP4, MOV, AVI, MKV and WebM.
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-xs font-semibold text-[var(--text)]">
-                Best compatibility
-              </dt>
-              <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                MP4 with H.264 video and AAC audio is recommended.
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-xs font-semibold text-[var(--text)]">
-                Processing
-              </dt>
-              <dd className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                Processing happens locally in your browser using FFmpeg.wasm.
-              </dd>
-            </div>
-          </dl>
-
-          <p className="mt-3 border-t border-[var(--border)] pt-3 text-xs leading-5 text-[var(--muted)]">
-            Large, high-resolution or complex videos can exceed browser memory,
-            especially on devices with limited RAM. For smoother exports, close
-            unused tabs and use the recommended MP4 format.
-          </p>
+        <div>
+          <dt className="marker">
+            <span aria-hidden="true">(</span>File size<span aria-hidden="true">)</span>
+          </dt>
+          <dd className="mt-2 max-w-[34ch] leading-5 text-[var(--muted)]">
+            Up to {formatBytes(MAX_FILE_SIZE)}. Export loads the whole file into browser memory, so files
+            over {formatBytes(WARNING_FILE_SIZE)} can fail on devices with little RAM.
+          </dd>
         </div>
-      </div>
+        <div>
+          <dt className="marker">
+            <span aria-hidden="true">(</span>Output<span aria-hidden="true">)</span>
+          </dt>
+          <dd className="mt-2 max-w-[34ch] leading-5 text-[var(--muted)]">
+            MP4, WebM, MKV or GIF, sized for each platform or to your own dimensions.
+          </dd>
+        </div>
+      </dl>
     </section>
   );
 }
@@ -102,54 +64,42 @@ interface FileInfoProps {
 }
 
 function FileInfo({ currentFile, duration, fileError, onChangeClick }: FileInfoProps) {
+  const ext = currentFile?.name.includes(".") ? currentFile.name.split(".").pop() : "video";
   return (
-    <div className="px-4 py-3 bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius)] shadow-[var(--shadow)]">
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <div className="hidden lg:flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--surface)] border border-[var(--border)] shrink-0">
-            <Film size={16} className="text-film-600" />
-          </div>
-          <Film size={18} className="lg:hidden text-film-600 shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-0.5">
-              <p className="text-sm font-semibold text-[var(--text)] truncate max-w-[320px] xl:max-w-[420px]">
-                {currentFile?.name}
-              </p>
-              {currentFile && (
-                <span className="px-2 py-0.5 bg-[var(--accent-muted)] text-[var(--text)] font-bold tracking-wider rounded text-[10px] uppercase shrink-0">
-                  {currentFile.name.includes(".")
-                    ? currentFile.name.split(".").pop()
-                    : "VIDEO"}
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-[var(--muted)] mt-1 space-y-0.5">
-              <p>{formatBytes(currentFile?.size ?? 0)}</p>
-              <p>
-                {duration > 0
-                  ? `Duration: ${formatDuration(duration)}`
-                  : "Loading duration..."}
-              </p>
-            </div>
-          </div>
+    <div>
+      <div className="flex items-center gap-3">
+        <div
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[var(--text-secondary)]"
+        >
+          <Film size={16} />
         </div>
-
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-[var(--text)]" title={currentFile?.name}>
+            {currentFile?.name}
+          </p>
+          <p className="tabular text-xs text-[var(--muted)]">
+            <span className="uppercase">{ext}</span>
+            {" · "}
+            {formatBytes(currentFile?.size ?? 0)}
+            {" · "}
+            {duration > 0 ? formatDuration(duration) : "Reading duration…"}
+          </p>
+        </div>
         <button
           type="button"
           onClick={onChangeClick}
-          className="text-xs font-semibold text-film-600 hover:text-film-700 uppercase tracking-wide"
+          className="btn btn-secondary btn-sm shrink-0"
+          title="Choose a different video (Ctrl+O)"
         >
-          Change
-          <span className="text-[var(--muted)] ml-1">(Ctrl+O)</span>
+          Replace video
         </button>
       </div>
 
-      <p className="text-xs text-[var(--muted)] mt-3 break-words">
-        Supports: MP4, MOV, AVI, MKV, WebM, and most video formats
-      </p>
-
       {fileError && (
-        <p className="text-xs text-[var(--error)] mt-2 font-medium">{fileError}</p>
+        <p role="alert" className="mt-2 text-xs font-medium text-[var(--error)]">
+          {fileError}
+        </p>
       )}
     </div>
   );
@@ -182,61 +132,70 @@ function DropZone({
       id="upload-zone"
       role="button"
       tabIndex={0}
-      aria-label="Video upload area. Drag and drop a video file or press Enter to browse."
+      // Named by its visible text so voice-control users can say what they see.
+      aria-labelledby="upload-zone-title"
+      aria-describedby="upload-zone-hint"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onClick={onClick}
       onKeyDown={onKeyDown}
+      // A dark "screen" waiting for footage, in every theme. The inset hairline
+      // frame tightens and turns red while a file is dragged over it.
       className={cn(
-        "group flex flex-col items-center justify-center gap-4 py-12 px-6",
-        "border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 relative overflow-hidden",
-        dragging
-          ? "border-[var(--accent)] bg-[var(--accent-muted)] scale-[1.02] shadow-[var(--shadow)] ring-4 ring-[var(--accent-muted)]"
-          : "border-[var(--border)] bg-[var(--bg)] hover:border-film-400 hover:bg-film-50/40"
+        "group relative flex min-h-[300px] cursor-pointer flex-col items-center justify-center gap-5 overflow-hidden rounded-[4px] border border-[var(--viewer-frame)] bg-[var(--stage)] px-6 py-14 text-center sm:min-h-[360px]",
+        "focus-visible:outline-offset-4"
       )}
     >
-      {dragging && (
-        <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-film-500/20 to-transparent pointer-events-none" />
-      )}
-
-      <div className="w-20 h-20 opacity-80 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200">
-        <LottiePlayer animationData={uploadAnim} loop autoplay />
-      </div>
-
-      <div className="text-center">
-        <p className="font-heading font-semibold text-[var(--text)] text-base">
-          {dragging ? "Release to upload" : "Drag & Drop your video here"}
-        </p>
-        <p className="text-sm text-[var(--muted)] mt-1">or click to browse</p>
-        <p className="text-xs text-[var(--muted)] mt-2 font-heading">
-          Ctrl+O / Cmd+O
-        </p>
-      </div>
-
-      <div className="flex flex-col items-center gap-3">
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-lg text-sm font-heading font-medium text-[var(--muted)]">
-            <FolderOpen size={14} />
-            MP4 / MOV / AVI / WebM
-          </div>
-          <p className="text-xs text-[var(--muted)]">Max file size: 2 GB</p>
-        </div>
-
-        {error && (
-          <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-2">
-            <span className="text-red-500">❌</span>
-            {error}
-          </div>
+      {/* The zone itself is visible from the first frame (it holds the main
+          call to action and is the page's LCP element); only this inner
+          hairline frame draws in. */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          "frame-inset pointer-events-none absolute rounded-[2px] border transition-[inset,border-color] duration-base ease-out",
+          dragging
+            ? "inset-2 border-[var(--accent)]"
+            : "inset-4 border-white/15 group-hover:inset-3 group-hover:border-white/30"
         )}
+      />
+      <div
+        aria-hidden="true"
+        className={cn(
+          "flex h-12 w-12 items-center justify-center rounded-full border text-[var(--viewer-text)] transition-transform duration-base ease-out",
+          dragging ? "-translate-y-1 border-[var(--accent)]" : "border-white/30 group-hover:-translate-y-0.5"
+        )}
+      >
+        <Upload size={18} />
       </div>
+      <div className="relative">
+        <p id="upload-zone-title" className="display text-2xl text-[var(--viewer-text)] sm:text-3xl">
+          {dragging ? "Drop to open this video" : "Choose a video or drag it here"}
+        </p>
+        <p id="upload-zone-hint" className="mt-2 text-sm text-[var(--viewer-muted)]">
+          {SUPPORTED_FORMATS} up to {formatBytes(MAX_FILE_SIZE)}
+        </p>
+      </div>
+      {/* Visual affordance only: the whole zone is the button, so this can't
+          be a nested <button>. */}
+      <span
+        aria-hidden="true"
+        className="relative inline-flex min-h-[2.25rem] items-center gap-3 rounded-pill bg-[var(--viewer-text)] px-4 text-sm font-medium text-[var(--viewer)] transition-transform duration-fast group-active:scale-[0.97]"
+      >
+        Choose video
+        <span className="hidden text-xs opacity-70 sm:inline">Ctrl O</span>
+      </span>
 
-      <p className="text-xs text-[var(--muted)] text-center">
-        Supports: MP4, MOV, AVI, MKV, WebM, and most video formats up to 2GB
-      </p>
-
+      {/* Errors sit on the dark screen, so they use the dark-theme error tint. */}
+      {error && (
+        <p role="alert" className="relative max-w-md rounded-control border border-[var(--viewer-error)] px-3 py-2 text-xs text-[var(--viewer-text)]">
+          {error}
+        </p>
+      )}
       {fileError && (
-        <p className="text-sm text-[var(--error)] text-center">{fileError}</p>
+        <p role="alert" className="relative max-w-md text-sm text-[var(--viewer-error)]">
+          {fileError}
+        </p>
       )}
     </div>
   );
@@ -279,24 +238,22 @@ export default function FileUpload({
     setWarning("");
 
     if (!file.type.startsWith("video/")) {
-      setError("Please drop a valid video file (MP4, MOV, AVI, WebM, etc.)");
+      setError(`That file isn't a video. Choose a ${SUPPORTED_FORMATS} file.`);
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
       setError(
-        `File too large (${formatBytes(file.size)}). Maximum allowed size is 2GB.`
+        `This file is ${formatBytes(file.size)}. The maximum is ${formatBytes(MAX_FILE_SIZE)}.`
       );
       return;
     }
 
     if (file.size > WARNING_FILE_SIZE) {
-      const estimatedMinutes = Math.max(
-        1,
-        Math.round(file.size / (100 * 1024 * 1024))
-      );
+      // No time estimate: export speed depends on codec, resolution and
+      // device far more than on file size, and it hasn't been measured.
       setWarning(
-        `Large file detected (${formatBytes(file.size)}). Processing may take ~${estimatedMinutes} minutes.`
+        `Large file (${formatBytes(file.size)}). Export can take several minutes and may fail on devices with limited memory.`
       );
     }
 
@@ -345,11 +302,12 @@ export default function FileUpload({
   }, [handleFile]);
 
   // ── Drop zone (inner) handler ─────────────────────────
+  // Only resets the zone's highlight: the drop bubbles to the document-level
+  // listener above, which handles the file. Handling it here as well ran
+  // validation and metadata extraction twice for every drop on the zone.
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleFile(file);
   };
 
   return (
@@ -358,42 +316,25 @@ export default function FileUpload({
       {pageDragging && (
         <div
           aria-live="polite"
-          aria-label="Drop your video file anywhere on the page"
-          className={cn(
-            "fixed inset-0 z-50 flex flex-col items-center justify-center gap-4",
-            "bg-black/60 backdrop-blur-sm",
-            "border-4 border-dashed border-film-500",
-            "transition-all duration-200 pointer-events-none"
-          )}
+          className="animate-fade-in pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
         >
-          {/* Animated ring */}
-          <div className="relative flex items-center justify-center">
-            <div className="absolute w-32 h-32 rounded-full border-4 border-film-500/40 animate-ping" />
-            <div className="w-24 h-24 rounded-full bg-film-500/10 border-2 border-film-500 flex items-center justify-center">
-              <Film size={40} className="text-film-400" />
-            </div>
-          </div>
-
-          <div className="text-center">
-            <p className="text-2xl font-bold text-white">
-              Drop your video anywhere
-            </p>
-            <p className="text-film-300 mt-1 text-sm">
-              Release to start uploading
-            </p>
+          <div className="absolute inset-6 rounded-[4px] border border-white/40" aria-hidden="true" />
+          <div className="flex flex-col items-center gap-4 text-center text-[var(--viewer-text)]">
+            <Film size={26} aria-hidden="true" />
+            <p className="display text-4xl">Drop to open this video</p>
           </div>
         </div>
       )}
 
       {/* ── Normal upload UI ── */}
       <div className="space-y-2">
-        {error && (
+        {error && currentFile && (
           <p role="alert" className="text-sm text-[var(--error)]">
             {error}
           </p>
         )}
         {warning && (
-          <p role="alert" className="text-sm text-[var(--warning)]">
+          <p role="status" className="callout callout-warning text-xs">
             {warning}
           </p>
         )}
@@ -405,7 +346,7 @@ export default function FileUpload({
             onChangeClick={() => inputRef.current?.click()}
           />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-8">
             <DropZone
               dragging={dragging}
               error={error}

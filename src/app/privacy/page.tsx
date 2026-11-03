@@ -11,12 +11,12 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <>
-      <main className="min-h-screen bg-[var(--bg)] text-[var(--text)] pt-24 pb-20">
+      <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] pt-24 pb-20">
         {/* Back link - top left below header */}
         <div className="px-6 mb-6">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--muted)] transition-colors hover:text-[var(--text)]"
+            className="inline-flex items-center gap-2 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--text)]"
           >
             <svg
               className="h-3.5 w-3.5"
@@ -244,7 +244,7 @@ export default function PrivacyPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </>
   );
 }

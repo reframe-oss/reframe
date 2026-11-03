@@ -12,9 +12,8 @@ import ExportOverlay from "./ExportOverlay";
  * timing. It is marked data-chromatic="ignore": Chromatic still renders it,
  * but excludes it from the diff.
  *
- * The Lottie spinner used to need the same treatment. It no longer does —
- * LottiePlayer checks isChromatic() and renders frame 0 statically, so the
- * spinner is deterministic and stays fully covered by the diff.
+ * The engine-loading state uses a CSS indeterminate bar; Chromatic pauses CSS
+ * animations, so it needs no special handling.
  *
  * A word of warning from how this file got here: an earlier version froze both
  * by stubbing window.setInterval and window.requestAnimationFrame. Chromatic's
@@ -31,10 +30,10 @@ const withCarouselIgnored: Decorator = (Story) => (
 
 function IgnoreCarousel({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
-    // The TipCarousel root, identified by its min-h-[142px] utility.
+    // The TipCarousel root (a data attribute, so restyling can't break it).
     const marked: Element[] = [];
 
-    document.querySelectorAll('[class*="min-h-[142px]"]').forEach((el) => {
+    document.querySelectorAll("[data-tip-carousel]").forEach((el) => {
       el.setAttribute("data-chromatic", "ignore");
       marked.push(el);
     });
@@ -56,6 +55,7 @@ const meta = {
     // builds. null takes its own early-return branch and pins it at zero.
     exportStartedAt: null,
     onCancel: () => {},
+    summary: { format: "MP4", resolution: "1080 × 1920", quality: "Balanced (CRF 23)" },
   },
 } satisfies Meta<typeof ExportOverlay>;
 
@@ -81,3 +81,25 @@ export const Exporting: Story = {
 export const AlmostDone: Story = {
   args: { status: "exporting", progress: 98 },
 };
+
+/** High-contrast palette: yellow progress and black/white surfaces. */
+export const HighContrast: Story = {
+  args: { status: "exporting", progress: 62 },
+  decorators: [
+    (Story) => (
+      <HighContrastFrame>
+        <Story />
+      </HighContrastFrame>
+    ),
+  ],
+};
+
+function HighContrastFrame({ children }: { children: React.ReactNode }) {
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = "high-contrast";
+    return () => {
+      delete document.documentElement.dataset.theme;
+    };
+  }, []);
+  return <>{children}</>;
+}

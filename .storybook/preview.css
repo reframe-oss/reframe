@@ -1,10 +1,10 @@
 /*
  * Snapshot stability for Chromatic.
  *
- * src/app/globals.css applies a 200ms transition to *every* element
- * (`*, *::before, *::after`) and several components animate on mount. A visual
- * regression service screenshots at an arbitrary moment, so those in-flight
- * transitions produce diffs that have nothing to do with a real change.
+ * Components use short, targeted transitions (globals.css no longer transitions
+ * every element) and a few animate on mount. A visual regression service
+ * screenshots at an arbitrary moment, so any in-flight transition produces a
+ * diff that has nothing to do with a real change.
  *
  * Freezing them here makes every story render at its settled end state. This
  * only affects the Storybook preview iframe — the app itself still animates.

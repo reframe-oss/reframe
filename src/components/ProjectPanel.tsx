@@ -19,8 +19,7 @@ function formatSavedAt(savedAt: number): string {
   return new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-const actionClass =
-  "inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-[var(--border)] text-xs font-heading font-bold uppercase tracking-widest text-[var(--text)] hover:bg-[var(--border)] transition-colors";
+const actionClass = "btn btn-secondary btn-sm w-full";
 
 interface PanelProps {
   hasFile: boolean;
@@ -90,17 +89,14 @@ export default function ProjectPanel({
   return (
     <section
       aria-labelledby="project-panel-title"
-      className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 space-y-3"
+      className="panel space-y-3 p-5"
     >
-      <h2
-        id="project-panel-title"
-        className="flex items-center gap-2 text-[10px] font-heading font-bold uppercase tracking-widest text-[var(--muted)]"
-      >
-        <HardDrive size={12} aria-hidden="true" />
+      <h2 id="project-panel-title" className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">
+        <HardDrive size={15} aria-hidden="true" className="text-[var(--muted)]" />
         Saved on this device
       </h2>
 
-      <div className="space-y-1.5 text-xs text-[var(--muted)] leading-relaxed">
+      <div className="space-y-1.5 text-sm leading-6 text-[var(--muted)]">
         <p>
           Your edit settings are saved in this browser as you work, so you can pick up after a
           refresh. Nothing is uploaded.
@@ -137,7 +133,7 @@ export default function ProjectPanel({
         />
       </div>
 
-      <div aria-live="polite" className="text-xs">
+      <div aria-live="polite" className="text-sm">
         {message && (
           <p className={message.tone === "error" ? "text-[var(--error)]" : "text-[var(--text)]"}>
             {message.text}
@@ -146,8 +142,8 @@ export default function ProjectPanel({
       </div>
 
       {confirmingDelete ? (
-        <div className="rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] p-3 space-y-2">
-          <p className="text-xs text-[var(--text)]">
+        <div className="space-y-3 rounded-[var(--radius-panel)] border border-[var(--error-border)] bg-[var(--error-bg)] p-4">
+          <p className="text-sm leading-6 text-[var(--text)]">
             Delete the saved edits and the stored copy of the video from this browser, and close the
             current video? Project files you saved are not affected.
           </p>
@@ -159,14 +155,14 @@ export default function ProjectPanel({
                 setConfirmingDelete(false);
                 setMessage({ tone: "ok", text: "Saved data deleted. The editor has been reset." });
               }}
-              className="min-h-[36px] px-3 rounded-lg bg-[var(--error)] text-white text-xs font-heading font-bold uppercase tracking-widest"
+              className="btn btn-danger btn-sm"
             >
               Delete
             </button>
             <button
               type="button"
               onClick={() => setConfirmingDelete(false)}
-              className="min-h-[36px] px-3 rounded-lg border border-[var(--border)] text-xs font-heading font-bold uppercase tracking-widest text-[var(--text)]"
+              className="btn btn-secondary btn-sm"
             >
               Cancel
             </button>
@@ -177,9 +173,9 @@ export default function ProjectPanel({
           type="button"
           onClick={() => setConfirmingDelete(true)}
           disabled={disabled}
-          className="inline-flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-widest text-[var(--muted)] hover:text-[var(--error)] transition-colors"
+          className="btn btn-ghost btn-sm -ml-3 hover:text-[var(--error)]"
         >
-          <Trash2 size={12} aria-hidden="true" />
+          <Trash2 size={14} aria-hidden="true" />
           Delete saved data
         </button>
       )}
@@ -198,12 +194,12 @@ export function RecoveryNotice({ recovery, onDiscard }: RecoveryProps) {
   return (
     <div
       role="status"
-      className="rounded-xl border border-film-200 bg-film-50 p-4 text-sm text-film-800 space-y-2"
+      className="panel space-y-2 p-5 text-sm leading-6 text-[var(--text)]"
     >
-      <p className="font-heading font-bold">
+      <p className="serif text-xl">
         {recovery.origin === "session" ? "Pick up where you left off" : "Choose the project's video"}
       </p>
-      <p className="text-film-700">
+      <p className="text-[var(--text-secondary)]">
         {recovery.origin === "session"
           ? "Your edits were saved, but this browser no longer has the video. "
           : "Project files don't include the video. "}
@@ -214,7 +210,7 @@ export function RecoveryNotice({ recovery, onDiscard }: RecoveryProps) {
       <button
         type="button"
         onClick={onDiscard}
-        className="text-xs font-heading font-bold uppercase tracking-widest text-film-600 hover:underline"
+        className="btn btn-ghost btn-sm -ml-3"
       >
         Discard saved edits
       </button>

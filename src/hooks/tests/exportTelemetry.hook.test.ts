@@ -89,6 +89,23 @@ describe("export reliability telemetry in the editor", () => {
     expect(JSON.stringify(rum.addAction.mock.calls)).not.toContain("holiday-clip");
   });
 
+  it("an automatic fallback to the single-threaded engine is one attempt, with a notice", async () => {
+    const { result } = await editorWithFile();
+    vi.mocked(exportVideo).mockImplementationOnce(async (...args) => {
+      const onEngineFallback = args[7] as (reason: "no_activity") => void;
+      onEngineFallback("no_activity");
+      return okResult;
+    });
+    await act(() => result.current.handleExport());
+    expect(lifecycle().map((e) => e.name)).toEqual(["export_started", "export_succeeded"]);
+    const fallback = rum.addAction.mock.calls.find(([name]) => name === "engine_fallback");
+    expect(fallback?.[1]).toMatchObject({ stall_reason: "no_activity", from: "multi", to: "single" });
+    expect(lifecycle()[1]!.ctx).toMatchObject({ engine: "single", fell_back: true });
+    expect(result.current.exportNotice).toMatch(/single-threaded engine/);
+    // The editor passes its known duration, so the export doesn't re-read it.
+    expect(vi.mocked(exportVideo).mock.calls[0]![6]).toBe(12);
+  });
+
   it("a cancel followed by a late rejection is one cancellation, not a failure", async () => {
     const { result } = await editorWithFile();
     let reject!: (e: unknown) => void;
@@ -106,6 +123,42 @@ describe("export reliability telemetry in the editor", () => {
     });
     expect(lifecycle().map((e) => e.name)).toEqual(["export_started", "export_cancelled"]);
     expect(lifecycle()[1]!.ctx).toMatchObject({ stage: "encode" });
+  });
+
+  it("a cancel after a minute without progress is reported as stuck", async () => {
+    const { result } = await editorWithFile();
+    let onProgress!: (p: number) => void;
+    vi.mocked(exportVideo).mockImplementationOnce((_f, _r, progress) => {
+      onProgress = progress;
+      return new Promise(() => {});
+    });
+    act(() => {
+      void result.current.handleExport();
+    });
+    await waitFor(() => expect(result.current.status).toBe("exporting"));
+    act(() => onProgress(100));
+    // Only the cancel happens "a minute later"; waitFor above uses real time.
+    const later = Date.now() + 61_000;
+    const now = vi.spyOn(Date, "now").mockReturnValue(later);
+    act(() => result.current.cancelExport());
+    now.mockRestore();
+    expect(lifecycle().at(-1)).toMatchObject({ name: "export_cancelled", ctx: { stuck: true } });
+  });
+
+  it("a cancel while progress is moving is not stuck", async () => {
+    const { result } = await editorWithFile();
+    let onProgress!: (p: number) => void;
+    vi.mocked(exportVideo).mockImplementationOnce((_f, _r, progress) => {
+      onProgress = progress;
+      return new Promise(() => {});
+    });
+    act(() => {
+      void result.current.handleExport();
+    });
+    await waitFor(() => expect(result.current.status).toBe("exporting"));
+    act(() => onProgress(40));
+    act(() => result.current.cancelExport());
+    expect(lifecycle().at(-1)).toMatchObject({ name: "export_cancelled", ctx: { stuck: false } });
   });
 
   it("cancelling while the engine loads is reported at the engine stage", async () => {
