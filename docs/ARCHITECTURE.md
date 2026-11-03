@@ -97,7 +97,7 @@ Reframe uses FFmpeg.wasm to process videos entirely in the browser. The processi
 
 - **Zero backend** — Entire app is static HTML/CSS/JS
 - **Fast deployment** — Can be hosted on any static file server
-- **Offline-capable** — Works offline after initial load (with service worker)
+- **Could work offline** — There is no service worker yet, so Reframe needs a connection to load. Offline support (a PWA that keeps the page cross-origin isolated) is planned
 - **SEO-friendly** — Static pages are easily crawlable
 
 ### Why Single-threaded FFmpeg?
