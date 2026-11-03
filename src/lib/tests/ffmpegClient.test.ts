@@ -218,32 +218,64 @@ describe("FFmpeg client lifecycle", () => {
     await expect(pending).resolves.toMatchObject({ size: 8 });
   });
 
-  it("a stalled multi-threaded export fails, and the retry loads the single-threaded core", async () => {
+  it("a stalled multi-threaded export is retried automatically on the single-threaded core", async () => {
     vi.useFakeTimers();
-    script.onLoad = (w) => w.emit({ type: "ready", mode: "multi" });
-    script.onExport = () => {}; // wedged: no progress, no heartbeat
-    const pending = run();
-    const assertion = expect(pending).rejects.toBeInstanceOf(ExportStalledError);
+    // First worker: multi-threaded and wedged. Second: single-threaded and fine.
+    script.onLoad = (w) => w.emit({ type: "ready", mode: workers.length === 1 ? "multi" : "single" });
+    script.onExport = (w, id) => {
+      if (workers.length > 1) w.emit(result(id));
+    };
+    const onFallback = vi.fn();
+    const onProgress = vi.fn();
+    const recipe = { ...DEFAULT_RECIPE, trimStart: 1, trimEnd: 4, speed: 2 };
+    const pending = exportVideo(file(), recipe, onProgress, undefined, undefined, undefined, 6, onFallback);
+    await vi.advanceTimersByTimeAsync(STALL_TIMEOUT_MS + 5_000);
+    await expect(pending).resolves.toMatchObject({ format: "mp4" });
+
+    expect(onFallback).toHaveBeenCalledWith("no_activity");
+    expect(workers[0]!.terminated).toBe(true);
+    expect(workers[1]!.posted.find((m) => m.type === "load")).toMatchObject({ singleThread: true });
+    // The retry is the same export: same edits.
+    const exports = workers.flatMap((w) => w.posted).filter((m) => m.type === "export") as unknown as { recipe: unknown }[];
+    expect(exports).toHaveLength(2);
+    expect(exports[1]!.recipe).toEqual(exports[0]!.recipe);
+    expect(exports[1]!.recipe).toMatchObject({ trimStart: 1, trimEnd: 4, speed: 2 });
+    expect(onProgress).toHaveBeenCalledWith(0);
+  });
+
+  it("if the single-threaded retry stalls too, the export fails with a Retry message", async () => {
+    vi.useFakeTimers();
+    script.onLoad = (w) => w.emit({ type: "ready", mode: workers.length === 1 ? "multi" : "single" });
+    script.onExport = () => {};
+    const onFallback = vi.fn();
+    const pending = exportVideo(file(), { ...DEFAULT_RECIPE }, vi.fn(), undefined, undefined, undefined, 6, onFallback);
+    const assertion = expect(pending).rejects.toMatchObject({ name: "ExportStalledError", mode: "single" });
+    await vi.advanceTimersByTimeAsync((STALL_TIMEOUT_MS + 5_000) * 2);
+    await assertion;
+    expect(onFallback).toHaveBeenCalledTimes(1);
+    await expect(pending).rejects.toThrow(/Press Retry/);
+  });
+
+  it("does not retry a single-threaded stall or a cancelled export", async () => {
+    vi.useFakeTimers();
+    script.onExport = () => {}; // default load is single-threaded
+    const onFallback = vi.fn();
+    const pending = exportVideo(file(), { ...DEFAULT_RECIPE }, vi.fn(), undefined, undefined, undefined, 6, onFallback);
+    const assertion = expect(pending).rejects.toMatchObject({ mode: "single" });
     await vi.advanceTimersByTimeAsync(STALL_TIMEOUT_MS + 5_000);
     await assertion;
-    await expect(pending).rejects.toMatchObject({ mode: "multi" });
-    expect(workers[0]!.terminated).toBe(true);
-    expect(getFFmpegClientState().hasWorker).toBe(false);
-
-    script.onLoad = undefined;
-    script.onExport = (w, id) => w.emit(result(id));
-    await expect(run()).resolves.toMatchObject({ format: "mp4" });
-    expect(workers[1]!.posted.find((m) => m.type === "load")).toMatchObject({ singleThread: true });
+    expect(onFallback).not.toHaveBeenCalled();
+    expect(workers).toHaveLength(1);
   });
 
   it("a stall's message says what happened and to press Retry", async () => {
     vi.useFakeTimers();
-    script.onLoad = (w) => w.emit({ type: "ready", mode: "multi" });
+    // Single-threaded: a multi-threaded stall would be retried automatically.
     script.onExport = () => {};
     const pending = run();
     const assertion = expect(pending).rejects.toMatchObject({
       reason: "no_activity",
-      message: expect.stringMatching(/stopped responding.*Retry.*single-threaded/),
+      message: expect.stringMatching(/stopped responding\. Press Retry/),
     });
     await vi.advanceTimersByTimeAsync(STALL_TIMEOUT_MS + 5_000);
     await assertion;

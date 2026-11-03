@@ -324,6 +324,8 @@ export function useVideoEditor() {
   const [error, setError] = useState<string | null>(null);
   const [fileError, setFileError] = useState("");
   const [exportStartedAt, setExportStartedAt] = useState<number | null>(null);
+  /** Shown during an export when something changed mid-way (engine fallback). */
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const exportAbortControllerRef = useRef<AbortController | null>(null);
   const exportCancelledRef = useRef(false);
   /** The export attempt in progress, which reports its single outcome. */
@@ -735,6 +737,7 @@ export function useVideoEditor() {
     try {
       setStatus("loading-engine");
       setProgress(0);
+      setExportNotice(null);
       setError(null);
       setExportStartedAt(null);
       if (result?.blobUrl) URL.revokeObjectURL(result.blobUrl);
@@ -764,6 +767,12 @@ export function useVideoEditor() {
           position: overlayPosition,
           size: overlaySize,
           opacity: overlayOpacity,
+        },
+        duration,
+        (reason) => {
+          // Same export, same edits, on the slower but sturdier engine.
+          attempt.engineFallback(reason);
+          setExportNotice("Switched to the single-threaded engine and started again. This takes longer.");
         }
       );
       if (exportCancelledRef.current) return;
@@ -1131,6 +1140,7 @@ export function useVideoEditor() {
     status,
     progress,
     exportStartedAt,
+    exportNotice,
     result,
     error,
     videoRef,

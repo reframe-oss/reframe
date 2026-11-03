@@ -93,6 +93,7 @@ export class ExportAttempt {
   private readonly startedAt = now();
   private encodeStartedAt: number | null = null;
   private engine: EngineMode | "none" = "none";
+  private fellBack = false;
 
   constructor(
     private readonly context: ExportContext,
@@ -116,10 +117,23 @@ export class ExportAttempt {
     this.encodeStartedAt = now();
   }
 
+  /**
+   * The multi-threaded engine stalled and this same attempt is being retried
+   * on the single-threaded one. The attempt keeps going: its one outcome is
+   * reported when the retry ends, with engine "single" and fell_back true.
+   */
+  engineFallback(reason: StallReason): void {
+    if (this.settled) return;
+    trackAction("engine_fallback", { ...this.context, from: "multi", to: "single", stall_reason: reason });
+    this.engine = "single";
+    this.fellBack = true;
+  }
+
   private common() {
     return {
       ...this.context,
       engine: this.engine,
+      fell_back: this.fellBack,
       is_retry: this.retryOf !== null,
       durationMs: Math.round(now() - this.startedAt),
     };

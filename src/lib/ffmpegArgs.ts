@@ -23,13 +23,19 @@ export type EngineMode = "multi" | "single";
  */
 export const MT_THREAD_CAP = 4;
 
-/** Threads to request per stage; 0 means "don't pass any thread flags". */
+/** Threads to assume when the browser doesn't report its core count. */
+export const UNKNOWN_CORES_THREADS = 2;
+
+/**
+ * Threads to request per stage: min(MT_THREAD_CAP, hardwareConcurrency || 2),
+ * or 0 ("don't pass any thread flags") for the single-threaded core.
+ */
 export function resolveThreadCount(mode: EngineMode, hardwareConcurrency?: number): number {
   if (mode !== "multi") return 0;
   const cores =
     hardwareConcurrency && Number.isFinite(hardwareConcurrency) && hardwareConcurrency > 0
       ? Math.floor(hardwareConcurrency)
-      : MT_THREAD_CAP;
+      : UNKNOWN_CORES_THREADS;
   return Math.max(1, Math.min(MT_THREAD_CAP, cores));
 }
 

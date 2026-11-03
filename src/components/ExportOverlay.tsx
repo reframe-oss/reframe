@@ -11,6 +11,8 @@ interface Props {
   status: ExportStatus;
   progress: number;
   exportStartedAt?: number | null;
+  /** One line about a change mid-export, e.g. the engine fallback. */
+  notice?: string | null;
   onCancel?: () => void;
 }
 
@@ -21,7 +23,7 @@ function formatElapsed(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-export default function ExportOverlay({ status, progress, exportStartedAt, onCancel }: Props) {
+export default function ExportOverlay({ status, progress, exportStartedAt, notice, onCancel }: Props) {
   const visible = status === "loading-engine" || status === "exporting";
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const focusAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -124,6 +126,11 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
                 ? "Downloading the video engine. This only happens once."
                 : "Processing your video locally."}
             </p>
+            {notice && (
+              <p role="status" className="text-sm text-[var(--text)] mt-2">
+                {notice}
+              </p>
+            )}
             <p className="text-xs font-heading font-semibold text-film-600 mt-2 uppercase tracking-wide">
               Do not close or refresh this tab
             </p>
