@@ -134,10 +134,25 @@ Created through the API on 2026-11-03 (site `datadoghq.com`):
 | Item | ID |
 |---|---|
 | Dashboard "Reframe — export reliability" | [`2tw-pge-qkk`](https://app.datadoghq.com/dashboard/2tw-pge-qkk) |
-| Monitor: exports failing in production (> 10 `export_failed` in 1 h; warning at 5) | `340137974` |
+| Monitor: exports not completing (started − succeeded − ordinary cancellations > 10 in 1 h; warning at 5). Counts failures, stuck cancellations (`stuck: true`) and abandoned exports | `340137974` |
 | Monitor: FFmpeg engine failing to load (> 5 `ffmpeg_load_failure` in 1 h) | `340138002` |
 | Monitor: cross-origin isolation missing (> 3 loads with `single_reason:not_isolated` in 1 h) | `340138004` |
 | Monitor: frontend errors spike (> 25 uncaught errors in 1 h) | `340138012` |
+| Monitor: exports start but none succeed (> 3 `export_started` and 0 `export_succeeded` in 6 h) | `340168191` |
+| RUM-based metrics `reframe.export.started` and `reframe.export.succeeded` (production action counts, from 2026-11-03) | — |
+| SLO: 95% of started exports succeed, 30 days (and 7 days), warning at 97% | `0ac26b24a9a156729eaa2bdab83d07ff` |
+| Monitor: SLO error budget burning > 6× over 6 h and 30 min | `340187598` |
+
+Why the "none succeed" and "not completing" monitors exist: during the
+multi-threaded engine outage (2026-10-22 to 2026-11-03) every export hung,
+and hung exports produced no `export_failed` at all, only cancellations or
+nothing. The original failure monitor counted only `export_failed`, so it
+stayed OK the whole time.
+
+The SLO counts every start that didn't end in success, so user
+cancellations count against it as well; that is deliberate (a cancel is
+usually an export that was too slow). With today's traffic a single failure
+moves it a lot; treat it as meaningful after a few hundred exports.
 
 The monitors only watch `env:production`, never page anyone, and email the
 maintainer. Their thresholds are absolute counts, chosen for today's low
