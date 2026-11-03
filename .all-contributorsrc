@@ -1,0 +1,14 @@
+{
+  "projectName": "reframe",
+  "projectOwner": "reframe-oss",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [".github/ALL_CONTRIBUTORS.md"],
+  "imageSize": 80,
+  "commit": false,
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "linkToUsage": false,
+  "skipCi": true,
+  "contributors": []
+}

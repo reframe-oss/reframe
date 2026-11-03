@@ -19,7 +19,7 @@ Not included, on purpose:
 - **The completion-sound preference.** It's a setting, not an edit, so undo never flips it.
 - **Files** (the source video, the image overlay file, background music). They are binary assets, not edit values, so adding or removing the image file is not an undo step.
 - **Transient UI state.** Hover, open panels, the selected text overlay, export progress, object URLs and worker state.
-- **The multi-track timeline state.** It isn't connected to the UI or the export yet (see `PHASE_1_MVP.md`).
+- **The multi-track timeline state.** It isn't connected to the UI or the export yet (see [history/PHASE_1_MVP.md](history/PHASE_1_MVP.md)).
 
 `useVideoEditor` exposes `recipe` derived from `EditState`. `handleExport` passes that same object, plus the image overlay settings, to `exportVideo`. So after an undo the preview and the export can't disagree.
 
