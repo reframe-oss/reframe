@@ -12,8 +12,7 @@ interface Props {
   onRedo: () => void;
 }
 
-const buttonClass =
-  "inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-xs font-heading font-bold uppercase tracking-widest transition-colors";
+const buttonClass = "btn btn-ghost btn-sm";
 
 export default function HistoryControls({ canUndo, canRedo, onUndo, onRedo }: Props) {
   const [isMac, setIsMac] = useState(false);
@@ -36,9 +35,7 @@ export default function HistoryControls({ canUndo, canRedo, onUndo, onRedo }: Pr
         title={`Undo (${undoKeys})`}
         className={cn(
           buttonClass,
-          canUndo
-            ? "text-[var(--text)] hover:bg-[var(--border)]"
-            : "text-[var(--muted)] opacity-50 cursor-not-allowed"
+          !canUndo && "cursor-not-allowed opacity-40"
         )}
       >
         <Undo2 size={14} aria-hidden="true" />
@@ -52,9 +49,7 @@ export default function HistoryControls({ canUndo, canRedo, onUndo, onRedo }: Pr
         title={`Redo (${redoKeys})`}
         className={cn(
           buttonClass,
-          canRedo
-            ? "text-[var(--text)] hover:bg-[var(--border)]"
-            : "text-[var(--muted)] opacity-50 cursor-not-allowed"
+          !canRedo && "cursor-not-allowed opacity-40"
         )}
       >
         <Redo2 size={14} aria-hidden="true" />

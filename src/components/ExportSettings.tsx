@@ -3,7 +3,6 @@
 import { EditRecipe } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
-  SlidersHorizontal,
   Info as InfoIcon,
 } from "lucide-react";
 
@@ -48,23 +47,22 @@ export default function ExportSettings({
         <div className="flex items-center justify-between mb-2">
           <label
             htmlFor="quality-control"
-            className="text-sm font-heading font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center gap-2"
+            className="label flex items-center gap-1.5"
           >
-            <SlidersHorizontal size={10} />
-            Quality
+                        Quality
 
             <span
               className="cursor-help"
               title="CRF (Constant Rate Factor): lower = higher quality, larger file. 18 = best quality, 30 = smallest file."
             >
-              <InfoIcon size={14} />
+              <InfoIcon size={13} aria-hidden="true" />
             </span>
           </label>
 
-          <span className="text-sm font-heading font-bold text-film-600">
+          <span className="text-sm font-medium text-[var(--text)]">
             {label}
 
-            <span className="font-normal text-sm text-[var(--muted)] ml-2">
+            <span className="tabular ml-1.5 text-xs font-normal text-[var(--muted)]">
               CRF {recipe.quality}
             </span>
           </span>
@@ -87,7 +85,7 @@ export default function ExportSettings({
           aria-describedby="quality-description"
           aria-label="Video export quality (CRF)"
           aria-valuetext={`${label} quality, CRF value ${recipe.quality}`}
-          className="w-full accent-film-600 cursor-pointer"
+          className="w-full cursor-pointer"
         />
 
         <div
@@ -95,11 +93,11 @@ export default function ExportSettings({
           className="mt-1 space-y-3"
         >
           <div className="flex justify-between">
-            <span className="text-sm text-[var(--muted)]">
+            <span className="hint">
               Smallest file
             </span>
 
-            <span className="text-sm text-[var(--muted)]">
+            <span className="hint">
               Best quality
             </span>
           </div>
@@ -113,7 +111,7 @@ export default function ExportSettings({
 
           {isGif && (
             <p className="text-xs text-[var(--warning)] font-medium">
-              ⚠ GIF files can be very large. Keep clips under 10 s for best results.
+              GIF files can be very large. Keep clips under 10 s for best results.
             </p>
           )}
         </div>
@@ -122,7 +120,7 @@ export default function ExportSettings({
         <div className="flex items-center justify-between mt-4">
           <label
             htmlFor="sound-on-completion"
-            className="text-[10px] font-heading font-semibold uppercase tracking-wider text-[var(--muted)]"
+            className="label"
           >
             Sound on completion
           </label>
@@ -135,7 +133,7 @@ export default function ExportSettings({
               onChange({ soundOnCompletion: e.target.checked })
             }
             aria-label="Play sound when export completes"
-            className="accent-film-600 cursor-pointer"
+            className="h-4 w-4 cursor-pointer"
           />
         </div>
         )}
@@ -145,13 +143,12 @@ export default function ExportSettings({
         <div className="flex items-center justify-between mb-1">
           <label
             htmlFor="stabilization-toggle"
-            className="text-sm font-heading font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center gap-2"
+            className="label flex items-center gap-1.5"
           >
-            <SlidersHorizontal size={10} />
-            Stabilization
+                        Stabilization
           </label>
 
-          <span className="flex text-sm font-heading font-bold text-film-600">
+          <span className="flex">
             <input
               id="stabilization-toggle"
               type="checkbox"
@@ -162,12 +159,12 @@ export default function ExportSettings({
                 })
               }
               aria-label="Enable video stabilization"
-              className="w-full accent-film-600 cursor-pointer"
+              className="h-4 w-4 cursor-pointer"
             />
           </span>
         </div>
 
-        <p className="text-xs text-[var(--muted)] mb-1">
+        <p className="hint mb-1">
           Reduce camera shake
         </p>
 
@@ -176,7 +173,7 @@ export default function ExportSettings({
             className={cn(
               "text-xs",
               recipe.stabilization
-                ? "text-[var(--error)] font-medium"
+                ? "text-[var(--warning)] font-medium"
                 : "text-[var(--muted)]"
             )}
           >
@@ -188,20 +185,19 @@ export default function ExportSettings({
         <div className="flex items-center justify-between mb-1">
           <label
             htmlFor="denoise-toggle"
-            className="text-sm font-heading font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center gap-2"
+            className="label flex items-center gap-1.5"
           >
-            <SlidersHorizontal size={10} />
-            Reduce noise
+                        Reduce noise
 
             <span
               className="cursor-help"
               title="Reduces video noise. May slow down export slightly."
             >
-              <InfoIcon size={14} />
+              <InfoIcon size={13} aria-hidden="true" />
             </span>
           </label>
 
-          <span className="flex text-sm font-heading font-bold text-film-600">
+          <span className="flex">
             <input
               id="denoise-toggle"
               type="checkbox"
@@ -213,12 +209,12 @@ export default function ExportSettings({
               }
               aria-label="Enable noise reduction"
               aria-checked={recipe.denoise}
-              className="w-full accent-film-600 cursor-pointer"
+              className="h-4 w-4 cursor-pointer"
             />
           </span>
         </div>
 
-        <p className="text-xs text-[var(--muted)] mb-1">
+        <p className="hint mb-1">
           Reduce low-light video grain
         </p>
 
@@ -227,7 +223,7 @@ export default function ExportSettings({
             className={cn(
               "text-xs",
               recipe.denoise
-                ? "text-red-700 font-medium"
+                ? "text-[var(--warning)] font-medium"
                 : "text-[var(--muted)]"
             )}
           >

@@ -42,15 +42,15 @@ export function Button({ variant = "primary", className = "", children, ...props
   const variants = {
     primary: `
       bg-[var(--accent)]
-      text-white
-      hover:bg-[var(--accent-hover)] hover:scale-[1.02]
+      text-[var(--on-accent)]
+      hover:bg-[var(--accent-hover)]
       focus:ring-[var(--accent)]
     `,
     secondary: `
       bg-[var(--accent-muted)]
       text-[var(--text)]
       border border-[var(--accent)]
-      hover:bg-[var(--surface)] hover:scale-[1.02]
+      hover:bg-[var(--surface)]
       focus:ring-[var(--accent)]
     `,
     ghost: `
@@ -68,7 +68,7 @@ export function Button({ variant = "primary", className = "", children, ...props
         rounded-[var(--radius)] px-4 py-2 text-sm font-medium
         focus:outline-none focus:ring-2 focus:ring-offset-2
         focus:ring-offset-[var(--bg)]
-        transition-all duration-200
+        transition-colors duration-fast
         disabled:opacity-50 disabled:cursor-not-allowed
         ${variants[variant]}
         ${className}
@@ -90,7 +90,7 @@ export function Input({ className = "", ...props }: React.InputHTMLAttributes<HT
         w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]
         placeholder:text-[var(--muted)]
         focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-muted)]
-        transition-all duration-200
+        transition-colors duration-fast
         ${className}
       `}
       {...props}

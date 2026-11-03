@@ -39,8 +39,8 @@ export class ExportStalledError extends Error {
     super(
       `${STALL_MESSAGES[reason]} ` +
         (mode === "multi"
-          ? "Press Retry to try again with the single-threaded engine, which is slower but more reliable."
-          : "Press Retry to try again, or try a shorter clip or a lower resolution.")
+          ? "Press Retry export to try again with the single-threaded engine, which is slower but more reliable."
+          : "Press Retry export to try again, or try a shorter clip or a lower resolution.")
     );
   }
 }
