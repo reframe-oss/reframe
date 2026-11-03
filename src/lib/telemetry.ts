@@ -131,6 +131,20 @@ export function trackAction(name: string, context?: TelemetryContext) {
   run((r) => r.addAction(name, context));
 }
 
+/**
+ * Reports a handled error to Datadog Error Tracking. `message` must be built
+ * from fixed strings and categories only (never an FFmpeg message, a file
+ * name or user text): Error Tracking groups issues by it, so one cause is
+ * one issue. Pass a stable `name` per kind of error.
+ */
+export function trackError(name: string, message: string, context?: TelemetryContext) {
+  run((r) => {
+    const error = new Error(message);
+    error.name = name;
+    r.addError(error, context);
+  });
+}
+
 export function trackTiming(name: string) {
   // addTiming is relative to the current view; capture the time now, not at replay.
   const time = typeof performance !== "undefined" ? Math.round(performance.now()) : undefined;

@@ -1,0 +1,72 @@
+name: Upload source maps to Datadog
+
+# Production JavaScript is minified, so Datadog error stack traces are
+# unreadable without source maps. Netlify builds the site and removes the maps
+# before publishing (netlify.toml, scripts/strip-sourcemaps.mjs) so they are
+# never served. This workflow rebuilds the same commit with the same settings,
+# waits until production serves exactly the files it built, then uploads the
+# maps for that release (the commit SHA, also reported as the RUM version).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sourcemaps-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      # Same toolchain as Netlify (netlify.toml), so the build is identical.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+      - run: bun install --frozen-lockfile
+
+      - name: Build exactly as Netlify does
+        run: bun run build
+        env:
+          CONTEXT: production
+          COMMIT_REF: ${{ github.sha }}
+          # Public values (they ship in the page), kept as repository variables.
+          NEXT_PUBLIC_DATADOG_APPLICATION_ID: ${{ vars.DD_RUM_APPLICATION_ID }}
+          NEXT_PUBLIC_DATADOG_CLIENT_TOKEN: ${{ vars.DD_RUM_CLIENT_TOKEN }}
+
+      - name: Wait for production to serve this build
+        id: match
+        run: |
+          set -euo pipefail
+          want=$(cd out && find _next/static/chunks -maxdepth 1 -name '*.js' | sort)
+          for _ in $(seq 1 40); do
+            served=$(curl -fsSL https://reframe-os.netlify.app/ | grep -oE '/_next/static/chunks/[^"]+\.js' | sed 's|^/||' | sort -u || true)
+            if [ -n "$served" ] && [ -z "$(comm -13 <(echo "$want") <(echo "$served"))" ]; then
+              echo "Production serves this build ($(echo "$served" | wc -l) chunks checked)."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::Production never served the chunks built here; not uploading maps that wouldn't match."
+          exit 1
+
+      - name: Upload source maps
+        run: |
+          release=$(echo "${GITHUB_SHA}" | cut -c1-12)
+          npx --yes @datadog/datadog-ci@5.25.0 sourcemaps upload out/_next \
+            --service reframe \
+            --release-version "$release" \
+            --minified-path-prefix https://reframe-os.netlify.app/_next
+        env:
+          DATADOG_API_KEY: ${{ secrets.DD_API_KEY }}
+          DATADOG_SITE: datadoghq.com

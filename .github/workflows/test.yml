@@ -15,16 +15,30 @@ concurrency:
 jobs:
   unit:
     name: Unit tests (Vitest)
+    env:
+      # CI Visibility uploads; empty on forks, so those steps are skipped.
+      DATADOG_API_KEY: ${{ secrets.DD_API_KEY }}
+      DATADOG_SITE: datadoghq.com
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: bun run test --run
+      - run: bun run test --run --reporter=default --reporter=junit --outputFile.junit=test-results/vitest-junit.xml
+
+      # CI Visibility: test results in Datadog. Skipped for forks (no secret).
+      - name: Upload test results to Datadog
+        if: always() && env.DATADOG_API_KEY != ''
+        continue-on-error: true
+        run: npx --yes @datadog/datadog-ci@5.25.0 junit upload --service reframe --tags "suite:unit" test-results/vitest-junit.xml
 
   e2e:
     name: Export end-to-end (Playwright)
+    env:
+      # CI Visibility uploads; empty on forks, so those steps are skipped.
+      DATADOG_API_KEY: ${{ secrets.DD_API_KEY }}
+      DATADOG_SITE: datadoghq.com
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -52,6 +66,11 @@ jobs:
       # without (single-threaded core); see playwright.config.ts.
       - name: Run Playwright
         run: bunx playwright test
+
+      - name: Upload test results to Datadog
+        if: always() && env.DATADOG_API_KEY != ''
+        continue-on-error: true
+        run: npx --yes @datadog/datadog-ci@5.25.0 junit upload --service reframe --tags "suite:e2e" test-results/e2e-junit.xml
 
       - name: Upload Playwright report
         if: failure()

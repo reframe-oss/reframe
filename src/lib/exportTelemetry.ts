@@ -6,7 +6,7 @@
  *   - failures carry one category from a closed list, never the raw message.
  * Event names and properties are documented in docs/DATADOG.md.
  */
-import { failureCategory, trackAction, trackVital } from "./telemetry";
+import { failureCategory, trackAction, trackError, trackVital } from "./telemetry";
 import type { EngineMode } from "./ffmpegArgs";
 
 export type { EngineMode };
@@ -84,6 +84,21 @@ export function engineLoadFailureCategory(err: unknown): EngineLoadFailureCatego
   return "unknown";
 }
 
+/**
+ * Processing speed, as seconds of output per second of encoding, in buckets:
+ * an exact ratio together with encode_ms would reveal the clip's length.
+ */
+export function speedBucket(outputSeconds: number | undefined, encodeMs: number): string {
+  if (!outputSeconds || !Number.isFinite(outputSeconds) || outputSeconds <= 0 || encodeMs <= 0) return "unknown";
+  const ratio = outputSeconds / (encodeMs / 1000);
+  if (ratio < 0.25) return "<0.25x";
+  if (ratio < 0.5) return "0.25-0.5x";
+  if (ratio < 1) return "0.5-1x";
+  if (ratio < 2) return "1-2x";
+  if (ratio < 4) return "2-4x";
+  return "4x+";
+}
+
 type Outcome = "succeeded" | "failed" | "cancelled";
 
 /** One export attempt, from the Export click to its single outcome. */
@@ -140,16 +155,22 @@ export class ExportAttempt {
   }
 
   /** Returns false if this attempt already had an outcome. */
-  succeeded(outputSize: string): boolean {
+  /**
+   * `outputSeconds`: length of the exported video, used only to report the
+   * processing speed as a bucket (never the length itself).
+   */
+  succeeded(outputSize: string, outputSeconds?: number): boolean {
     if (this.settled) return false;
     this.outcome = "succeeded";
     const encodeStartedAt = this.encodeStartedAt ?? this.startedAt;
+    const encodeMs = Math.round(now() - encodeStartedAt);
     // The duration vital measures encoding only; engine start-up is ffmpeg_init.
     trackVital("export", encodeStartedAt, { ...this.context, engine: this.engine });
     trackAction("export_succeeded", {
       ...this.common(),
-      encode_ms: Math.round(now() - encodeStartedAt),
+      encode_ms: encodeMs,
       output_size: outputSize,
+      speed: speedBucket(outputSeconds, encodeMs),
     });
     return true;
   }
@@ -179,6 +200,15 @@ export class ExportAttempt {
       ...this.common(),
       stage: this.stage,
       category,
+      ...(stallReason ? { stall_reason: stallReason } : {}),
+    });
+    // Also an Error Tracking issue, one per category (the message is fixed
+    // text, never FFmpeg's output), so failures group cleanly by cause.
+    trackError("ExportFailure", `Export failed: ${category}`, {
+      category,
+      stage: this.stage,
+      engine: this.engine,
+      format: this.context.format,
       ...(stallReason ? { stall_reason: stallReason } : {}),
     });
     return category;
@@ -231,11 +261,16 @@ export function startEngineLoad(requested: EngineMode, singleReason: SingleThrea
     failed(err: unknown) {
       if (done) return;
       done = true;
+      const category = engineLoadFailureCategory(err);
       trackAction("ffmpeg_load_failure", {
         engine_requested: requested,
         load_number,
-        category: engineLoadFailureCategory(err),
+        category,
         durationMs: Math.round(now() - startedAt),
+      });
+      trackError("EngineLoadFailure", `FFmpeg engine failed to load: ${category}`, {
+        category,
+        engine_requested: requested,
       });
     },
     abandoned() {

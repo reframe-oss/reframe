@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { DatadogRum } from "@datadog/browser-rum";
-import { profileKind, trackFeature } from "../featureTelemetry";
+import { profileKind, toolsUsed, trackExportTools, trackFeature } from "../featureTelemetry";
+import { DEFAULT_RECIPE } from "../constants";
 import { registerRum, resetTelemetryForTests } from "../telemetry";
 
-let rum: { addAction: ReturnType<typeof vi.fn>; addDurationVital: ReturnType<typeof vi.fn> };
+let rum: { addAction: ReturnType<typeof vi.fn>; addDurationVital: ReturnType<typeof vi.fn>; addError: ReturnType<typeof vi.fn> };
 
 beforeEach(() => {
   localStorage.clear();
@@ -11,7 +12,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_DATADOG_APPLICATION_ID", "app");
   vi.stubEnv("NEXT_PUBLIC_DATADOG_CLIENT_TOKEN", "token");
   vi.stubEnv("NEXT_PUBLIC_DATADOG_ENV", "unit-test");
-  rum = { addAction: vi.fn(), addDurationVital: vi.fn() };
+  rum = { addAction: vi.fn(), addDurationVital: vi.fn(), addError: vi.fn() };
   registerRum(rum as unknown as DatadogRum);
 });
 afterEach(() => {
@@ -39,5 +40,30 @@ describe("feature usage telemetry", () => {
     expect(sent).not.toContain("holiday");
     expect(sent).not.toContain("1234");
     expect(rum.addAction.mock.calls.map(([, ctx]) => ctx.profile)).toEqual(["custom", "custom"]);
+  });
+});
+
+describe("tools used by an export", () => {
+  const recipe = (o: Partial<typeof DEFAULT_RECIPE> = {}) => ({ ...DEFAULT_RECIPE, ...o });
+
+  it("a default recipe uses no tools", () => {
+    expect(toolsUsed(recipe())).toEqual([]);
+  });
+
+  it("detects each tool from the recipe", () => {
+    expect(
+      toolsUsed(
+        recipe({ trimStart: 1, rotate: 90, speed: 2, keepAudio: false, brightness: 0.1, framing: "fill", preset: "custom" }),
+        { music: true, imageOverlay: true }
+      )
+    ).toEqual(["trim", "rotate", "speed", "mute", "image_overlay", "background_music", "color_adjustments", "fill_framing", "custom_size"]);
+  });
+
+  it("sends one event per tool with no values", () => {
+    trackExportTools(recipe({ trimEnd: 4, sharpness: 2 }));
+    expect(rum.addAction.mock.calls).toEqual([
+      ["feature_used", { feature: "trim", action: "exported" }],
+      ["feature_used", { feature: "sharpen", action: "exported" }],
+    ]);
   });
 });

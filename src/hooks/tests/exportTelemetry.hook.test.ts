@@ -37,7 +37,7 @@ beforeAll(() => {
   URL.revokeObjectURL = vi.fn();
 });
 
-let rum: { addAction: ReturnType<typeof vi.fn>; addDurationVital: ReturnType<typeof vi.fn> };
+let rum: { addAction: ReturnType<typeof vi.fn>; addDurationVital: ReturnType<typeof vi.fn>; addError: ReturnType<typeof vi.fn> };
 const lifecycle = () =>
   rum.addAction.mock.calls
     .map(([name, ctx]) => ({ name: name as string, ctx: ctx as Record<string, unknown> }))
@@ -52,7 +52,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_DATADOG_APPLICATION_ID", "app");
   vi.stubEnv("NEXT_PUBLIC_DATADOG_CLIENT_TOKEN", "token");
   vi.stubEnv("NEXT_PUBLIC_DATADOG_ENV", "unit-test");
-  rum = { addAction: vi.fn(), addDurationVital: vi.fn() };
+  rum = { addAction: vi.fn(), addDurationVital: vi.fn(), addError: vi.fn() };
   registerRum(rum as unknown as DatadogRum);
 });
 afterEach(() => {
@@ -104,6 +104,26 @@ describe("export reliability telemetry in the editor", () => {
     expect(result.current.exportNotice).toMatch(/single-threaded engine/);
     // The editor passes its known duration, so the export doesn't re-read it.
     expect(vi.mocked(exportVideo).mock.calls[0]![6]).toBe(12);
+  });
+
+  it("an export reports which tools it used, as anonymous counts", async () => {
+    const { result } = await editorWithFile();
+    act(() => result.current.updateRecipe({ rotate: 90, keepAudio: false }));
+    vi.mocked(exportVideo).mockResolvedValueOnce(okResult);
+    await act(() => result.current.handleExport());
+    const tools = rum.addAction.mock.calls.filter(([name]) => name === "feature_used").map(([, ctx]) => ctx.feature);
+    expect(tools).toEqual(expect.arrayContaining(["rotate", "mute"]));
+    const succeeded = lifecycle().find((e) => e.name === "export_succeeded")!;
+    expect(succeeded.ctx.speed).toMatch(/x|unknown/);
+  });
+
+  it("undo and redo are counted", async () => {
+    const { result } = await editorWithFile();
+    act(() => result.current.updateRecipe({ rotate: 90 }));
+    act(() => result.current.undo());
+    act(() => result.current.redo());
+    const history = rum.addAction.mock.calls.filter(([name, ctx]) => name === "feature_used" && ctx.feature === "history");
+    expect(history.map(([, ctx]) => ctx.action)).toEqual(["undo", "redo"]);
   });
 
   it("a cancel followed by a late rejection is one cancellation, not a failure", async () => {

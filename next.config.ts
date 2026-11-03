@@ -11,11 +11,29 @@ function deployContext(): string {
   return (process.env.CONTEXT || process.env.VERCEL_ENV || "").trim().toLowerCase();
 }
 
+/**
+ * The commit being built: Netlify's COMMIT_REF, GitHub Actions' GITHUB_SHA,
+ * or Vercel's. Reported to Datadog RUM as the version, and used as the
+ * source-map release, so errors are tied to the code that produced them.
+ * "dev" for local builds.
+ */
+function release(): string {
+  const sha = (process.env.COMMIT_REF || process.env.GITHUB_SHA || process.env.VERCEL_GIT_COMMIT_SHA || "").trim();
+  return /^[0-9a-f]{7,40}$/i.test(sha) ? sha.slice(0, 12).toLowerCase() : "dev";
+}
+
 const nextConfig: NextConfig = {
   output: "export",
   env: {
     NEXT_PUBLIC_DEPLOY_CONTEXT: deployContext(),
+    NEXT_PUBLIC_RELEASE: release(),
   },
+  // The same commit builds to the same files on Netlify and in CI, so the
+  // source maps CI uploads match what production serves.
+  generateBuildId: async () => release(),
+  // Generated so CI can upload them to Datadog; netlify.toml deletes them
+  // from the published site, so they are never served publicly.
+  productionBrowserSourceMaps: true,
   experimental: {
     scrollRestoration: true,
   },

@@ -33,7 +33,8 @@ export default function DatadogInit() {
             site: "datadoghq.com",
             service: "reframe",
             env,
-            version: "0.1.0",
+            // The commit SHA (next.config.ts): errors and vitals group by release.
+            version: process.env.NEXT_PUBLIC_RELEASE || "dev",
             sessionSampleRate: 100,
             // Reframe advertises itself as 100% private client-side video editing —
             // session replay would visually record the editor UI, which cuts
