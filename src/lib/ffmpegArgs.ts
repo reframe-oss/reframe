@@ -55,16 +55,62 @@ function outputThreadArgs(threads: number, hasFilterComplex: boolean): string[] 
 /**
  * Explicit output duration. Stops encoder flush overshoot and, with looped
  * background music (`-stream_loop -1`) on a silent video, an export that
- * never ends. Omitted when the duration is unknown (metadata read failed):
- * `-t 0` would produce an empty file.
+ * never ends. Omitted when the duration is unknown (metadata read failed, or
+ * a live-recorded file whose header has none): `-t 0` would produce an empty
+ * file, and `-t Infinity` / `-t NaN` are invalid.
  */
 export function outputDurationArgs(recipe: EditRecipe, videoDuration: number): string[] {
-  const sourceDuration = (recipe.trimEnd ?? videoDuration) - recipe.trimStart;
-  if (!(sourceDuration > 0) || !(recipe.speed > 0)) return [];
-  return ["-t", (sourceDuration / recipe.speed).toFixed(6)];
+  const seconds = expectedOutputSeconds(recipe, videoDuration);
+  return seconds === null ? [] : ["-t", seconds.toFixed(6)];
 }
 
-export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: number): string {
+/** A usable duration in seconds: finite and positive. */
+export function isUsableDuration(seconds: unknown): seconds is number {
+  return typeof seconds === "number" && Number.isFinite(seconds) && seconds > 0;
+}
+
+/**
+ * Length of the exported video in seconds, or null when it can't be known
+ * (no usable source duration and no trim end, or an invalid speed).
+ */
+export function expectedOutputSeconds(recipe: EditRecipe, videoDuration: number): number | null {
+  if (!isUsableDuration(recipe.speed)) return null;
+  const end = recipe.trimEnd ?? videoDuration;
+  if (!isUsableDuration(end)) return null;
+  const start = Number.isFinite(recipe.trimStart) && recipe.trimStart > 0 ? recipe.trimStart : 0;
+  const seconds = (end - start) / recipe.speed;
+  return isUsableDuration(seconds) ? seconds : null;
+}
+
+/**
+ * The recipe with every time value FFmpeg will see made valid: a non-finite
+ * or negative trim start becomes 0, a trim end that isn't finite or isn't
+ * after the start becomes "to the end of the stream", and an unusable speed
+ * becomes 1. The editor shouldn't produce these, but a bad value would
+ * otherwise reach FFmpeg as "Infinity" or "NaN".
+ */
+export function withSafeTimes(recipe: EditRecipe): EditRecipe {
+  const trimStart = Number.isFinite(recipe.trimStart) && recipe.trimStart > 0 ? recipe.trimStart : 0;
+  const trimEnd =
+    recipe.trimEnd !== null && Number.isFinite(recipe.trimEnd) && recipe.trimEnd > trimStart
+      ? recipe.trimEnd
+      : null;
+  const speed = isUsableDuration(recipe.speed) ? recipe.speed : 1;
+  if (trimStart === recipe.trimStart && trimEnd === recipe.trimEnd && speed === recipe.speed) return recipe;
+  return { ...recipe, trimStart, trimEnd, speed };
+}
+
+/** Throws if any argument carries a non-finite number. Last line of defence. */
+export function assertFiniteArgs(args: string[]): string[] {
+  const bad = args.find((arg) => /(^|[^a-z])(-?Infinity|NaN)([^a-z]|$)/.test(arg));
+  if (bad !== undefined) {
+    throw new Error(`Invalid export settings: a time value is not a number (${bad.slice(0, 80)})`);
+  }
+  return args;
+}
+
+export function buildVideoFilter(input: EditRecipe, targetW: number, targetH: number): string {
+  const recipe = withSafeTimes(input);
   const filters: string[] = [];
 
   if (recipe.trimStart > 0 || recipe.trimEnd !== null) {
@@ -138,8 +184,8 @@ export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: n
   return filters.join(",");
 }
 
-export function buildAudioFilter(recipe: EditRecipe): string {
-  if (recipe.speed <= 0) return "";
+export function buildAudioFilter(input: EditRecipe): string {
+  const recipe = withSafeTimes(input);
   const filters: string[] = [];
 
   let remaining = recipe.speed;
@@ -166,7 +212,8 @@ export function buildAudioFilter(recipe: EditRecipe): string {
   return filters.join(",");
 }
 
-export function buildAudioTrimFilter(recipe: EditRecipe): string {
+export function buildAudioTrimFilter(input: EditRecipe): string {
+  const recipe = withSafeTimes(input);
   if (recipe.trimStart === 0 && recipe.trimEnd === null) return "";
   let trimFilter = `atrim=start=${recipe.trimStart}`;
   if (recipe.trimEnd !== null) {
@@ -198,7 +245,7 @@ export interface ExportArgsOptions {
 }
 
 export function buildArguments({
-  recipe,
+  recipe: input,
   format,
   inputName,
   outputName,
@@ -210,6 +257,7 @@ export function buildArguments({
   overlay,
   threads,
 }: ExportArgsOptions): string[] {
+  const recipe = withSafeTimes(input);
   const vf = buildVideoFilter(recipe, targetW, targetH);
   const audioTrim = hasOriginalAudio ? buildAudioTrimFilter(recipe) : "";
   const audioSpeed = hasOriginalAudio ? buildAudioFilter(recipe) : "";
@@ -319,9 +367,13 @@ export function buildArguments({
   }
 
   args.push(...outputThreadArgs(threads, usesFilterComplex));
-  args.push(...outputDurationArgs(recipe, videoDuration));
+  const durationArgs = outputDurationArgs(recipe, videoDuration);
+  args.push(...durationArgs);
+  // Without -t, looped music (-stream_loop -1) never ends: stop at the end
+  // of the shortest stream, which is the video.
+  if (durationArgs.length === 0 && music?.options.loopMusic) args.push("-shortest");
   args.push(outputName);
-  return args;
+  return assertFiniteArgs(args);
 }
 
 export interface GifArgsOptions {
@@ -337,7 +389,7 @@ export interface GifArgsOptions {
 
 /** Two-pass GIF: palettegen, then paletteuse. */
 export function buildGifArguments({
-  recipe,
+  recipe: input,
   inputName,
   paletteName,
   outputName,
@@ -346,6 +398,7 @@ export function buildGifArguments({
   videoDuration,
   threads,
 }: GifArgsOptions): { palette: string[]; render: string[] } {
+  const recipe = withSafeTimes(input);
   const vf = buildVideoFilter(recipe, targetW, targetH);
   const vfWithPalette = vf ? `${vf},palettegen` : "palettegen";
   const vfWithPaletteUse = vf ? `[0:v]${vf}[x];[x][1:v]paletteuse` : "[0:v][1:v]paletteuse";
@@ -354,17 +407,17 @@ export function buildGifArguments({
   const durationArgs = recipe.speed !== 1 ? outputDurationArgs(recipe, videoDuration) : [];
 
   return {
-    palette: [
+    palette: assertFiniteArgs([
       ...inputThreadArgs(threads), "-i", inputName,
       "-vf", vfWithPalette,
       ...durationArgs, ...outputThreadArgs(threads, false),
       "-y", paletteName,
-    ],
-    render: [
+    ]),
+    render: assertFiniteArgs([
       ...inputThreadArgs(threads), "-i", inputName, "-i", paletteName,
       "-lavfi", vfWithPaletteUse,
       ...durationArgs, ...outputThreadArgs(threads, true),
       "-y", outputName,
-    ],
+    ]),
   };
 }

@@ -1,7 +1,8 @@
 import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, MAX_FILE_SIZE } from "./types";
 import { trackTiming } from "./telemetry";
 import { startEngineLoad, type StallReason } from "./exportTelemetry";
-import type { EngineMode } from "./ffmpegArgs";
+import { expectedOutputSeconds, isUsableDuration, type EngineMode } from "./ffmpegArgs";
+import { resolveDuration } from "./mediaDuration";
 
 // The command line itself is built in ffmpegArgs.ts and run by the worker.
 export { buildVideoFilter, buildAudioFilter } from "./ffmpegArgs";
@@ -14,6 +15,20 @@ export class FFmpegLoadError extends Error {
   }
 }
 
+/**
+ * Why the watchdog gave up on an export:
+ *   - no_activity: the engine went silent (the multi-threaded deadlock);
+ *   - no_progress: FFmpeg kept logging but encoded nothing new;
+ *   - overrun: it encoded well past the length the export should have.
+ */
+export type { StallReason };
+
+const STALL_MESSAGES: Record<StallReason, string> = {
+  no_activity: "The export stopped responding.",
+  no_progress: "The export stopped making progress.",
+  overrun: "The export kept running past the end of the video.",
+};
+
 /** The watchdog stopped an export that wasn't going to finish. */
 export class ExportStalledError extends Error {
   name = "ExportStalledError";
@@ -22,9 +37,10 @@ export class ExportStalledError extends Error {
     readonly reason: StallReason = "no_activity"
   ) {
     super(
-      mode === "multi"
-        ? "The export stopped responding. Press Retry to try again with the single-threaded engine, which is slower but more reliable."
-        : "The export stopped responding. Press Retry to try again, or try a shorter clip or a lower resolution."
+      `${STALL_MESSAGES[reason]} ` +
+        (mode === "multi"
+          ? "Press Retry to try again with the single-threaded engine, which is slower but more reliable."
+          : "Press Retry to try again, or try a shorter clip or a lower resolution.")
     );
   }
 }
@@ -36,6 +52,19 @@ export class ExportStalledError extends Error {
  * exactly like this: stuck at 0% forever). Fail instead of spinning.
  */
 export const STALL_TIMEOUT_MS = 60_000;
+
+/**
+ * FFmpeg can keep printing log lines while encoding nothing (for example a
+ * filter that never gets input). Two minutes without a new encoded second
+ * means it won't finish. Long enough for the slowest legitimate gap: the GIF
+ * palette pass and muxing a large file at the end.
+ */
+export const NO_PROGRESS_TIMEOUT_MS = 120_000;
+
+/** How far past the expected length encoding may run before it's an overrun. */
+export function overrunLimitSeconds(expectedSeconds: number): number {
+  return expectedSeconds * 1.25 + 15;
+}
 
 
 type SerializedFile = {
@@ -58,7 +87,7 @@ type WorkerExportRequest = {
 
 type WorkerLoadResponse = { type: "ready"; mode: EngineMode };
 type WorkerHeartbeatResponse = { type: "heartbeat" };
-type WorkerProgressResponse = { type: "progress"; percent: number };
+type WorkerProgressResponse = { type: "progress"; percent: number; outputSeconds?: number };
 type WorkerResultResponse = {
   type: "result";
   id: string;
@@ -90,8 +119,11 @@ let pendingExport: {
   reject: (reason: unknown) => void;
 } | null = null;
 let pendingProgress: ((percent: number) => void) | null = null;
-/** Called on any sign of life from the worker during an export. */
-let pendingActivity: (() => void) | null = null;
+/**
+ * Called on any sign of life from the worker during an export, with the
+ * encoded output time when the worker reports it.
+ */
+let pendingActivity: ((outputSeconds?: number) => void) | null = null;
 /** The core the current worker loaded, once it is ready. */
 let engineMode: EngineMode | null = null;
 /**
@@ -180,7 +212,7 @@ function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
   }
 
   if (data.type === "progress") {
-    pendingActivity?.();
+    pendingActivity?.(data.outputSeconds);
     pendingProgress?.(data.percent);
     return;
   }
@@ -411,18 +443,39 @@ async function exportOnce(
   };
   signal?.addEventListener("abort", onAbort, { once: true });
 
+  const videoDuration = isUsableDuration(knownDuration) ? knownDuration : await getVideoDuration(file);
+  const expectedSeconds = expectedOutputSeconds(recipe, videoDuration);
+
   const mode = engineMode ?? "single";
   let lastActivity = Date.now();
-  pendingActivity = () => {
-    lastActivity = Date.now();
+  let lastAdvance = Date.now();
+  let encodedSeconds = -1;
+  let overrun = false;
+  pendingActivity = (outputSeconds) => {
+    const now = Date.now();
+    lastActivity = now;
+    if (outputSeconds === undefined || outputSeconds === encodedSeconds) return;
+    // Any change counts: the GIF export restarts its clock for the second pass.
+    encodedSeconds = outputSeconds;
+    lastAdvance = now;
+    if (expectedSeconds !== null && outputSeconds > overrunLimitSeconds(expectedSeconds)) overrun = true;
   };
   const watchdog = setInterval(() => {
-    if (Date.now() - lastActivity < STALL_TIMEOUT_MS) return;
+    const now = Date.now();
+    const reason: StallReason | null = overrun
+      ? "overrun"
+      : now - lastActivity >= STALL_TIMEOUT_MS
+        ? "no_activity"
+        : // Only once the worker reports encoded time; without it, activity is all we know.
+          encodedSeconds >= 0 && now - lastAdvance >= NO_PROGRESS_TIMEOUT_MS
+          ? "no_progress"
+          : null;
+    if (!reason) return;
     clearInterval(watchdog);
     if (mode === "multi") preferSingleThread = true;
-    const stalled = new ExportStalledError(mode);
-    cancelPendingExport(stalled);
-    // The worker is wedged and can't be told to stop; discard it.
+    cancelPendingExport(new ExportStalledError(mode, reason));
+    // A wedged worker can't be told to stop; discard it (this also frees its
+    // memory, including the files in FFmpeg's virtual filesystem).
     resetWorker();
   }, 5_000);
 
@@ -436,10 +489,7 @@ async function exportOnce(
       id: sessionId,
       file: filePayload,
       recipe,
-      videoDuration:
-        knownDuration && Number.isFinite(knownDuration) && knownDuration > 0
-          ? knownDuration
-          : await getVideoDuration(file),
+      videoDuration,
       musicFile: musicFilePayload,
       musicOptions: sanitizedMusicOptions,
       overlayFile: overlayFilePayload,
@@ -470,7 +520,11 @@ async function getVideoDuration(file: File): Promise<number> {
     // 0 makes the worker omit -t, so a stalled metadata read degrades safely.
     const timer = setTimeout(() => finish(0), 5000);
     video.preload = "metadata";
-    video.onloadedmetadata = () => finish(video.duration);
+    video.onloadedmetadata = () => {
+      clearTimeout(timer);
+      // Live-recorded files need a seek before the browser knows their length.
+      void resolveDuration(video).then(finish);
+    };
     video.onerror = () => finish(0);
     video.src = url;
   });

@@ -30,7 +30,14 @@ import {
 } from "@/lib/project";
 import { DEFAULT_RECIPE, SPEED_STEPS } from "@/lib/constants";
 import { getPresetById } from "@/lib/presets";
-import { loadFFmpeg, exportVideo, terminateFFmpeg, getEngineMode, FFmpegLoadError } from "@/lib/ffmpeg";
+import {
+  loadFFmpeg,
+  exportVideo,
+  terminateFFmpeg,
+  getEngineMode,
+  FFmpegLoadError,
+  ExportStalledError,
+} from "@/lib/ffmpeg";
 import {
   addTelemetryRedaction,
   durationBucket,
@@ -62,9 +69,15 @@ import {
   EDITOR_STATE_KEY,
 } from "@/lib/editorPersistence";
 import { saveSessionFile, loadSessionFile, clearSessionFile } from "@/lib/sessionDB";
+import { resolveDuration } from "@/lib/mediaDuration";
 
 const DEFAULT_TITLE = "Reframe — Resize, trim, and export videos in your browser";
 const PROJECT_SAVE_DELAY_MS = 500;
+/**
+ * A cancel after this long without the progress percentage changing is
+ * reported as stuck (export_cancelled.stuck): the user gave up on a hang.
+ */
+const STUCK_CANCEL_MS = 60_000;
 
 /** A saved project whose source video has to be chosen again. */
 export interface PendingRecovery {
@@ -130,12 +143,14 @@ export function extractMetadata(
     }, 5000);
 
     video.preload = "metadata";
-    video.onloadedmetadata = () => {
+    video.onloadedmetadata = async () => {
       clearTimeout(timeout);
+      // Screen recordings report an Infinity duration until read to the end.
+      const duration = await resolveDuration(video);
       resolve({
         width: video.videoWidth,
         height: video.videoHeight,
-        duration: isFinite(video.duration) ? video.duration : 0,
+        duration,
       });
       URL.revokeObjectURL(url);
     };
@@ -318,6 +333,16 @@ export function useVideoEditor() {
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const exportAbortControllerRef = useRef<AbortController | null>(null);
   const exportCancelledRef = useRef(false);
+  /** When the export progress percentage last changed (see STUCK_CANCEL_MS). */
+  const lastProgressAtRef = useRef(0);
+  const lastProgressRef = useRef(-1);
+  const trackProgress = useCallback((percent: number) => {
+    if (percent !== lastProgressRef.current) {
+      lastProgressRef.current = percent;
+      lastProgressAtRef.current = Date.now();
+    }
+    setProgress(percent);
+  }, []);
   /** The export attempt in progress, which reports its single outcome. */
   const exportAttemptRef = useRef<ExportAttempt | null>(null);
   // Category of the last failed export for this source, so the next attempt
@@ -726,14 +751,14 @@ export function useVideoEditor() {
 
     try {
       setStatus("loading-engine");
-      setProgress(0);
+      trackProgress(0);
       setExportNotice(null);
       setError(null);
       setExportStartedAt(null);
       if (result?.blobUrl) URL.revokeObjectURL(result.blobUrl);
       setResult(null);
 
-      await loadFFmpeg(abortController.signal, setProgress);
+      await loadFFmpeg(abortController.signal, trackProgress);
       if (exportCancelledRef.current) return;
 
       const startedAt = Date.now();
@@ -744,7 +769,7 @@ export function useVideoEditor() {
       const exportResult = await exportVideo(
         file,
         recipe,
-        setProgress,
+        trackProgress,
         abortController.signal,
         {
           file: musicFile,
@@ -784,7 +809,8 @@ export function useVideoEditor() {
       // Reported above as export_failed; the prefix keeps RUM's automatic
       // console-error collection from reporting it a second time.
       console.error(`${HANDLED_ERROR_PREFIX} export failed:`, err);
-      if (err instanceof FFmpegLoadError) {
+      if (err instanceof FFmpegLoadError || err instanceof ExportStalledError) {
+        // Both messages say what happened and what to do next.
         setError(err.message);
       } else if (err instanceof Error && err.message.includes("network")) {
         setError("Network error. Check your internet connection and try again.");
@@ -804,6 +830,7 @@ export function useVideoEditor() {
       }
     }
   }, [
+    trackProgress,
     duration,
     file,
     loopMusic,
@@ -926,7 +953,8 @@ export function useVideoEditor() {
   }, [file, musicFile, overlayFile, recovery, recipe.textOverlays]);
 
   const cancelExport = useCallback(() => {
-    exportAttemptRef.current?.cancelled();
+    const stuck = Date.now() - lastProgressAtRef.current >= STUCK_CANCEL_MS;
+    exportAttemptRef.current?.cancelled(stuck);
     exportAttemptRef.current = null;
     exportCancelledRef.current = true;
     exportAbortControllerRef.current?.abort();

@@ -1,5 +1,5 @@
 {
-  "title": "Reframe — export reliability",
+  "title": "Reframe \u2014 export reliability",
   "description": "Export outcomes from Reframe's browser RUM events (src/lib/exportTelemetry.ts). Success rate = export_succeeded / (export_succeeded + export_failed); cancellations are excluded. Treat groups with few finished exports as noise. Setup and facets: docs/DATADOG.md.",
   "layout_type": "ordered",
   "template_variables": [
@@ -1004,6 +1004,56 @@
             "formulas": [
               {
                 "formula": "loads"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Stalled exports by reason and engine",
+        "type": "query_table",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "stalled",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed @context.category:(timeout OR unknown_duration)"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.stall_reason",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  },
+                  {
+                    "facet": "@context.engine",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "stalled",
+                "alias": "Stalled exports"
               }
             ]
           }
