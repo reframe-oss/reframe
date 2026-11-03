@@ -1,4 +1,5 @@
 import type { DatadogRum as RumPublicApi } from "@datadog/browser-rum";
+import { analyticsAllowed } from "./analyticsConsent";
 
 // Custom Datadog RUM actions. Only coarse, non-identifying metrics are sent —
 // never file names, contents, captions or recipe values (Reframe is
@@ -16,7 +17,9 @@ import type { DatadogRum as RumPublicApi } from "@datadog/browser-rum";
 export const telemetryConfigured = () =>
   typeof window !== "undefined" &&
   Boolean(process.env.NEXT_PUBLIC_DATADOG_APPLICATION_ID && process.env.NEXT_PUBLIC_DATADOG_CLIENT_TOKEN) &&
-  currentTelemetryEnv() !== null;
+  currentTelemetryEnv() !== null &&
+  // The viewer's choice in Settings, Do Not Track and Global Privacy Control.
+  analyticsAllowed();
 
 // ── Environment ────────────────────────────────────────────────────────────
 // Local builds read .env.local, which holds the real Datadog keys. Without a
@@ -308,6 +311,12 @@ type MutableRumEvent = {
  * place because the SDK only reads back modified fields of the same object.
  */
 export function sanitizeRumEvent(event: MutableRumEvent): boolean {
+  // Turned off in Settings after RUM started on this page: send nothing more.
+  if (!analyticsAllowed()) return false;
+  // No user identity, even an anonymous one. The real switch is
+  // trackAnonymousUser: false in DatadogInit; this is a backstop, and the SDK
+  // may ignore edits to fields it doesn't let beforeSend change.
+  delete (event as { usr?: unknown }).usr;
   if (event.view) {
     event.view.url = stripQuery(event.view.url);
     event.view.referrer = stripQuery(event.view.referrer);

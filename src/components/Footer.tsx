@@ -14,6 +14,7 @@ import {
   Lock,
   Mail,
   HeartHandshake,
+  Settings,
 } from "lucide-react";
 
 export default function Footer() {
@@ -87,11 +88,20 @@ export default function Footer() {
               Privacy Policy
             </Link>
 
+            <Link
+              href="/privacy#settings"
+              aria-label="Settings: anonymous analytics"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
+            >
+              <Settings size={14} />
+              Settings
+            </Link>
+
             {/* Netlify's open source plan expects a publicly reachable Code of
                 Conduct. Points at the repo file rather than an in-site route,
                 since CODE_OF_CONDUCT.md is the canonical copy. */}
             <a
-              href="https://github.com/magic-peach/reframe/blob/main/CODE_OF_CONDUCT.md"
+              href="https://github.com/reframe-oss/reframe/blob/main/CODE_OF_CONDUCT.md"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Code of Conduct"
@@ -181,7 +191,22 @@ export default function Footer() {
 
       {/* Bottom Bar */}
       <div className="max-w-[1440px] mx-auto mt-16 pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[var(--muted)]">
-        <p>© {new Date().getFullYear()} Reframe · MIT License</p>
+        <nav aria-label="Credits and license" className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          <span>© {new Date().getFullYear()} Reframe</span>
+          <a href="https://github.com/reframe-oss/reframe/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--text)] underline-offset-4 hover:underline transition-colors rounded">
+            MIT License
+          </a>
+          <a href="https://github.com/reframe-oss/reframe" target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--text)] underline-offset-4 hover:underline transition-colors rounded">
+            GitHub
+          </a>
+          {/* Netlify's open source plan asks for this wording and link. */}
+          <a href="https://www.netlify.com" target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--text)] underline-offset-4 hover:underline transition-colors rounded">
+            This site is powered by Netlify
+          </a>
+          <a href="https://snyk.io" target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--text)] underline-offset-4 hover:underline transition-colors rounded">
+            Security by Snyk
+          </a>
+        </nav>
 
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
