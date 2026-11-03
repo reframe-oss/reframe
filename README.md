@@ -6,6 +6,8 @@
 
 ### No login. No uploads. No ads. 100% private.
 
+**[Try it live → reframe-os.netlify.app](https://reframe-os.netlify.app)**
+
 <p align="center">
   <a href="https://github.com/reframe-oss/reframe/stargazers">
     <img src="https://img.shields.io/github/stars/reframe-oss/reframe?style=flat-square&logo=github&label=Stars&color=yellow&logoColor=white">
