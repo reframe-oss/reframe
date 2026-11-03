@@ -20,6 +20,7 @@ vi.mock("@/lib/ffmpeg", () => ({
   getEngineMode: vi.fn(() => "multi"),
   formatBytes: (n: number) => `${n} B`,
   FFmpegLoadError: class extends Error {},
+  ExportStalledError: class extends Error {},
 }));
 
 vi.mock("@/lib/sessionDB", () => ({

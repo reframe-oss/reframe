@@ -10,6 +10,8 @@ import {
   FFmpegLoadError,
   ExportStalledError,
   STALL_TIMEOUT_MS,
+  NO_PROGRESS_TIMEOUT_MS,
+  overrunLimitSeconds,
 } from "../ffmpeg";
 import { DEFAULT_RECIPE } from "../constants";
 
@@ -232,6 +234,104 @@ describe("FFmpeg client lifecycle", () => {
     script.onExport = (w, id) => w.emit(result(id));
     await expect(run()).resolves.toMatchObject({ format: "mp4" });
     expect(workers[1]!.posted.find((m) => m.type === "load")).toMatchObject({ singleThread: true });
+  });
+
+  it("a stall's message says what happened and to press Retry", async () => {
+    vi.useFakeTimers();
+    script.onLoad = (w) => w.emit({ type: "ready", mode: "multi" });
+    script.onExport = () => {};
+    const pending = run();
+    const assertion = expect(pending).rejects.toMatchObject({
+      reason: "no_activity",
+      message: expect.stringMatching(/stopped responding.*Retry.*single-threaded/),
+    });
+    await vi.advanceTimersByTimeAsync(STALL_TIMEOUT_MS + 5_000);
+    await assertion;
+  });
+
+  it("fails an export that keeps logging but encodes nothing new (stuck at 100%)", async () => {
+    vi.useFakeTimers();
+    let worker!: FakeWorker;
+    script.onExport = (w) => {
+      worker = w;
+      w.emit({ type: "progress", percent: 99, outputSeconds: 5.9 });
+    };
+    const pending = run();
+    const assertion = expect(pending).rejects.toMatchObject({ name: "ExportStalledError", reason: "no_progress" });
+    for (let t = 0; t <= NO_PROGRESS_TIMEOUT_MS; t += 10_000) {
+      await vi.advanceTimersByTimeAsync(10_000);
+      worker?.emit({ type: "heartbeat" });
+      worker?.emit({ type: "progress", percent: 99, outputSeconds: 5.9 });
+    }
+    await assertion;
+    expect(workers[0]!.terminated).toBe(true);
+  });
+
+  it("keeps a long export alive while encoded time keeps advancing", async () => {
+    vi.useFakeTimers();
+    let worker!: FakeWorker;
+    let jobId = "";
+    script.onExport = (w, id) => {
+      worker = w;
+      jobId = id;
+    };
+    const pending = exportVideo(file(), { ...DEFAULT_RECIPE }, vi.fn(), undefined, undefined, undefined, 600);
+    for (let t = 1; t <= 30; t++) {
+      await vi.advanceTimersByTimeAsync(10_000);
+      worker?.emit({ type: "progress", percent: Math.round((t * 10 * 100) / 600), outputSeconds: t * 10 });
+    }
+    worker.emit(result(jobId));
+    await expect(pending).resolves.toMatchObject({ size: 8 });
+  });
+
+  it("without encoded-time reports, only silence counts as a stall", async () => {
+    vi.useFakeTimers();
+    let worker!: FakeWorker;
+    let jobId = "";
+    script.onExport = (w, id) => {
+      worker = w;
+      jobId = id;
+    };
+    const pending = run();
+    for (let t = 0; t < NO_PROGRESS_TIMEOUT_MS * 2; t += 10_000) {
+      await vi.advanceTimersByTimeAsync(10_000);
+      worker?.emit({ type: "progress", percent: 0 });
+    }
+    worker.emit(result(jobId));
+    await expect(pending).resolves.toMatchObject({ size: 8 });
+  });
+
+  it("fails an export that runs far past the clip's length", async () => {
+    vi.useFakeTimers();
+    script.onExport = (w) => {
+      // A 6 s clip; looped music without -t would keep going like this.
+      [3, 6, 12, 30].forEach((outputSeconds) => w.emit({ type: "progress", percent: 99, outputSeconds }));
+    };
+    const pending = run();
+    const assertion = expect(pending).rejects.toMatchObject({ reason: "overrun" });
+    await vi.advanceTimersByTimeAsync(5_000);
+    await assertion;
+  });
+
+  it("never posts a non-finite duration to the worker", async () => {
+    // jsdom never loads media, so the fallback metadata read times out (5 s).
+    vi.useFakeTimers();
+    script.onExport = (w, id) => w.emit(result(id));
+    for (const knownDuration of [Infinity, NaN, -1, 0]) {
+      const pending = exportVideo(file(), { ...DEFAULT_RECIPE }, vi.fn(), undefined, undefined, undefined, knownDuration);
+      await vi.advanceTimersByTimeAsync(6_000);
+      await pending;
+    }
+    const durations = workers.flatMap((w) => w.posted).filter((m) => m.type === "export").map((m) => (m as { videoDuration?: number }).videoDuration);
+    expect(durations).toHaveLength(4);
+    for (const d of durations) expect(Number.isFinite(d)).toBe(true);
+  });
+});
+
+describe("overrunLimitSeconds", () => {
+  it("allows a margin over the expected length", () => {
+    expect(overrunLimitSeconds(6)).toBeGreaterThan(6);
+    expect(overrunLimitSeconds(600)).toBeGreaterThan(700);
   });
 });
 

@@ -20,7 +20,14 @@ export type ExportFailureCategory =
   | "out_of_memory"
   | "encoder_crash"
   | "network"
-  | "encode_error";
+  | "encode_error"
+  // The browser couldn't tell how long the clip is, and the export then
+  // stalled or failed. Usually a live recording with no duration header.
+  | "unknown_duration";
+
+/** Which watchdog rule stopped a stalled export (see ExportStalledError). */
+export type StallReason = "no_activity" | "no_progress" | "overrun";
+const STALL_REASONS: readonly StallReason[] = ["no_activity", "no_progress", "overrun"];
 
 export type EngineLoadFailureCategory = "network" | "integrity" | "wasm" | "worker_script" | "unknown";
 
@@ -144,8 +151,22 @@ export class ExportAttempt {
       return null;
     }
     this.outcome = "failed";
-    const category = exportFailureCategory(err, this.stage);
-    trackAction("export_failed", { ...this.common(), stage: this.stage, category });
+    let category = exportFailureCategory(err, this.stage);
+    if (
+      this.context.clip_length === "unknown" &&
+      this.stage === "encode" &&
+      (category === "timeout" || category === "encode_error")
+    ) {
+      category = "unknown_duration";
+    }
+    const reason = (err as { reason?: unknown } | null)?.reason;
+    const stallReason = STALL_REASONS.find((r) => r === reason);
+    trackAction("export_failed", {
+      ...this.common(),
+      stage: this.stage,
+      category,
+      ...(stallReason ? { stall_reason: stallReason } : {}),
+    });
     return category;
   }
 

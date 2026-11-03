@@ -2,7 +2,13 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { toBlobURL } from "@ffmpeg/util";
 import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions } from "./types";
 import { getPresetById } from "./presets";
-import { buildArguments, buildGifArguments, resolveThreadCount, type EngineMode } from "./ffmpegArgs";
+import {
+  buildArguments,
+  buildGifArguments,
+  expectedOutputSeconds,
+  resolveThreadCount,
+  type EngineMode,
+} from "./ffmpegArgs";
 
 const CORE_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
 // MT core aligned to the same version and distribution format as CORE_BASE_URL.
@@ -58,7 +64,11 @@ type TerminateRequest = { type: "terminate" };
 
 type WorkerCommand = LoadRequest | ExportRequest | CancelRequest | TerminateRequest;
 
-type ProgressPayload = { type: "progress"; percent: number };
+/**
+ * `outputSeconds`: how much output has been encoded, so the client can tell an
+ * export that is advancing from one that is stuck or running past its end.
+ */
+type ProgressPayload = { type: "progress"; percent: number; outputSeconds?: number };
 
 type ReadyPayload = { type: "ready"; mode: EngineMode };
 
@@ -238,16 +248,30 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const threads = resolveThreadCount(engineMode, self.navigator?.hardwareConcurrency);
   const signal = activeExportAbortController?.signal;
 
-  // FFmpeg emits progress per frame; post only when the whole percentage
-  // changes so the main thread isn't flooded with identical updates.
+  // FFmpeg's own `progress` divides by the duration in the file header, which
+  // live-recorded files (MediaRecorder) don't have. Prefer encoded time over
+  // the length we expect, which also accounts for trim and speed.
+  const expectedSeconds = expectedOutputSeconds(recipe, videoDuration);
+  // FFmpeg emits progress per frame; post only when the whole percentage or
+  // the encoded second changes so the main thread isn't flooded.
   let lastPercent = -1;
-  const handleProgress = ({ progress }: { progress: number }) => {
+  let lastSecond = -1;
+  const handleProgress = ({ progress, time }: { progress: number; time?: number }) => {
     if (activeExportId !== sessionId) return;
     heartbeat();
-    const percent = Math.max(0, Math.min(99, Math.round(progress * 100)));
-    if (percent === lastPercent) return;
+    const outputSeconds = typeof time === "number" && Number.isFinite(time) && time > 0 ? time / 1e6 : undefined;
+    const fraction =
+      expectedSeconds !== null && outputSeconds !== undefined
+        ? outputSeconds / expectedSeconds
+        : Number.isFinite(progress)
+          ? progress
+          : 0;
+    const percent = Math.max(0, Math.min(99, Math.round(fraction * 100)));
+    const second = outputSeconds === undefined ? -1 : Math.floor(outputSeconds);
+    if (percent === lastPercent && second === lastSecond) return;
     lastPercent = percent;
-    postMessage({ type: "progress", percent });
+    lastSecond = second;
+    postMessage({ type: "progress", percent, outputSeconds });
   };
 
   // FFmpeg prints a stats line about twice a second while it works, so log

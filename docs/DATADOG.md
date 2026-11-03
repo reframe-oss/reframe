@@ -44,7 +44,7 @@ its own, so we can see which browser and device combinations fail.
 |---|---|---|
 | `export_started` | Export clicked and settings validated | `format`, `resolution`, `input_size`, `clip_length`, `has_text`, `has_music`, `has_image_overlay`, `is_retry`, `retry_after` (retries only: the previous failure's category) |
 | `export_succeeded` | Terminal | the context above, plus `engine`, `durationMs` (click to done), `encode_ms`, `output_size` |
-| `export_failed` | Terminal | the context, plus `engine`, `durationMs`, `stage` (`engine` / `encode`), `category` |
+| `export_failed` | Terminal | the context, plus `engine`, `durationMs`, `stage` (`engine` / `encode`), `category`, and `stall_reason` for stalls |
 | `export_cancelled` | Terminal: the user cancelled | the context, plus `engine`, `durationMs`, `stage` |
 | `ffmpeg_load_success` | A worker loaded the engine (once per worker) | `engine` (`multi` / `single`, what actually loaded), `engine_requested`, `single_reason` (`not_isolated` / `after_stall` / `mt_load_failed`, single-threaded only), `load_number` (`first` / `repeat`), `durationMs` |
 | `ffmpeg_load_failure` | A worker failed to load (not sent when the user cancelled) | `engine_requested`, `load_number`, `category` (`network` / `integrity` / `wasm` / `worker_script` / `unknown`), `durationMs` |
@@ -68,12 +68,21 @@ as part of the schema.
 | Category | Meaning |
 |---|---|
 | `engine_load` | The engine never became ready (any failure in the `engine` stage) |
-| `timeout` | No progress for 60 s; the next attempt uses the single-threaded engine |
+| `timeout` | The stall watchdog stopped the export (see `stall_reason`); the next attempt uses the single-threaded engine |
 | `unsupported_format` | FFmpeg couldn't decode the input |
 | `out_of_memory` | An allocation failed, or a `RangeError` |
 | `encoder_crash` | A WASM trap in the encoder (`memory access out of bounds`, `unreachable`) |
 | `network` | A network error after the engine started |
 | `encode_error` | Any other FFmpeg failure |
+| `unknown_duration` | The browser couldn't tell how long the clip is (`clip_length: unknown`), and the export then stalled or failed. Usually a live recording with no duration header that the seek-to-end fallback couldn't resolve |
+
+`export_failed.stall_reason` (stalls only):
+
+| Reason | Meaning |
+|---|---|
+| `no_activity` | No heartbeat or log line for 60 s: the engine is wedged (the multi-threaded thread-pool deadlock looked like this) |
+| `no_progress` | FFmpeg kept logging, but the encoded time didn't change for 120 s ("stuck at 100%") |
+| `overrun` | Encoding ran past 1.25 × the expected length + 15 s, for example looped music that never stops |
 
 ### Guarantees (covered by tests)
 

@@ -3,6 +3,10 @@ import {
   buildArguments,
   buildGifArguments,
   outputDurationArgs,
+  expectedOutputSeconds,
+  withSafeTimes,
+  assertFiniteArgs,
+  buildAudioFilter,
   resolveThreadCount,
   MT_THREAD_CAP,
   type ExportArgsOptions,
@@ -165,5 +169,89 @@ describe("outputDurationArgs", () => {
     expect(outputDurationArgs(recipe(), 0)).toEqual([]);
     expect(outputDurationArgs(recipe({ trimStart: 8 }), 6)).toEqual([]);
     expect(outputDurationArgs(recipe({ speed: 0 }), 6)).toEqual([]);
+  });
+});
+
+describe("time values never reach FFmpeg as Infinity or NaN", () => {
+  const BAD = [Infinity, -Infinity, NaN];
+  const music = {
+    inputName: "music.mp3",
+    options: { file: null, musicVolume: 50, originalAudioVolume: 100, loopMusic: true },
+  } as unknown as ExportArgsOptions["music"];
+
+  it("expectedOutputSeconds only returns finite, positive lengths", () => {
+    expect(expectedOutputSeconds(recipe(), 10)).toBe(10);
+    expect(expectedOutputSeconds(recipe({ trimStart: 2, trimEnd: 8, speed: 2 }), 10)).toBe(3);
+    for (const bad of [...BAD, 0, -5]) {
+      expect(expectedOutputSeconds(recipe(), bad)).toBeNull();
+      expect(expectedOutputSeconds(recipe({ speed: bad }), 10)).toBeNull();
+    }
+    // A trim end still bounds the clip when the file's own duration is unknown.
+    expect(expectedOutputSeconds(recipe({ trimEnd: 4 }), Infinity)).toBe(4);
+  });
+
+  it("omits -t when the duration is unknown, at any speed", () => {
+    for (const bad of [...BAD, 0]) {
+      for (const speed of [0.5, 1, 2]) {
+        expect(outputDurationArgs(recipe({ speed }), bad)).toEqual([]);
+        expect(buildArguments(opts({ recipe: recipe({ speed }), videoDuration: bad }))).not.toContain("-t");
+      }
+    }
+  });
+
+  it("stops looped music at the end of the video when there's no -t", () => {
+    const args = buildArguments(opts({ videoDuration: Infinity, music }));
+    expect(args).toContain("-stream_loop");
+    expect(args).toContain("-shortest");
+    expect(args).not.toContain("-t");
+    // With a known length, -t bounds it instead.
+    expect(buildArguments(opts({ videoDuration: 6, music }))).not.toContain("-shortest");
+  });
+
+  it("repairs invalid trim and speed values instead of passing them on", () => {
+    const fixed = withSafeTimes(recipe({ trimStart: NaN, trimEnd: Infinity, speed: Infinity }));
+    expect(fixed).toMatchObject({ trimStart: 0, trimEnd: null, speed: 1 });
+    expect(withSafeTimes(recipe({ trimStart: 5, trimEnd: 3 })).trimEnd).toBeNull();
+    const ok = recipe({ trimStart: 1, trimEnd: 4, speed: 1.5 });
+    expect(withSafeTimes(ok)).toBe(ok);
+  });
+
+  it("an infinite speed doesn't hang the audio filter builder", () => {
+    expect(buildAudioFilter(recipe({ speed: Infinity }))).not.toMatch(/Infinity|NaN/);
+    expect(buildAudioFilter(recipe({ speed: NaN }))).not.toMatch(/Infinity|NaN/);
+  });
+
+  it("no combination of bad values produces a non-finite argument", () => {
+    const values = [...BAD, 0, -1, 2.5];
+    for (const trimStart of values)
+      for (const trimEnd of [...values, null])
+        for (const speed of values)
+          for (const videoDuration of values) {
+            const r = recipe({ trimStart, trimEnd, speed });
+            const all = [
+              ...buildArguments(opts({ recipe: r, videoDuration })),
+              ...buildArguments(opts({ recipe: r, videoDuration, format: "webm", music })),
+              ...Object.values(
+                buildGifArguments({
+                  recipe: r,
+                  inputName: "in.mp4",
+                  paletteName: "p.png",
+                  outputName: "out.gif",
+                  targetW: 480,
+                  targetH: 270,
+                  videoDuration,
+                  threads: 4,
+                })
+              ).flat(),
+            ];
+            for (const arg of all) expect(arg, JSON.stringify({ trimStart, trimEnd, speed, videoDuration })).not.toMatch(/Infinity|NaN/);
+          }
+  });
+
+  it("assertFiniteArgs rejects a non-finite argument with a clear error", () => {
+    expect(() => assertFiniteArgs(["-t", "Infinity"])).toThrow(/time value is not a number/);
+    expect(() => assertFiniteArgs(["-vf", "trim=start=NaN"])).toThrow();
+    // Words that merely contain the letters are fine.
+    expect(assertFiniteArgs(["-i", "Nanaimo.mp4", "-metadata", "title=Infinityband"])).toHaveLength(4);
   });
 });

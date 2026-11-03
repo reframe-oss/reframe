@@ -30,7 +30,14 @@ import {
 } from "@/lib/project";
 import { DEFAULT_RECIPE, SPEED_STEPS } from "@/lib/constants";
 import { getPresetById } from "@/lib/presets";
-import { loadFFmpeg, exportVideo, terminateFFmpeg, getEngineMode, FFmpegLoadError } from "@/lib/ffmpeg";
+import {
+  loadFFmpeg,
+  exportVideo,
+  terminateFFmpeg,
+  getEngineMode,
+  FFmpegLoadError,
+  ExportStalledError,
+} from "@/lib/ffmpeg";
 import {
   addTelemetryRedaction,
   durationBucket,
@@ -62,6 +69,7 @@ import {
   EDITOR_STATE_KEY,
 } from "@/lib/editorPersistence";
 import { saveSessionFile, loadSessionFile, clearSessionFile } from "@/lib/sessionDB";
+import { resolveDuration } from "@/lib/mediaDuration";
 
 const DEFAULT_TITLE = "Reframe — Resize, trim, and export videos in your browser";
 const PROJECT_SAVE_DELAY_MS = 500;
@@ -130,12 +138,14 @@ export function extractMetadata(
     }, 5000);
 
     video.preload = "metadata";
-    video.onloadedmetadata = () => {
+    video.onloadedmetadata = async () => {
       clearTimeout(timeout);
+      // Screen recordings report an Infinity duration until read to the end.
+      const duration = await resolveDuration(video);
       resolve({
         width: video.videoWidth,
         height: video.videoHeight,
-        duration: isFinite(video.duration) ? video.duration : 0,
+        duration,
       });
       URL.revokeObjectURL(url);
     };
@@ -775,7 +785,8 @@ export function useVideoEditor() {
       // Reported above as export_failed; the prefix keeps RUM's automatic
       // console-error collection from reporting it a second time.
       console.error(`${HANDLED_ERROR_PREFIX} export failed:`, err);
-      if (err instanceof FFmpegLoadError) {
+      if (err instanceof FFmpegLoadError || err instanceof ExportStalledError) {
+        // Both messages say what happened and what to do next.
         setError(err.message);
       } else if (err instanceof Error && err.message.includes("network")) {
         setError("Network error. Check your internet connection and try again.");

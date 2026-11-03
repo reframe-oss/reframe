@@ -10,6 +10,7 @@ vi.mock("@/lib/ffmpeg", () => ({
   terminateFFmpeg: vi.fn(),
   getEngineMode: vi.fn(() => null),
   FFmpegLoadError: class extends Error {},
+  ExportStalledError: class extends Error {},
 }));
 
 vi.mock("@/lib/sessionDB", () => ({
