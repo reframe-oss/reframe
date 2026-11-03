@@ -129,13 +129,6 @@ Documents from a newer schema than the page knows are refused with "saved by a n
 
 A change to `EditRecipe` fields needs a project schema bump, because the validator requires every field.
 
-## Not done yet: export profiles
+## Export profiles
 
-Reusable export profiles were scoped out of this change so undo/redo and recovery could land as one coherent slice. The suggested next slice:
-
-- **Profiles.** A profile is a named subset of `EditState["recipe"]`: preset or custom size, framing, format, quality and audio options. It is stored in its own localStorage key with its own schema version, and never includes trims, overlays or media.
-- **Built-in profiles.** Landscape 1920×1080, square 1080×1080 and portrait 1080×1920, plus 1080×1350. Label them by shape and size, not by platform name, to avoid implying endorsement.
-- **Applying a profile.** Applying one is one undoable `updateEdit` step. Manual controls stay as they are.
-- **Command-builder tests.** A test runs every profile through the worker's `buildArguments`/`buildVideoFilter` and asserts the scale and pad output matches the declared dimensions.
-- **Safe-area guides.** A CSS overlay on the preview only. It is not part of `EditState`, so it can't reach the export.
-- **Batch export, if added.** Encode one profile at a time through the existing worker, never concurrently, and report each output's success or failure separately.
+Implemented separately; see [EXPORT_PROFILES.md](EXPORT_PROFILES.md). Applying a profile is one undo step and changes only the output fields of `EditState`. Profiles are stored apart from projects, and a project file doesn't include them.

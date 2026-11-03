@@ -1,128 +1,222 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto:wght@400;700&family=Poppins:wght@400;700&family=Montserrat:wght@400;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── Light mode tokens ── */
+/*
+ * Reframe design tokens — "screening room" palette.
+ *
+ * Near-black, slate, warm brown, charcoal and warm ivory, with the film red
+ * from the logo kept for the few things that must be found instantly: the
+ * Export/Download action, the playhead, the trim range and progress.
+ *
+ * The five core names (--bg, --surface, --border, --text, --muted) are a
+ * public contract used by every component — never rename them. Raw palette
+ * values live only in this file; components use the semantic tokens.
+ */
+
+/* ── Light: warm ivory ── */
 :root {
-  --bg: #ffffff;
-  --surface: #f1f5f9;
-  --border: #cbd5e1;
-  --text: #0f172a;
-  --muted: #64748b;
-  --accent: #3b82f6;
-  --accent-hover: #1d4ed8;
-  --accent-muted: rgba(59, 130, 246, 0.12);
-  --radius: 10px;
-  --shadow: 0 2px 12px rgba(15, 23, 42, 0.12);
-  --film-600: #e63946;
-  --film-400: #ff6b6b;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --error-bg: #fee2e2;
-  --error-border: #fca5a5;
-  --error-hover: #fecaca;
-  --neo-bg: #eceff5;
-  --neo-hi: rgba(255, 255, 255, 1);
-  --neo-lo: rgba(150, 165, 190, 0.8);
-  --skeu-top: #f8fafc;
-  --skeu-bottom: #cfd6e0;
-  --skeu-edge: rgba(255, 255, 255, 0.9);
-  --skeu-cut: rgba(15, 23, 42, 0.25);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  /* Set by next/font in layout.tsx (self-hosted at build time). The fallback
+     stack keeps headings serif if the font file hasn't arrived yet. */
+  --font-serif: var(--font-cormorant), "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype",
+    Palatino, Georgia, serif;
+  --font-serif-italic: var(--font-cormorant-italic), var(--font-serif);
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Palette (reference values; use the semantic tokens below in components) */
+  --ink: #0a0a0a;
+  --slate: #313945;
+  --brown: #463729;
+  --charcoal: #535352;
+  --ivory: #f5f5f3;
+  --stone: #807d7a;
+  --mist: #9c9d9c;
+
+  --bg: var(--ivory);
+  --surface: #fafaf8;
+  --surface-2: #ecebe7;
+  --border: #dedcd6;
+  /* Input/handle outlines: ≥3:1 against --bg and --surface (WCAG 1.4.11). */
+  --border-strong: #8a8682;
+  --text: #121211;
+  --text-secondary: var(--charcoal); /* 7.1:1 on ivory */
+  /* --stone (#807d7a) is 3.7:1 on ivory — too light for small text — so muted
+     text uses the same hue, darkened to 5.1:1. */
+  --muted: #6b6865;
+
+  /* Selection / "this is the active choice": warm brown, never red. */
+  --selected: var(--brown);
+  --selected-bg: rgba(70, 55, 41, 0.08);
+  --on-selected: var(--ivory);
+  /* Secondary controls */
+  --control: var(--slate);
+
+  /* Film red, deepened slightly so white text passes AA (5.6:1). */
+  --accent: #c42f3a;
+  --accent-hover: #a8242e;
+  --accent-muted: rgba(196, 47, 58, 0.09);
+  --accent-text: #a8242e;
+  --on-accent: #ffffff;
+  --film-600: #c42f3a;
+  --film-400: #de5560;
+
+  --focus: var(--slate);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus);
+
+  --success: #2f6b45;
+  --success-bg: #e7efe8;
+  --warning: #855000;
+  --warning-bg: #f6eddd;
+  --error: #a8261d;
+  --error-bg: #f7e6e3;
+  --error-border: #e4b2ab;
+  --error-hover: #f1d6d1;
+
+  /* The viewer stays black in every theme, like a grading monitor. */
+  --viewer: var(--ink);
+  --viewer-frame: #1c1c1b;
+  /* The empty drop zone: a dark "screen". Same as the viewer in light mode;
+     slate-tinted in dark mode so it separates from the near-black page, like
+     the reference's slate-black panels. */
+  --stage: var(--ink);
+  /* Text placed on the viewer/drop-zone screen (always dark). */
+  --viewer-text: var(--ivory);
+  --viewer-muted: var(--mist);
+  --viewer-error: #f3a39b;
+
+  --radius: 6px;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --radius-pill: 999px;
+  --shadow: 0 1px 2px rgba(18, 18, 17, 0.05);
+  --shadow-overlay: 0 24px 60px rgba(10, 10, 10, 0.22);
+
+  /* Motion: fast = hover/press, base = state changes, panel = disclosure,
+     enter = once-per-mount entrances. Durations are deliberately short;
+     reduced motion disables all of them (bottom of file). */
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 220ms;
+  --dur-panel: 280ms;
+  --dur-enter: 560ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  color-scheme: light;
 }
 
-/* ── Dark mode tokens ── */
+/* ── Dark: near-black screening room ── */
 .dark {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --border: #2e3147;
-  --text: #f0f0f5;
-  --muted: #8b8fa8;
-  --accent: #4f6ef7;
-  --accent-hover: #3a57d4;
-  --accent-muted: rgba(79, 110, 247, 0.12);
-  --radius: 10px;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  --warning: #fbbf24;
-  --error: #f87171;
-  --error-bg: #7f1d1d;
-  --error-border: #991b1b;
-  --error-hover: #991b1b;
-  --neo-bg: #242836;
-  --neo-hi: rgba(255, 255, 255, 0.09);
-  --neo-lo: rgba(0, 0, 0, 0.8);
-  --skeu-top: #2b3042;
-  --skeu-bottom: #141722;
-  --skeu-edge: rgba(255, 255, 255, 0.12);
-  --skeu-cut: rgba(0, 0, 0, 0.7);
+  --bg: var(--ink);
+  --surface: #111215;
+  --surface-2: #1a1c20;
+  --border: #25272c;
+  --border-strong: #6c6c6a; /* 3.7:1 on --bg */
+  --text: var(--ivory);
+  --text-secondary: #cfcdc8;
+  --muted: var(--mist); /* 7.4:1 on --bg */
+
+  --selected: #b39a7f; /* the brown, lifted so it reads on black */
+  --selected-bg: rgba(70, 55, 41, 0.42);
+  --on-selected: var(--ink);
+  --control: #3a4350;
+
+  --accent: #d0343f;
+  --accent-hover: #e0464f;
+  --accent-muted: rgba(208, 52, 63, 0.14);
+  --accent-text: #f08088;
+  --on-accent: #ffffff;
+  --film-600: #d0343f;
+  --film-400: #f08088;
+
+  --focus: var(--ivory);
+
+  --success: #7cc79a;
+  --success-bg: rgba(124, 199, 154, 0.1);
+  --warning: #e2b46a;
+  --warning-bg: rgba(226, 180, 106, 0.1);
+  --error: #f08a80;
+  --error-bg: rgba(240, 138, 128, 0.1);
+  --error-border: rgba(240, 138, 128, 0.35);
+  --error-hover: rgba(240, 138, 128, 0.18);
+
+  --viewer: #000000;
+  --viewer-frame: #1a1c20;
+  --stage: #13171a;
+
+  --shadow: none;
+  --shadow-overlay: 0 30px 80px rgba(0, 0, 0, 0.7);
+
+  color-scheme: dark;
 }
 
-/* ── High contrast mode tokens ── */
+/* ── High contrast (set by ThemeProvider when the user asks for more contrast) ── */
 [data-theme="high-contrast"] {
   --bg: #000000;
   --surface: #000000;
-  --border: #FFFFFF;
+  --surface-2: #000000;
+  --border: #ffffff;
+  --border-strong: #ffffff;
 
-  --text: #FFFFFF;
-  --muted: #FFFFFF;
+  --text: #ffffff;
+  --text-secondary: #ffffff;
+  --muted: #ffffff;
 
-  --accent: #FFFF00;
-  --accent-hover: #FFFF00;
+  --selected: #00ffff;
+  --selected-bg: #000000;
+  --on-selected: #000000;
+  --control: #ffffff;
+
+  /* Yellow fill needs black text; --on-accent makes that automatic. */
+  --accent: #ffff00;
+  --accent-hover: #ffff66;
   --accent-muted: rgba(255, 255, 0, 0.22);
-  --radius: 10px;
+  --accent-text: #ffff00;
+  --on-accent: #000000;
+  --film-600: #ffff00;
+  --film-400: #ffff00;
+
+  --focus: #00ffff;
+
+  --success: #66ff66;
+  --success-bg: #000000;
+  --warning: #ffcc00;
+  --warning-bg: #000000;
+  --error: #ff6666;
+  --error-bg: #000000;
+  --error-border: #ff6666;
+  --error-hover: #330000;
+
+  --viewer: #000000;
+  --viewer-frame: #ffffff;
+  --stage: #000000;
+  --viewer-text: #ffffff;
+  --viewer-muted: #ffffff;
+  --viewer-error: #ff6666;
   --shadow: none;
+  --shadow-overlay: none;
 
-  --error: #FF6666;
-  --success: #66FF66;
-
-  --film-600: #FF6666;
-  --film-400: #66FF66;
-  --neo-bg: #000000;
-  --neo-hi: transparent;
-  --neo-lo: transparent;
-  --skeu-top: #000000;
-  --skeu-bottom: #000000;
-  --skeu-edge: transparent;
-  --skeu-cut: transparent;
+  color-scheme: dark;
 }
 
-/* Ensure export overlay text is readable in high-contrast by forcing dark text */
-[data-theme="high-contrast"] .export-text,
-[data-theme="high-contrast"] .export-text * {
-  color: #000000 !important;
-}
-
-/* Make the main export button readable in high-contrast mode */
-[data-theme="high-contrast"] #export-button {
-  background: #7ee081 !important;
-  color: #000000 !important;
-  border: 2px solid #ffffff !important;
-}
-
-[data-theme="high-contrast"] #export-button:hover,
-[data-theme="high-contrast"] #export-button:focus-visible {
-  background: #69d66d !important;
-  color: #000000 !important;
-}
-
-[data-theme="high-contrast"] #export-button svg {
-  color: #000000 !important;
-}
-
-/* ── Base styles ── */
+/* ── Base ── */
 html {
   min-height: 100%;
-  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--neo-bg);
+  background-color: var(--bg);
   color: var(--text);
-  line-height: 1.6;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
 }
 
 img,
@@ -141,158 +235,534 @@ h4,
 h5,
 h6 {
   color: var(--text);
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-p,
-li {
-  color: color-mix(in srgb, var(--text) 95%, transparent);
-}
-
-button {
-  transition: all 0.2s ease;
+/* One stroke weight for every lucide icon, to match the hairline UI. */
+svg.lucide {
+  stroke-width: 1.6;
 }
 
 input,
 select,
 textarea {
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   color: var(--text);
-}
-
-input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
-select,
-textarea {
-  background: var(--neo-bg);
-  border-color: transparent;
-  box-shadow: inset 3px 3px 7px var(--neo-lo), inset -3px -3px 7px var(--neo-hi);
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-muted);
+  border-color: var(--focus);
   outline: none;
 }
 
-/* Smooth transitions for all themed elements */
-*,
-*::before,
-*::after {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: ease;
-  transition-duration: 200ms;
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--selected);
 }
 
+/*
+ * Sliders: a hairline track and an ivory/ink thumb. Native range inputs keep
+ * their keyboard and touch behaviour; only the paint changes. The 24px hit
+ * area is kept for touch.
+ */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.5rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+input[type="range"]::-moz-range-track {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+input[type="range"]::-moz-range-progress {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--text);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--text);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+input[type="range"]:hover::-webkit-slider-thumb,
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+input[type="range"]:hover::-moz-range-thumb,
+input[type="range"]:active::-moz-range-thumb {
+  transform: scale(1.15);
+}
+input[type="range"]:focus-visible {
+  outline: none;
+}
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--focus-ring);
+}
+input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: var(--focus-ring);
+}
+input[type="range"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* One focus treatment for everything keyboard-reachable. */
 :focus-visible {
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--accent-muted);
-  border-radius: var(--radius);
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
-detail > summary {
+::selection {
+  background: color-mix(in srgb, var(--selected) 30%, transparent);
+}
+
+details > summary {
   list-style: none;
 }
 details > summary::-webkit-details-marker {
   display: none;
 }
 
-/* ── Neomorphism + skeuomorphism ── */
-.neo-raised {
-  background: var(--neo-bg);
-  border: 1px solid transparent;
-  box-shadow: 12px 12px 26px var(--neo-lo), -12px -12px 26px var(--neo-hi);
+/* Timecodes and numeric readouts keep a fixed width while they change. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
-.neo-inset {
-  background: var(--neo-bg);
-  border: 1px solid transparent;
-  box-shadow: inset 6px 6px 12px var(--neo-lo), inset -6px -6px 12px var(--neo-hi);
+/*
+ * Theme switches crossfade colours for one short window only. ThemeProvider
+ * adds this class for ~200ms around a toggle, so ordinary interaction never
+ * pays for a transition on every element (the old `*, *::before, *::after`
+ * rule animated colour changes on every node, including during playback).
+ */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition-property: background-color, border-color, color, fill, stroke !important;
+  transition-duration: 200ms !important;
+  transition-timing-function: ease !important;
 }
 
-.neo-pressable {
-  background: var(--neo-bg);
-  box-shadow: 6px 6px 13px var(--neo-lo), -6px -6px 13px var(--neo-hi);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-.neo-pressable:hover { transform: translateY(-1px); }
-.neo-pressable:active {
-  transform: translateY(0);
-  box-shadow: inset 4px 4px 9px var(--neo-lo), inset -4px -4px 9px var(--neo-hi);
+/* Returning visitors who dismissed the privacy notice: hide it before first paint. */
+html[data-privacy-dismissed] [data-privacy-banner] {
+  display: none;
 }
 
-/* Brushed-metal title plate with screws and letterpress text */
-.skeu-plate {
-  position: relative;
-  background:
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 3px),
-    linear-gradient(160deg, var(--skeu-top), var(--skeu-bottom));
-  border: 1px solid var(--skeu-cut);
-  border-radius: 18px;
-  box-shadow:
-    inset 0 1px 0 var(--skeu-edge),
-    inset 0 -3px 6px var(--skeu-cut),
-    0 2px 0 var(--skeu-edge),
-    12px 14px 28px var(--neo-lo),
-    -10px -10px 24px var(--neo-hi);
-}
-.skeu-plate::before,
-.skeu-plate::after {
-  content: "";
-  position: absolute;
-  top: 10px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background:
-    linear-gradient(45deg, transparent 44%, var(--skeu-cut) 44% 56%, transparent 56%),
-    radial-gradient(circle at 30% 30%, var(--skeu-top), var(--skeu-bottom));
-  box-shadow: inset 0 0 0 1px var(--skeu-cut), 0 1px 0 var(--skeu-edge);
-}
-.skeu-plate::before { left: 10px; }
-.skeu-plate::after { right: 10px; }
+/* ── Shared component classes ── */
+@layer components {
+  /* Editorial type: the serif is for headings and a few numerals only. */
+  .display {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.02;
+    /* Cormorant defaults to old-style figures ("1" reads as "ı"). */
+    font-variant-numeric: lining-nums;
+  }
+  .serif {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    font-variant-numeric: lining-nums;
+  }
+  /* "(Output)", "(2)" — the parenthetical label from the reference. Sentence
+     case, italic serif; never an all-caps eyebrow. */
+  .marker {
+    font-family: var(--font-serif-italic);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 0.9375rem;
+    line-height: 1;
+    color: var(--muted);
+    font-variant-numeric: lining-nums;
+  }
 
-.skeu-title {
-  text-shadow: 0 1px 0 var(--skeu-edge), 0 -1px 0 var(--skeu-cut);
+  /* Buttons: pills, three emphasis levels, explicit transitions. */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 whitespace-nowrap border text-sm font-medium;
+    border-radius: var(--radius-pill);
+    min-height: 2.25rem;
+    padding: 0 1rem;
+    transition:
+      background-color var(--dur-fast) var(--ease-standard),
+      border-color var(--dur-fast) var(--ease-standard),
+      color var(--dur-fast) var(--ease-standard),
+      transform var(--dur-fast) var(--ease-standard);
+  }
+  .btn:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: scale(0.97);
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .btn-lg {
+    min-height: 2.875rem;
+    padding: 0 1.375rem;
+    font-size: 0.9375rem;
+  }
+  .btn-sm {
+    min-height: 1.875rem;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+  }
+  .btn-primary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+  /* Ivory/ink pill — the reference's "Book a visit" button. */
+  .btn-solid {
+    background: var(--text);
+    border-color: var(--text);
+    color: var(--bg);
+  }
+  .btn-solid:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--text-secondary);
+    border-color: var(--text-secondary);
+  }
+  .btn-secondary {
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .btn-secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--surface-2);
+    border-color: var(--text-secondary);
+  }
+  .btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .btn-danger {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error);
+  }
+  .btn-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--error-hover);
+  }
+  /* Icon-only buttons must still carry an aria-label (and usually a title). */
+  .btn-icon {
+    padding: 0;
+    width: 2.25rem;
+  }
+  .btn-icon.btn-sm {
+    width: 1.875rem;
+  }
+  /* Pressed toggles (framing guide, grid, theme, contrast). */
+  .btn[aria-pressed="true"] {
+    border-color: var(--selected);
+    color: var(--text);
+    background: var(--selected-bg);
+  }
+
+  /*
+   * Selectable option tiles (presets, formats, rotation, framing): small
+   * rectangular frames like the reference's photographs. The chosen tile gets
+   * a warm brown outline; red stays reserved for the primary action.
+   */
+  .choice {
+    @apply border text-sm;
+    border-radius: var(--radius-control);
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text-secondary);
+    transition:
+      background-color var(--dur-fast) var(--ease-standard),
+      border-color var(--dur-fast) var(--ease-standard),
+      color var(--dur-fast) var(--ease-standard);
+  }
+  .choice:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .choice[aria-pressed="true"],
+  .choice[aria-checked="true"],
+  .choice[data-active="true"] {
+    background: var(--selected-bg);
+    border-color: var(--selected);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--selected);
+  }
+
+  /* Text inputs */
+  .field {
+    @apply w-full border text-sm;
+    border-radius: var(--radius-control);
+    min-height: 2.25rem;
+    padding: 0 0.75rem;
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--text);
+    transition: border-color var(--dur-fast) var(--ease-standard);
+  }
+  .field:hover {
+    border-color: var(--text-secondary);
+  }
+  .field::placeholder {
+    color: var(--muted);
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--error);
+  }
+
+  /* Labels: sentence case, medium weight, no tracking. */
+  .label {
+    @apply text-xs font-medium;
+    color: var(--text-secondary);
+  }
+  .hint {
+    @apply text-xs;
+    color: var(--muted);
+  }
+
+  /* Surfaces are separated by hairlines and tone, not by heavy cards. */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+  }
+
+  /* Section heading row: "(2)  Edit" with a hairline underneath. */
+  .section-head {
+    @apply flex items-baseline gap-3 pb-3;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .kbd {
+    @apply inline-flex items-center justify-center rounded border text-2xs font-medium;
+    min-width: 1.375rem;
+    height: 1.25rem;
+    padding: 0 0.3125rem;
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+  }
+
+  /* Links that underline from left to right on hover. */
+  .link {
+    color: var(--text);
+    background-image: linear-gradient(currentColor, currentColor);
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    background-size: 0% 1px;
+    transition: background-size var(--dur-base) var(--ease-out);
+  }
+  .link:hover {
+    background-size: 100% 1px;
+  }
+
+  /* Status callouts: a rule on the leading edge, not a filled box. */
+  .callout {
+    @apply flex items-start gap-3 border p-3 text-sm;
+    border-radius: var(--radius-control);
+  }
+  .callout-error {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--text);
+  }
+  .callout-warning {
+    background: var(--warning-bg);
+    border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+    color: var(--text);
+  }
+  .callout-info {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  /* Determinate progress: a hairline whose fill scales on the GPU. */
+  .progress-track {
+    @apply relative h-[3px] w-full overflow-hidden;
+    border-radius: 3px;
+    background: var(--border);
+  }
+  .progress-fill {
+    @apply absolute inset-0 origin-left;
+    border-radius: 3px;
+    background: var(--accent);
+    transition: transform var(--dur-base) linear;
+  }
+  /* Indeterminate: a short segment travelling along the hairline. */
+  .progress-indeterminate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 30%;
+    border-radius: 3px;
+    background: var(--accent);
+    animation: progress-travel 1.4s var(--ease-in-out) infinite;
+  }
+
+  /*
+   * Disclosure panels (accordions). Height animates through grid rows, so the
+   * content never has to be measured; closed content becomes visibility:hidden
+   * once the collapse finishes, which removes it from the tab order and the
+   * accessibility tree.
+   */
+  .disclosure {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--dur-panel) var(--ease-standard);
+  }
+  .disclosure[data-open="true"] {
+    grid-template-rows: 1fr;
+  }
+  .disclosure > .disclosure-inner {
+    min-height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition:
+      opacity var(--dur-base) var(--ease-standard),
+      transform var(--dur-base) var(--ease-standard),
+      visibility 0s linear var(--dur-panel);
+  }
+  .disclosure[data-open="true"] > .disclosure-inner {
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity var(--dur-panel) var(--ease-standard) 60ms,
+      transform var(--dur-panel) var(--ease-out) 60ms,
+      visibility 0s;
+  }
+
+  /* ── Entrances (run once when an element mounts) ── */
+  /* Fade and rise. Stagger with style={{ "--enter-delay": "120ms" }}. */
+  .enter {
+    animation: enter-rise var(--dur-enter) var(--ease-out) var(--enter-delay, 0ms) both;
+  }
+  /* Headline lines rise out of a mask, as in the reference's titles. */
+  .line-mask {
+    display: block;
+    overflow: hidden;
+    padding-bottom: 0.08em;
+    margin-bottom: -0.08em;
+  }
+  .line-mask > span {
+    display: block;
+    animation: line-rise 640ms var(--ease-out) var(--enter-delay, 0ms) both;
+  }
+  /* A hairline frame that settles into place (opacity + scale only). */
+  .frame-inset {
+    animation: frame-settle 700ms var(--ease-out) 150ms both;
+  }
+  /* Frames wipe open from the bottom edge, like the reference's photographs. */
+  .frame-reveal {
+    animation: frame-wipe 620ms var(--ease-in-out) var(--enter-delay, 0ms) both;
+  }
 }
 
-.skeu-well {
-  background: var(--neo-bg);
-  border-radius: 12px;
-  box-shadow: inset 3px 3px 7px var(--neo-lo), inset -3px -3px 7px var(--neo-hi);
+@keyframes enter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes line-rise {
+  from {
+    transform: translateY(105%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes frame-wipe {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes frame-settle {
+  from {
+    opacity: 0;
+    transform: scale(1.025);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes progress-travel {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
 }
 
-[data-theme="high-contrast"] .skeu-plate,
-[data-theme="high-contrast"] .neo-raised,
-[data-theme="high-contrast"] .neo-inset,
-[data-theme="high-contrast"] .neo-pressable {
-  border: 1px solid var(--border);
-  box-shadow: none;
-}
-
-/* Hanging sign: tilted from a pivot above, with two wires to the screws */
-.skeu-hang {
-  position: relative;
-  margin-top: 28px;
-  transform: rotate(-2.5deg);
-  transform-origin: 50% -28px;
-  transition: transform 0.6s cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-.skeu-hang:hover { transform: rotate(1.5deg); }
-.skeu-wire {
-  position: absolute;
-  bottom: calc(100% - 14px);
-  width: 2px;
-  height: 30px;
-  background: linear-gradient(90deg, var(--skeu-edge), var(--skeu-cut));
-  transform-origin: 50% 100%;
-  pointer-events: none;
-}
-.skeu-wire-l { left: 14px; transform: rotate(14deg); }
-.skeu-wire-r { right: 14px; transform: rotate(-14deg); }
+/*
+ * Reduced motion: drop decorative movement and long transitions, but keep
+ * instant state feedback (colour changes still apply, they just don't fade).
+ * Entrances jump straight to their end state; progress bars keep updating.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .skeu-hang, .skeu-hang:hover { transition: none; }
-  .skeu-hang:hover { transform: rotate(-2.5deg); }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+  /* A one-shot indeterminate segment would vanish; show a static one. */
+  .progress-indeterminate::after {
+    animation: none;
+    transform: translateX(115%);
+  }
 }

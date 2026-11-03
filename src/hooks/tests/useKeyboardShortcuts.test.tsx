@@ -22,7 +22,7 @@ function setup(file: File | null = new File(["x"], "a.mp4")) {
       status: "idle",
       cancelExport: vi.fn(),
       onToggleShortcutsModal: vi.fn(),
-      currentTime: 0,
+      getCurrentTime: () => 0,
       duration: 10,
       undo,
       redo,

@@ -98,7 +98,7 @@ export default function TextControls({
               key={overlay.id}
               className={`flex items-center justify-between gap-2 p-2 rounded border transition-colors ${
                 selectedTextId === overlay.id
-                  ? "border-film-500 bg-film-600/10"
+                  ? "border-[var(--selected)] bg-[var(--selected-bg)]"
                   : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--border)]"
               }`}
             >
@@ -112,7 +112,7 @@ export default function TextControls({
               <button
                 type="button"
                 onClick={() => handleRemoveText(overlay.id)}
-                className="w-5 h-5 flex items-center justify-center rounded text-red-400 hover:bg-red-500/10 transition-colors"
+                className="w-5 h-5 flex items-center justify-center rounded text-[var(--error)] hover:bg-[var(--error-bg)] transition-colors"
                 aria-label={`Remove text overlay ${idx + 1}`}
               >
                 <Trash2 size={13} />
@@ -202,7 +202,7 @@ export default function TextControls({
                   }
                   className={`px-2 py-1.5 text-xs rounded border transition-colors ${
                     selectedOverlay.fontWeight === weight
-                      ? "border-film-500 bg-film-600/10 text-film-400"
+                      ? "border-[var(--selected)] bg-[var(--selected-bg)] text-[var(--text)]"
                       : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--border)]"
                   }`}
                   style={{

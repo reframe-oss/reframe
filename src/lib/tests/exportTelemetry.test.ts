@@ -8,15 +8,7 @@ import {
   type ExportContext,
 } from "../exportTelemetry";
 import { HANDLED_ERROR_PREFIX, registerRum, resetTelemetryForTests, sanitizeRumEvent } from "../telemetry";
-import { FFmpegLoadError } from "../ffmpeg";
-
-// main has no stall watchdog yet; an error with its name must still map to "timeout".
-class ExportStalledError extends Error {
-  name = "ExportStalledError";
-  constructor(readonly mode: "multi" | "single") {
-    super("Export stopped responding");
-  }
-}
+import { ExportStalledError, FFmpegLoadError } from "../ffmpeg";
 import type { DatadogRum } from "@datadog/browser-rum";
 
 const context: ExportContext = {
@@ -43,6 +35,11 @@ const ALLOWED_KEYS = new Set([
   "category",
   "load_number",
   "single_reason",
+  "fell_back",
+  "from",
+  "to",
+  "stall_reason",
+  "stuck",
 ]);
 
 let rum: { addAction: ReturnType<typeof vi.fn>; addDurationVital: ReturnType<typeof vi.fn> };
@@ -106,6 +103,31 @@ describe("export attempt outcomes", () => {
     expect(events()[1]!.ctx).toMatchObject({ stage: "encode", category: "encode_error" });
   });
 
+  it("reports which watchdog rule stopped a stalled export", () => {
+    const attempt = new ExportAttempt(context);
+    attempt.encoding("multi");
+    expect(attempt.failed(new ExportStalledError("multi", "no_progress"))).toBe("timeout");
+    expect(events()[1]!.ctx).toMatchObject({ category: "timeout", stall_reason: "no_progress" });
+  });
+
+  it("a clip of unknown length that stalls or fails is reported as unknown_duration", () => {
+    const unknown = { ...context, clip_length: "unknown" };
+    const stalled = new ExportAttempt(unknown);
+    stalled.encoding("multi");
+    expect(stalled.failed(new ExportStalledError("multi", "overrun"))).toBe("unknown_duration");
+    expect(events()[1]!.ctx).toMatchObject({ category: "unknown_duration", stall_reason: "overrun" });
+
+    const failed = new ExportAttempt(unknown);
+    failed.encoding("single");
+    expect(failed.failed(new Error("ffmpeg exited with code 1"))).toBe("unknown_duration");
+
+    // Failures with a clearer cause keep it, and the engine stage is never this.
+    const oom = new ExportAttempt(unknown);
+    oom.encoding("single");
+    expect(oom.failed(new RangeError("Array buffer allocation failed"))).toBe("out_of_memory");
+    expect(new ExportAttempt(unknown).failed(new FFmpegLoadError("Failed to fetch"))).toBe("engine_load");
+  });
+
   it("marks retries, and whether the retry recovered", () => {
     new ExportAttempt(context, "timeout").succeeded("<25MB");
     expect(events()[0]!.ctx).toMatchObject({ is_retry: true, retry_after: "timeout" });
@@ -118,6 +140,10 @@ describe("export attempt outcomes", () => {
     a.failed(new Error("x"));
     new ExportAttempt(context).cancelled();
     new ExportAttempt(context).succeeded("25-100MB");
+    const fb = new ExportAttempt(context);
+    fb.encoding("multi");
+    fb.engineFallback("no_activity");
+    fb.succeeded("<25MB");
     const load = startEngineLoad("multi");
     load.failed(new Error("Failed to fetch engine file (HTTP 503)"));
     startEngineLoad("single").succeeded("single");
@@ -129,6 +155,25 @@ describe("export attempt outcomes", () => {
         if (typeof value === "string") expect(value.length).toBeLessThan(24);
       }
     }
+  });
+});
+
+describe("engine fallback", () => {
+  it("reports the fallback with its reason, and the attempt's one outcome on the single-threaded engine", () => {
+    const attempt = new ExportAttempt(context);
+    attempt.encoding("multi");
+    attempt.engineFallback("no_activity");
+    expect(attempt.succeeded("<25MB")).toBe(true);
+    expect(names()).toEqual(["export_started", "engine_fallback", "export_succeeded"]);
+    expect(events()[1]!.ctx).toMatchObject({ from: "multi", to: "single", stall_reason: "no_activity", format: "mp4" });
+    expect(events()[2]!.ctx).toMatchObject({ engine: "single", fell_back: true });
+  });
+
+  it("does nothing once the attempt has an outcome", () => {
+    const attempt = new ExportAttempt(context);
+    attempt.cancelled();
+    attempt.engineFallback("no_activity");
+    expect(names()).toEqual(["export_started", "export_cancelled"]);
   });
 });
 
