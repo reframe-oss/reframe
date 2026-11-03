@@ -14,6 +14,7 @@ import {
   Lock,
   Mail,
   HeartHandshake,
+  Settings,
 } from "lucide-react";
 
 export default function Footer() {
@@ -89,11 +90,20 @@ export default function Footer() {
               Privacy Policy
             </Link>
 
+            <Link
+              href="/privacy#settings"
+              aria-label="Settings: anonymous analytics"
+              className="flex items-center gap-2 opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+            >
+              <Settings size={14} />
+              Settings
+            </Link>
+
             {/* Netlify's open source plan expects a publicly reachable Code of
                 Conduct. Points at the repo file rather than an in-site route,
                 since CODE_OF_CONDUCT.md is the canonical copy. */}
             <a
-              href="https://github.com/magic-peach/reframe/blob/main/CODE_OF_CONDUCT.md"
+              href="https://github.com/reframe-oss/reframe/blob/main/CODE_OF_CONDUCT.md"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Code of Conduct"
@@ -185,7 +195,42 @@ export default function Footer() {
 
       {/* Bottom Bar */}
       <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-semibold uppercase tracking-[0.25em] opacity-50">
-        <p>© {new Date().getFullYear()} Reframe · MIT License</p>
+        <nav aria-label="Credits and license" className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          <span>© {new Date().getFullYear()} Reframe</span>
+          <a
+            href="https://github.com/reframe-oss/reframe/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:opacity-100 hover:text-[var(--accent)] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+          >
+            MIT License
+          </a>
+          <a
+            href="https://github.com/reframe-oss/reframe"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:opacity-100 hover:text-[var(--accent)] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+          >
+            GitHub
+          </a>
+          {/* Netlify's open source plan asks for this wording and link. */}
+          <a
+            href="https://www.netlify.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:opacity-100 hover:text-[var(--accent)] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+          >
+            This site is powered by Netlify
+          </a>
+          <a
+            href="https://snyk.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:opacity-100 hover:text-[var(--accent)] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+          >
+            Security by Snyk
+          </a>
+        </nav>
 
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">

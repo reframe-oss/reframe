@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { capabilityContext, currentTelemetryEnv, registerRum, sanitizeRumEvent } from "@/lib/telemetry";
+import { analyticsAllowed } from "@/lib/analyticsConsent";
 
 export default function DatadogInit() {
   useEffect(() => {
@@ -11,7 +12,9 @@ export default function DatadogInit() {
     // null on localhost, LAN addresses and automated browsers unless
     // NEXT_PUBLIC_DATADOG_ENV names a non-production env (see telemetry.ts).
     const env = currentTelemetryEnv();
-    if (!applicationId || !clientToken || !env) {
+    // Off in Settings, or the browser sends Do Not Track / Global Privacy
+    // Control: don't load the SDK at all.
+    if (!applicationId || !clientToken || !env || !analyticsAllowed()) {
       return;
     }
 
@@ -36,6 +39,11 @@ export default function DatadogInit() {
             // session replay would visually record the editor UI, which cuts
             // against that claim. Metrics/errors only.
             sessionReplaySampleRate: 0,
+            // Replay is off; if it were ever enabled, text and inputs stay masked.
+            defaultPrivacyLevel: "mask",
+            // No persistent anonymous user ID (usr.anonymous_id): sessions
+            // can't be linked across visits.
+            trackAnonymousUser: false,
             plugins: [reactPlugin()],
             trackUserInteractions: true,
             // Auto-named click actions use the clicked element's text, which can
