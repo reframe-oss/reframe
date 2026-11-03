@@ -125,6 +125,42 @@ describe("export reliability telemetry in the editor", () => {
     expect(lifecycle()[1]!.ctx).toMatchObject({ stage: "encode" });
   });
 
+  it("a cancel after a minute without progress is reported as stuck", async () => {
+    const { result } = await editorWithFile();
+    let onProgress!: (p: number) => void;
+    vi.mocked(exportVideo).mockImplementationOnce((_f, _r, progress) => {
+      onProgress = progress;
+      return new Promise(() => {});
+    });
+    act(() => {
+      void result.current.handleExport();
+    });
+    await waitFor(() => expect(result.current.status).toBe("exporting"));
+    act(() => onProgress(100));
+    // Only the cancel happens "a minute later"; waitFor above uses real time.
+    const later = Date.now() + 61_000;
+    const now = vi.spyOn(Date, "now").mockReturnValue(later);
+    act(() => result.current.cancelExport());
+    now.mockRestore();
+    expect(lifecycle().at(-1)).toMatchObject({ name: "export_cancelled", ctx: { stuck: true } });
+  });
+
+  it("a cancel while progress is moving is not stuck", async () => {
+    const { result } = await editorWithFile();
+    let onProgress!: (p: number) => void;
+    vi.mocked(exportVideo).mockImplementationOnce((_f, _r, progress) => {
+      onProgress = progress;
+      return new Promise(() => {});
+    });
+    act(() => {
+      void result.current.handleExport();
+    });
+    await waitFor(() => expect(result.current.status).toBe("exporting"));
+    act(() => onProgress(40));
+    act(() => result.current.cancelExport());
+    expect(lifecycle().at(-1)).toMatchObject({ name: "export_cancelled", ctx: { stuck: false } });
+  });
+
   it("cancelling while the engine loads is reported at the engine stage", async () => {
     const { result } = await editorWithFile();
     vi.mocked(loadFFmpeg).mockImplementationOnce(() => new Promise(() => {}));

@@ -184,11 +184,16 @@ export class ExportAttempt {
     return category;
   }
 
-  /** Returns false if this attempt already had an outcome. */
-  cancelled(): boolean {
+  /**
+   * Returns false if this attempt already had an outcome. `stuck`: progress
+   * hadn't moved for a while when the user cancelled, so this cancellation is
+   * probably a hang the watchdog hadn't caught yet, and monitors count it as
+   * a failure.
+   */
+  cancelled(stuck = false): boolean {
     if (this.settled) return false;
     this.outcome = "cancelled";
-    trackAction("export_cancelled", { ...this.common(), stage: this.stage });
+    trackAction("export_cancelled", { ...this.common(), stage: this.stage, stuck });
     return true;
   }
 }

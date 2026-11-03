@@ -39,6 +39,7 @@ const ALLOWED_KEYS = new Set([
   "from",
   "to",
   "stall_reason",
+  "stuck",
 ]);
 
 let rum: { addAction: ReturnType<typeof vi.fn>; addDurationVital: ReturnType<typeof vi.fn> };

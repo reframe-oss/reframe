@@ -226,6 +226,7 @@ describe("time values never reach FFmpeg as Infinity or NaN", () => {
 
   it("no combination of bad values produces a non-finite argument", () => {
     const values = [...BAD, 0, -1, 2.5];
+    const failures: string[] = [];
     for (const trimStart of values)
       for (const trimEnd of [...values, null])
         for (const speed of values)
@@ -247,8 +248,10 @@ describe("time values never reach FFmpeg as Infinity or NaN", () => {
                 })
               ).flat(),
             ];
-            for (const arg of all) expect(arg, JSON.stringify({ trimStart, trimEnd, speed, videoDuration })).not.toMatch(/Infinity|NaN/);
+            const bad = all.find((arg) => /Infinity|NaN/.test(arg));
+            if (bad) failures.push(`${JSON.stringify({ trimStart, trimEnd, speed, videoDuration })}: ${bad}`);
           }
+    expect(failures).toEqual([]);
   });
 
   it("assertFiniteArgs rejects a non-finite argument with a clear error", () => {
