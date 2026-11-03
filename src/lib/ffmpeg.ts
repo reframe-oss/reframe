@@ -1,8 +1,10 @@
 import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, MAX_FILE_SIZE } from "./types";
-import { getPresetById } from "./presets";
-import { buildTextFilter } from "./text-overlay";
 import { trackTiming } from "./telemetry";
-import { startEngineLoad, type EngineMode } from "./exportTelemetry";
+import { startEngineLoad, type StallReason } from "./exportTelemetry";
+import type { EngineMode } from "./ffmpegArgs";
+
+// The command line itself is built in ffmpegArgs.ts and run by the worker.
+export { buildVideoFilter, buildAudioFilter } from "./ffmpegArgs";
 
 export class FFmpegLoadError extends Error {
   name = "FFmpegLoadError";
@@ -11,6 +13,29 @@ export class FFmpegLoadError extends Error {
     super(message);
   }
 }
+
+/** The watchdog stopped an export that wasn't going to finish. */
+export class ExportStalledError extends Error {
+  name = "ExportStalledError";
+  constructor(
+    readonly mode: EngineMode,
+    readonly reason: StallReason = "no_activity"
+  ) {
+    super(
+      mode === "multi"
+        ? "The export stopped responding. Press Retry to try again with the single-threaded engine, which is slower but more reliable."
+        : "The export stopped responding. Press Retry to try again, or try a shorter clip or a lower resolution."
+    );
+  }
+}
+
+/**
+ * FFmpeg prints a stats line about every 0.5 s while encoding and the worker
+ * forwards a heartbeat at most every 2 s, so a minute of silence means the
+ * run is wedged (the multi-threaded core's thread-pool deadlock looked
+ * exactly like this: stuck at 0% forever). Fail instead of spinning.
+ */
+export const STALL_TIMEOUT_MS = 60_000;
 
 
 type SerializedFile = {
@@ -31,7 +56,8 @@ type WorkerExportRequest = {
   overlayOptions?: ImageOverlayOptions;
 };
 
-type WorkerLoadResponse = { type: "ready"; mode?: EngineMode };
+type WorkerLoadResponse = { type: "ready"; mode: EngineMode };
+type WorkerHeartbeatResponse = { type: "heartbeat" };
 type WorkerProgressResponse = { type: "progress"; percent: number };
 type WorkerResultResponse = {
   type: "result";
@@ -48,6 +74,7 @@ type WorkerCancelledResponse = { type: "cancelled"; id?: string };
 
 type WorkerResponse =
   | WorkerLoadResponse
+  | WorkerHeartbeatResponse
   | WorkerProgressResponse
   | WorkerResultResponse
   | WorkerErrorResponse
@@ -63,10 +90,16 @@ let pendingExport: {
   reject: (reason: unknown) => void;
 } | null = null;
 let pendingProgress: ((percent: number) => void) | null = null;
-
+/** Called on any sign of life from the worker during an export. */
+let pendingActivity: (() => void) | null = null;
 /** The core the current worker loaded, once it is ready. */
 let engineMode: EngineMode | null = null;
-/** Telemetry for the engine load in progress, if any (one outcome per worker). */
+/**
+ * Set after a multi-threaded export stalls: later workers in this page
+ * session load the single-threaded core even though the page is isolated.
+ */
+let preferSingleThread = false;
+/** Telemetry for the load in progress, if any. */
 let engineLoad: ReturnType<typeof startEngineLoad> | null = null;
 
 function createWorker(): Worker {
@@ -96,12 +129,30 @@ function createWorker(): Worker {
   return ffmpegWorker;
 }
 
+/**
+ * Wraps a progress callback so it only fires when the rounded percentage
+ * changes. FFmpeg reports progress per encoded frame; forwarding every event
+ * re-rendered the editor hundreds of times per export for no visible change.
+ */
+export function dedupeProgress(onProgress?: (percent: number) => void) {
+  if (!onProgress) return undefined;
+  let last = -1;
+  return (percent: number) => {
+    const rounded = Math.max(0, Math.min(100, Math.round(percent)));
+    if (rounded === last) return;
+    last = rounded;
+    onProgress(rounded);
+  };
+}
+
 function resetWorker() {
   // A load that never finished was abandoned (cancelled), not failed.
   engineLoad?.abandoned();
   engineLoad = null;
-  engineMode = null;
+  ffmpegWorker?.terminate();
   ffmpegWorker = null;
+  engineMode = null;
+  pendingActivity = null;
   workerReady = null;
   workerReadyResolve = null;
   workerReadyReject = null;
@@ -123,7 +174,13 @@ function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
     return;
   }
 
+  if (data.type === "heartbeat") {
+    pendingActivity?.();
+    return;
+  }
+
   if (data.type === "progress") {
+    pendingActivity?.();
     pendingProgress?.(data.percent);
     return;
   }
@@ -158,13 +215,14 @@ function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
       return;
     }
 
-    const loadError = new FFmpegLoadError(data.message);
-    if (workerReadyReject) engineLoad?.failed(loadError);
+    // An error without a matching id means the worker itself failed. Settle
+    // whatever is waiting on it — an export left pending here used to keep
+    // the UI on "Exporting" forever.
+    const error = new FFmpegLoadError(data.message);
+    if (workerReadyReject) engineLoad?.failed(error);
     engineLoad = null;
-    workerReadyReject?.(loadError);
-    workerReady = null;
-    workerReadyResolve = null;
-    workerReadyReject = null;
+    workerReadyReject?.(error);
+    pendingExport?.reject(error);
     resetWorker();
     return;
   }
@@ -202,14 +260,20 @@ export async function loadFFmpeg(
   // 2. Use the captured flag to securely trigger the worker's internal load phase
   if (isFirstLoad) {
     const isolated = typeof crossOriginIsolated !== "undefined" && crossOriginIsolated;
-    engineLoad = startEngineLoad(isolated ? "multi" : "single", isolated ? null : "not_isolated");
-    ffmpegWorker!.postMessage({ type: "load" });
+    engineLoad = startEngineLoad(
+      isolated && !preferSingleThread ? "multi" : "single",
+      !isolated ? "not_isolated" : preferSingleThread ? "after_stall" : null
+    );
+    ffmpegWorker!.postMessage({ type: "load", singleThread: preferSingleThread });
   }
 
-  pendingProgress = onProgress ?? null;
+  pendingProgress = dedupeProgress(onProgress) ?? null;
 
+  // A load can't be interrupted inside the worker, so cancelling one
+  // discards the worker; the next attempt starts a fresh one (the core files
+  // come back from the HTTP cache).
   if (signal?.aborted) {
-    ffmpegWorker?.postMessage({ type: "cancel" });
+    terminateFFmpeg();
     throw new DOMException("Aborted", "AbortError");
   }
 
@@ -218,8 +282,7 @@ export async function loadFFmpeg(
   };
 
   const onAbort = () => {
-    ffmpegWorker?.postMessage({ type: "cancel" });
-    workerReadyReject?.(new DOMException("Aborted", "AbortError"));
+    terminateFFmpeg();
     cleanup();
   };
 
@@ -227,7 +290,7 @@ export async function loadFFmpeg(
 
   try {
     // ffmpeg_load_success / ffmpeg_load_failure are reported once per worker
-    // by the message handlers, however many callers wait on the same load.
+    // by handleWorkerMessage, however many callers wait on the same load.
     await workerReady;
     if (isFirstLoad) trackTiming("ffmpeg_ready");
   } finally {
@@ -241,17 +304,47 @@ function cancelPendingExport(reason?: unknown) {
     pendingExport = null;
   }
   pendingProgress = null;
+  pendingActivity = null;
 }
 
+/**
+ * Exports `file` with `recipe`. If the multi-threaded engine stalls, the same
+ * export (same file and edits) is retried once on the single-threaded engine,
+ * and `onEngineFallback` is told why before the retry starts.
+ */
 export async function exportVideo(
   file: File,
   recipe: EditRecipe,
   onProgress: (percent: number) => void,
   signal?: AbortSignal,
   musicOptions?: BackgroundMusicOptions,
-  overlayOptions?: ImageOverlayOptions
+  overlayOptions?: ImageOverlayOptions,
+  knownDuration?: number,
+  onEngineFallback?: (reason: StallReason) => void
 ): Promise<ExportResult> {
-  await loadFFmpeg(signal, onProgress);
+  try {
+    return await exportOnce(file, recipe, onProgress, signal, musicOptions, overlayOptions, knownDuration);
+  } catch (err) {
+    if (!(err instanceof ExportStalledError) || err.mode !== "multi" || signal?.aborted) throw err;
+    // The stall set preferSingleThread, so this loads the single-threaded core.
+    // The file is read again: its first copy was transferred to the old worker.
+    onEngineFallback?.(err.reason);
+    onProgress(0);
+    return exportOnce(file, recipe, onProgress, signal, musicOptions, overlayOptions, knownDuration);
+  }
+}
+
+async function exportOnce(
+  file: File,
+  recipe: EditRecipe,
+  onProgress: (percent: number) => void,
+  signal?: AbortSignal,
+  musicOptions?: BackgroundMusicOptions,
+  overlayOptions?: ImageOverlayOptions,
+  /** Duration already read by the editor; skips a second metadata load. */
+  knownDuration?: number
+): Promise<ExportResult> {
+  await loadFFmpeg(signal);
 
   if (!ffmpegWorker) {
     throw new Error("FFmpeg worker is not available.");
@@ -300,7 +393,7 @@ export async function exportVideo(
     ? { ...overlayOptions, file: null }
     : undefined;
 
-  pendingProgress = onProgress;
+  pendingProgress = dedupeProgress(onProgress) ?? null;
 
   const exportPromise = new Promise<ExportResult>((resolve, reject) => {
     pendingExport = { id: sessionId, resolve, reject };
@@ -318,6 +411,21 @@ export async function exportVideo(
   };
   signal?.addEventListener("abort", onAbort, { once: true });
 
+  const mode = engineMode ?? "single";
+  let lastActivity = Date.now();
+  pendingActivity = () => {
+    lastActivity = Date.now();
+  };
+  const watchdog = setInterval(() => {
+    if (Date.now() - lastActivity < STALL_TIMEOUT_MS) return;
+    clearInterval(watchdog);
+    if (mode === "multi") preferSingleThread = true;
+    const stalled = new ExportStalledError(mode);
+    cancelPendingExport(stalled);
+    // The worker is wedged and can't be told to stop; discard it.
+    resetWorker();
+  }, 5_000);
+
   const transfers: Transferable[] = [arrayBuffer];
   if (musicFilePayload) transfers.push(musicFilePayload.data);
   if (overlayFilePayload) transfers.push(overlayFilePayload.data);
@@ -328,7 +436,10 @@ export async function exportVideo(
       id: sessionId,
       file: filePayload,
       recipe,
-      videoDuration: await getVideoDuration(file),
+      videoDuration:
+        knownDuration && Number.isFinite(knownDuration) && knownDuration > 0
+          ? knownDuration
+          : await getVideoDuration(file),
       musicFile: musicFilePayload,
       musicOptions: sanitizedMusicOptions,
       overlayFile: overlayFilePayload,
@@ -340,6 +451,8 @@ export async function exportVideo(
   try {
     return await exportPromise;
   } finally {
+    clearInterval(watchdog);
+    pendingActivity = null;
     signal?.removeEventListener("abort", onAbort);
   }
 }
@@ -347,19 +460,20 @@ export async function exportVideo(
 async function getVideoDuration(file: File): Promise<number> {
   return new Promise((resolve) => {
     const video = document.createElement("video");
-    video.preload = "metadata";
-    video.onloadedmetadata = () => {
-      URL.revokeObjectURL(video.src);
-      resolve(video.duration);
+    const url = URL.createObjectURL(file);
+    const finish = (value: number) => {
+      clearTimeout(timer);
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      resolve(Number.isFinite(value) ? value : 0);
     };
-    video.onerror = () => resolve(0);
-    video.src = URL.createObjectURL(file);
+    // 0 makes the worker omit -t, so a stalled metadata read degrades safely.
+    const timer = setTimeout(() => finish(0), 5000);
+    video.preload = "metadata";
+    video.onloadedmetadata = () => finish(video.duration);
+    video.onerror = () => finish(0);
+    video.src = url;
   });
-}
-
-/** The core the worker loaded ("multi" or "single"), or null before it is ready. */
-export function getEngineMode(): EngineMode | null {
-  return engineMode;
 }
 
 export function terminateFFmpeg() {
@@ -367,8 +481,29 @@ export function terminateFFmpeg() {
     ffmpegWorker.postMessage({ type: "terminate" });
     ffmpegWorker.terminate();
   }
+  // Settle a load that is still in flight so its caller never hangs.
+  workerReadyReject?.(new DOMException("Export cancelled", "AbortError"));
   cancelPendingExport(new DOMException("Export cancelled", "AbortError"));
   resetWorker();
+}
+
+/** Test/diagnostic helper: whether a worker or export is currently held. */
+export function getFFmpegClientState() {
+  return {
+    hasWorker: ffmpegWorker !== null,
+    hasPendingExport: pendingExport !== null,
+    hasPendingProgress: pendingProgress !== null,
+  };
+}
+
+/** The loaded core ("multi" | "single"), or null before the engine is ready. */
+export function getEngineMode(): EngineMode | null {
+  return engineMode;
+}
+
+/** Test helper: forget the single-thread preference set by a stall. */
+export function resetEnginePreferenceForTests() {
+  preferSingleThread = false;
 }
 
 function buildSessionId(): string {
@@ -396,268 +531,6 @@ function buildSessionId(): string {
   const randomPart = Math.random().toString(36).substring(2, 15);
   const counterPart = (Math.random() * 10000000).toString(36);
   return `${timestamp}-${randomPart}${counterPart}`;
-}
-
-export function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: number): string {
-  const filters: string[] = [];
-
-  if (recipe.trimStart > 0 || recipe.trimEnd !== null) {
-    // Only use trim filter with precise bounds to avoid scanning entire file
-    // If trimEnd is null, use duration parameter instead of large placeholder value
-    if (recipe.trimEnd !== null) {
-      filters.push(`trim=start=${recipe.trimStart}:end=${recipe.trimEnd}`);
-    } else if (recipe.trimStart > 0) {
-      // When only trimStart is set, let FFmpeg infer end (don't use 999999 placeholder)
-      filters.push(`trim=start=${recipe.trimStart}`);
-    }
-  }
-
-  if (recipe.stabilization) {
-    filters.push("deshake");
-  }
-
-  if (recipe.rotate === 90) {
-    filters.push("transpose=1");
-  } else if (recipe.rotate === 180) {
-    filters.push("transpose=1,transpose=1");
-  } else if (recipe.rotate === 270) {
-    filters.push("transpose=2");
-  }
-
-  if (recipe.framing === "fit") {
-    filters.push(
-      `scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease`,
-      `pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2:color=black`
-    );
-  } else {
-    filters.push(
-      `scale=${targetW}:${targetH}:force_original_aspect_ratio=increase`,
-      `crop=${targetW}:${targetH}`
-    );
-  }
-  if (recipe.sharpness !== 0) {
-    filters.push(`unsharp=5:5:${recipe.sharpness}:5:5:0.0`);
-  }
-
-  // Normalize timestamps only when needed — trim or speed change both
-  // require a clean 0-based timeline to produce correct output duration.
-  if (recipe.trimStart > 0 || recipe.trimEnd !== null || recipe.speed !== 1) {
-    filters.push("setpts=PTS-STARTPTS");
-  }
-
-  if (recipe.speed !== 1) {
-    const pts = (1 / recipe.speed).toFixed(4);
-    filters.push(`setpts=${pts}*PTS`);
-  }
-
-  if (recipe.denoise) {
-    filters.push("hqdn3d=1.5:1.5:6:6");
-  }
-
-  const needsEq =
-    recipe.brightness !== 0 ||
-    recipe.contrast !== 1 ||
-    recipe.saturation !== 1;
-
-  if (needsEq) {
-    filters.push(
-      `eq=brightness=${recipe.brightness}:contrast=${recipe.contrast}:saturation=${recipe.saturation}`
-    );
-  }
-
-  // Add text overlays
-  const textOverlays = recipe.textOverlays || [];
-  textOverlays.forEach((overlay) => {
-    filters.push(buildTextFilter(overlay, targetW, targetH));
-  });
-
-  return filters.join(",");
-}
-
-export function buildAudioFilter(recipe: EditRecipe): string {
-  if (recipe.speed <= 0) return "";
-  const filters: string[] = [];
-
-  let remaining = recipe.speed;
-  while (remaining < 0.5) {
-    filters.push("atempo=0.5");
-    remaining /= 0.5;
-  }
-
-  while (remaining > 2.0) {
-    filters.push("atempo=2.0");
-    remaining /= 2.0;
-  }
-
-  if (Math.abs(remaining - 1.0) > 0.001) {
-    filters.push(`atempo=${Number(remaining.toFixed(4))}`);
-  }
-
-  if (recipe.volume !== undefined && recipe.volume !== 100) {
-    filters.push(`volume=${(recipe.volume / 100).toFixed(2)}`);
-  }
-
-  if (recipe.normalizeAudio) filters.push("loudnorm=I=-14:TP=-1.5:LRA=11");
-
-  return filters.join(",");
-}
-
-function buildAudioTrimFilter(recipe: EditRecipe): string {
-  if (recipe.trimStart === 0 && recipe.trimEnd === null) return "";
-
-  // Avoid scanning entire audio with large placeholder values
-  // Use precise trim bounds when available
-  let trimFilter = `atrim=start=${recipe.trimStart}`;
-  if (recipe.trimEnd !== null) {
-    trimFilter += `:end=${recipe.trimEnd}`;
-  }
-  // asetpts normalizes timestamps after trim for correct stream positioning
-  return `${trimFilter},asetpts=PTS-STARTPTS`;
-}
-
-function buildArguments(
-  recipe: EditRecipe,
-  format: "mp4" | "webm" | "mkv" | "gif",
-  outputName: string,
-  inputName: string,
-  targetW: number,
-  targetH: number,
-  hasMusicTrack: boolean,
-  musicInputName: string,
-  musicOptions: BackgroundMusicOptions | undefined,
-  hasOverlay: boolean,
-  overlayInputName: string,
-  overlayOptions: ImageOverlayOptions | undefined,
-  hasOriginalAudio: boolean,
-  videoDuration: number
-): string[] {
-  const vf = buildVideoFilter(recipe, targetW, targetH);
-  const audioTrim = hasOriginalAudio ? buildAudioTrimFilter(recipe) : "";
-  const audioSpeed = hasOriginalAudio ? buildAudioFilter(recipe) : "";
-  const afParts = [audioTrim, audioSpeed].filter(Boolean);
-  const af = afParts.join(",");
-
-  const musicIdx = 1;
-  const overlayIdx = hasMusicTrack ? 2 : 1;
-
-  const args: string[] = [];
-  args.push("-i", inputName);
-  if (hasMusicTrack) {
-    if (musicOptions!.loopMusic) args.push("-stream_loop", "-1");
-    args.push("-i", musicInputName);
-  }
-  if (hasOverlay) {
-    args.push("-i", overlayInputName);
-  }
-
-  const needsFilterComplex = hasOverlay || hasMusicTrack;
-  const shouldKeepAudio = recipe.keepAudio && (hasOriginalAudio || hasMusicTrack);
-
-  if (needsFilterComplex) {
-    const filterParts: string[] = [];
-    let videoOut = "[0:v]";
-
-    if (vf) {
-      filterParts.push(`[0:v]${vf}[vbase]`);
-      videoOut = "[vbase]";
-    }
-
-if (hasOverlay) {
-  const scaledW = overlayOptions!.size;
-  const alpha = (overlayOptions!.opacity / 100).toFixed(2);
-  const posMap: Record<string, string> = {
-    "top-left":     "20:20",
-    "top-right":    "main_w-w-20:20",
-    "bottom-left":  "20:main_h-h-20",
-    "bottom-right": "main_w-w-20:main_h-h-20",
-  };
-
-interface PositionCoords {
-    x: number;
-    y: number;
-  }
-
-  const pos = typeof overlayOptions?.position === "string"
-    ? (posMap[overlayOptions.position] ?? "main_w-w-20:main_h-h-20")
-    : overlayOptions?.position
-    ? `(main_w)*${(overlayOptions.position as PositionCoords).x}/100:(main_h)*${(overlayOptions.position as PositionCoords).y}/100`
-    : "main_w-w-20:main_h-h-20";
-
-  filterParts.push(`[${overlayIdx}:v]scale=${scaledW}:-2,format=rgba,colorchannelmixer=aa=${alpha}[logo]`);
-  filterParts.push(`${videoOut}[logo]overlay=${pos}[vout]`);
-  videoOut = "[vout]";
-}
-
-    let audioOut = "";
-    if (shouldKeepAudio) {
-      if (hasMusicTrack) {
-        const musicVol = (musicOptions!.musicVolume / 100).toFixed(2);
-        if (hasOriginalAudio) {
-          const origVol  = (musicOptions!.originalAudioVolume / 100).toFixed(2);
-          const origChain = afParts.length > 0
-            ? `[0:a]${afParts.join(",")},volume=${origVol}[orig]`
-            : `[0:a]volume=${origVol}[orig]`;
-          filterParts.push(origChain);
-          filterParts.push(`[${musicIdx}:a]volume=${musicVol}[music]`);
-          filterParts.push(`[orig][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
-          audioOut = "[aout]";
-        } else {
-          filterParts.push(`[${musicIdx}:a]volume=${musicVol}[aout]`);
-          audioOut = "[aout]";
-        }
-      } else if (hasOriginalAudio && af) {
-        filterParts.push(`[0:a]${af}[aout]`);
-        audioOut = "[aout]";
-      }
-    }
-
-    if (filterParts.length > 0) {
-      args.push("-filter_complex", filterParts.join(";"));
-    }
-    args.push("-map", videoOut === "[0:v]" ? "0:v" : videoOut);
-
-    if (!shouldKeepAudio) {
-      args.push("-an");
-    } else if (audioOut) {
-      args.push("-map", audioOut);
-    } else if (hasOriginalAudio) {
-      args.push("-map", "0:a");
-    }
-  } else {
-    if (vf) args.push("-vf", vf);
-    if (!shouldKeepAudio) {
-      args.push("-an");
-    } else if (af && hasOriginalAudio) {
-      args.push("-af", af);
-    }
-  }
-
-  if (format === "webm") {
-    args.push(
-      "-c:v", "libvpx-vp9",
-      "-b:v", "0",
-      "-crf", String(recipe.quality),
-      "-cpu-used", "4",
-      "-deadline", "realtime"
-    );
-    if (shouldKeepAudio) args.push("-c:a", "libopus");
-  } else if (format === "mkv") {
-    args.push("-c:v", "libx264", "-crf", String(recipe.quality), "-preset", "ultrafast");
-    if (shouldKeepAudio) args.push("-c:a", "aac", "-b:a", "128k");
-  } else {
-    args.push("-c:v", "libx264", "-crf", String(recipe.quality), "-preset", "ultrafast", "-movflags", "+faststart");
-    if (shouldKeepAudio) args.push("-c:a", "aac", "-b:a", "128k");
-  }
-
-  // Add explicit output duration to prevent slight duration overshoot
-  // caused by encoder/filter pipeline frame flush at stream end,
-  // and to prevent infinite loops when adding looped audio to silent videos.
-  const sourceDuration = (recipe.trimEnd ?? videoDuration) - recipe.trimStart;
-  const outputDuration = sourceDuration / recipe.speed;
-  args.push("-t", outputDuration.toFixed(6));
-
-  args.push(outputName);
-  return args;
 }
 
 export function formatBytes(bytes: number): string {

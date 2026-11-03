@@ -7,9 +7,9 @@
  * Event names and properties are documented in docs/DATADOG.md.
  */
 import { failureCategory, trackAction, trackVital } from "./telemetry";
+import type { EngineMode } from "./ffmpegArgs";
 
-/** Which FFmpeg core the worker loaded. */
-export type EngineMode = "multi" | "single";
+export type { EngineMode };
 
 export type ExportStage = "engine" | "encode";
 
@@ -21,6 +21,9 @@ export type ExportFailureCategory =
   | "encoder_crash"
   | "network"
   | "encode_error";
+
+/** Which watchdog rule stopped a stalled export (see ExportStalledError). */
+export type StallReason = "no_activity" | "no_progress" | "overrun";
 
 export type EngineLoadFailureCategory = "network" | "integrity" | "wasm" | "worker_script" | "unknown";
 
@@ -86,6 +89,7 @@ export class ExportAttempt {
   private readonly startedAt = now();
   private encodeStartedAt: number | null = null;
   private engine: EngineMode | "none" = "none";
+  private fellBack = false;
 
   constructor(
     private readonly context: ExportContext,
@@ -109,10 +113,23 @@ export class ExportAttempt {
     this.encodeStartedAt = now();
   }
 
+  /**
+   * The multi-threaded engine stalled and this same attempt is being retried
+   * on the single-threaded one. The attempt keeps going: its one outcome is
+   * reported when the retry ends, with engine "single" and fell_back true.
+   */
+  engineFallback(reason: StallReason): void {
+    if (this.settled) return;
+    trackAction("engine_fallback", { ...this.context, from: "multi", to: "single", stall_reason: reason });
+    this.engine = "single";
+    this.fellBack = true;
+  }
+
   private common() {
     return {
       ...this.context,
       engine: this.engine,
+      fell_back: this.fellBack,
       is_retry: this.retryOf !== null,
       durationMs: Math.round(now() - this.startedAt),
     };

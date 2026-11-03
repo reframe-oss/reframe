@@ -43,6 +43,10 @@ const ALLOWED_KEYS = new Set([
   "category",
   "load_number",
   "single_reason",
+  "fell_back",
+  "from",
+  "to",
+  "stall_reason",
 ]);
 
 let rum: { addAction: ReturnType<typeof vi.fn>; addDurationVital: ReturnType<typeof vi.fn> };
@@ -118,6 +122,10 @@ describe("export attempt outcomes", () => {
     a.failed(new Error("x"));
     new ExportAttempt(context).cancelled();
     new ExportAttempt(context).succeeded("25-100MB");
+    const fb = new ExportAttempt(context);
+    fb.encoding("multi");
+    fb.engineFallback("no_activity");
+    fb.succeeded("<25MB");
     const load = startEngineLoad("multi");
     load.failed(new Error("Failed to fetch engine file (HTTP 503)"));
     startEngineLoad("single").succeeded("single");
@@ -129,6 +137,25 @@ describe("export attempt outcomes", () => {
         if (typeof value === "string") expect(value.length).toBeLessThan(24);
       }
     }
+  });
+});
+
+describe("engine fallback", () => {
+  it("reports the fallback with its reason, and the attempt's one outcome on the single-threaded engine", () => {
+    const attempt = new ExportAttempt(context);
+    attempt.encoding("multi");
+    attempt.engineFallback("no_activity");
+    expect(attempt.succeeded("<25MB")).toBe(true);
+    expect(names()).toEqual(["export_started", "engine_fallback", "export_succeeded"]);
+    expect(events()[1]!.ctx).toMatchObject({ from: "multi", to: "single", stall_reason: "no_activity", format: "mp4" });
+    expect(events()[2]!.ctx).toMatchObject({ engine: "single", fell_back: true });
+  });
+
+  it("does nothing once the attempt has an outcome", () => {
+    const attempt = new ExportAttempt(context);
+    attempt.cancelled();
+    attempt.engineFallback("no_activity");
+    expect(names()).toEqual(["export_started", "export_cancelled"]);
   });
 });
 
