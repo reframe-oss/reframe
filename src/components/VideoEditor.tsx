@@ -285,6 +285,7 @@ export default function VideoEditor() {
     result,
     error,
     exportStartedAt,
+    exportNotice,
     updateRecipe,
     handleFileSelect,
     fileError,
@@ -425,6 +426,7 @@ export default function VideoEditor() {
         status={status}
         progress={progress}
         exportStartedAt={exportStartedAt}
+        notice={exportNotice}
         onCancel={cancelExport}
       />
       <OnboardingTour />

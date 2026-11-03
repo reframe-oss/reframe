@@ -1,6 +1,6 @@
 import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, MAX_FILE_SIZE } from "./types";
 import { trackTiming } from "./telemetry";
-import { startEngineLoad } from "./exportTelemetry";
+import { startEngineLoad, type StallReason } from "./exportTelemetry";
 import type { EngineMode } from "./ffmpegArgs";
 
 // The command line itself is built in ffmpegArgs.ts and run by the worker.
@@ -14,11 +14,18 @@ export class FFmpegLoadError extends Error {
   }
 }
 
-/** The engine stopped reporting activity mid-export (see STALL_TIMEOUT_MS). */
+/** The watchdog stopped an export that wasn't going to finish. */
 export class ExportStalledError extends Error {
   name = "ExportStalledError";
-  constructor(readonly mode: EngineMode) {
-    super("Export stopped responding");
+  constructor(
+    readonly mode: EngineMode,
+    readonly reason: StallReason = "no_activity"
+  ) {
+    super(
+      mode === "multi"
+        ? "The export stopped responding. Press Retry to try again with the single-threaded engine, which is slower but more reliable."
+        : "The export stopped responding. Press Retry to try again, or try a shorter clip or a lower resolution."
+    );
   }
 }
 
@@ -300,7 +307,34 @@ function cancelPendingExport(reason?: unknown) {
   pendingActivity = null;
 }
 
+/**
+ * Exports `file` with `recipe`. If the multi-threaded engine stalls, the same
+ * export (same file and edits) is retried once on the single-threaded engine,
+ * and `onEngineFallback` is told why before the retry starts.
+ */
 export async function exportVideo(
+  file: File,
+  recipe: EditRecipe,
+  onProgress: (percent: number) => void,
+  signal?: AbortSignal,
+  musicOptions?: BackgroundMusicOptions,
+  overlayOptions?: ImageOverlayOptions,
+  knownDuration?: number,
+  onEngineFallback?: (reason: StallReason) => void
+): Promise<ExportResult> {
+  try {
+    return await exportOnce(file, recipe, onProgress, signal, musicOptions, overlayOptions, knownDuration);
+  } catch (err) {
+    if (!(err instanceof ExportStalledError) || err.mode !== "multi" || signal?.aborted) throw err;
+    // The stall set preferSingleThread, so this loads the single-threaded core.
+    // The file is read again: its first copy was transferred to the old worker.
+    onEngineFallback?.(err.reason);
+    onProgress(0);
+    return exportOnce(file, recipe, onProgress, signal, musicOptions, overlayOptions, knownDuration);
+  }
+}
+
+async function exportOnce(
   file: File,
   recipe: EditRecipe,
   onProgress: (percent: number) => void,

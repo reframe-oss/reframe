@@ -43,9 +43,10 @@ its own, so we can see which browser and device combinations fail.
 | Event | When | Properties |
 |---|---|---|
 | `export_started` | Export clicked and settings validated | `format`, `resolution`, `input_size`, `clip_length`, `has_text`, `has_music`, `has_image_overlay`, `is_retry`, `retry_after` (retries only: the previous failure's category) |
-| `export_succeeded` | Terminal | the context above, plus `engine`, `durationMs` (click to done), `encode_ms`, `output_size` |
+| `export_succeeded` | Terminal | the context above, plus `engine`, `fell_back` (true after an engine fallback), `durationMs` (click to done), `encode_ms`, `output_size` |
 | `export_failed` | Terminal | the context, plus `engine`, `durationMs`, `stage` (`engine` / `encode`), `category` |
 | `export_cancelled` | Terminal: the user cancelled | the context, plus `engine`, `durationMs`, `stage` |
+| `engine_fallback` | The multi-threaded engine stalled; the same export restarts automatically on the single-threaded engine. Not terminal: the attempt's outcome follows | the context, plus `from: multi`, `to: single`, `stall_reason` |
 | `ffmpeg_load_success` | A worker loaded the engine (once per worker) | `engine` (`multi` / `single`, what actually loaded), `engine_requested`, `single_reason` (`not_isolated` / `after_stall` / `mt_load_failed`, single-threaded only), `load_number` (`first` / `repeat`), `durationMs` |
 | `ffmpeg_load_failure` | A worker failed to load (not sent when the user cancelled) | `engine_requested`, `load_number`, `category` (`network` / `integrity` / `wasm` / `worker_script` / `unknown`), `durationMs` |
 | `export` (duration vital) | With `export_succeeded`; encoding time only | the context, plus `engine` |

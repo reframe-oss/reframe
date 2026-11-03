@@ -89,6 +89,23 @@ describe("export reliability telemetry in the editor", () => {
     expect(JSON.stringify(rum.addAction.mock.calls)).not.toContain("holiday-clip");
   });
 
+  it("an automatic fallback to the single-threaded engine is one attempt, with a notice", async () => {
+    const { result } = await editorWithFile();
+    vi.mocked(exportVideo).mockImplementationOnce(async (...args) => {
+      const onEngineFallback = args[7] as (reason: "no_activity") => void;
+      onEngineFallback("no_activity");
+      return okResult;
+    });
+    await act(() => result.current.handleExport());
+    expect(lifecycle().map((e) => e.name)).toEqual(["export_started", "export_succeeded"]);
+    const fallback = rum.addAction.mock.calls.find(([name]) => name === "engine_fallback");
+    expect(fallback?.[1]).toMatchObject({ stall_reason: "no_activity", from: "multi", to: "single" });
+    expect(lifecycle()[1]!.ctx).toMatchObject({ engine: "single", fell_back: true });
+    expect(result.current.exportNotice).toMatch(/single-threaded engine/);
+    // The editor passes its known duration, so the export doesn't re-read it.
+    expect(vi.mocked(exportVideo).mock.calls[0]![6]).toBe(12);
+  });
+
   it("a cancel followed by a late rejection is one cancellation, not a failure", async () => {
     const { result } = await editorWithFile();
     let reject!: (e: unknown) => void;

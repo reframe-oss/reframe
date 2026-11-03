@@ -5,6 +5,7 @@ import {
   outputDurationArgs,
   resolveThreadCount,
   MT_THREAD_CAP,
+  UNKNOWN_CORES_THREADS,
   type ExportArgsOptions,
 } from "../ffmpegArgs";
 import { DEFAULT_RECIPE } from "../constants";
@@ -41,12 +42,14 @@ describe("resolveThreadCount", () => {
     expect(resolveThreadCount("multi", 64)).toBe(4);
   });
 
-  it("uses fewer threads on small devices and falls back to the cap when unknown", () => {
+  it("is min(4, hardwareConcurrency || 2)", () => {
     expect(resolveThreadCount("multi", 2)).toBe(2);
     expect(resolveThreadCount("multi", 1)).toBe(1);
-    expect(resolveThreadCount("multi", 0)).toBe(4);
-    expect(resolveThreadCount("multi", undefined)).toBe(4);
-    expect(resolveThreadCount("multi", NaN)).toBe(4);
+    expect(resolveThreadCount("multi", 3)).toBe(3);
+    expect(UNKNOWN_CORES_THREADS).toBe(2);
+    expect(resolveThreadCount("multi", 0)).toBe(2);
+    expect(resolveThreadCount("multi", undefined)).toBe(2);
+    expect(resolveThreadCount("multi", NaN)).toBe(2);
   });
 });
 
