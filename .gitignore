@@ -57,3 +57,7 @@ chromatic.log
 # playwright
 /test-results/
 /playwright-report/
+
+# local performance measurement output
+scripts/perf/lh/
+scripts/perf/reports/

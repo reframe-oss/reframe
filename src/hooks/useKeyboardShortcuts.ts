@@ -1,6 +1,6 @@
 import { EditRecipe, ExportStatus } from "@/lib/types";
 import { PRESETS } from "@/lib/presets";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { isMacPlatform, isTextEntryTarget, matchHistoryShortcut } from "@/lib/historyShortcuts";
 
 interface UseKeyboardShortcutsProps {
@@ -12,7 +12,8 @@ interface UseKeyboardShortcutsProps {
   status: ExportStatus;
   cancelExport: () => void;
   onToggleShortcutsModal: () => void;
-  currentTime: number;
+  /** Reads the playhead at key-press time (no per-frame re-subscription). */
+  getCurrentTime: () => number;
   duration: number;
   undo?: () => void;
   redo?: () => void;
@@ -27,15 +28,11 @@ export function useKeyboardShortcuts({
   status,
   cancelExport,
   onToggleShortcutsModal,
-  currentTime,
+  getCurrentTime,
   duration,
   undo,
   redo,
 }: UseKeyboardShortcutsProps) {
-  const currentTimeRef = useRef(currentTime);
-  useEffect(() => {
-    currentTimeRef.current = currentTime;
-  }, [currentTime]);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Undo/redo works from sliders and buttons too, but never steals the
@@ -52,6 +49,7 @@ export function useKeyboardShortcuts({
       if (
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
         target.isContentEditable
       ) return;
 
@@ -87,11 +85,11 @@ export function useKeyboardShortcuts({
           break;
         case "i":
         case "I":
-          updateRecipe({trimStart: Math.floor(currentTimeRef.current)});
+          updateRecipe({ trimStart: Math.floor(getCurrentTime()) });
           break;
         case "o":
         case "O":
-          updateRecipe({trimEnd: Math.floor(currentTimeRef.current)});
+          updateRecipe({ trimEnd: Math.floor(getCurrentTime()) });
           break;
 
         default:
@@ -106,5 +104,5 @@ export function useKeyboardShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [file, recipe, resetSettings, updateRecipe, handleExport, status, cancelExport, onToggleShortcutsModal, currentTime, duration, undo, redo]);
+  }, [file, recipe, resetSettings, updateRecipe, handleExport, status, cancelExport, onToggleShortcutsModal, getCurrentTime, duration, undo, redo]);
 }

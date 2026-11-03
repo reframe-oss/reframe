@@ -9,7 +9,7 @@ interface ColorPickerProps {
 }
 
 const getGlassyClasses = (opacity = 10) =>
-    `backdrop-filter backdrop-blur-lg bg-[var(--surface)] bg-opacity-${opacity} border border-[var(--border)] rounded-lg shadow-lg transition-all duration-300`;
+    `bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-overlay)]`;
 
 function hexToHsv(hex: string): [number, number, number] {
     const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -220,7 +220,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
                     ref={triggerRef}
                     type="button"
                     onClick={() => setOpen(!open)}
-                    className={`flex items-center gap-3 ${getGlassyClasses(20)} p-1.5 border border-[var(--border)] hover:bg-[var(--border)] active:scale-95 transition-transform`}
+                    className={`flex items-center gap-3 ${getGlassyClasses()} p-1.5 border border-[var(--border)] hover:bg-[var(--border)] active:scale-95 transition-transform`}
                     aria-label="Open custom palette"
                 >
                     <span
@@ -234,7 +234,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
                     value={hexInput}
                     onChange={handleHexInput}
                     maxLength={6}
-                    className='flex-1 px-2 py-1.5 text-xs rounded border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] font-mono uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-film-500'
+                    className='flex-1 px-2 py-1.5 text-xs rounded border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] font-mono uppercase focus:outline-none focus:ring-2 focus:ring-film-500'
                     spellCheck={false}
                 />
             </div>
@@ -243,7 +243,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
                 createPortal(
                     <div
                         ref={panelRef}
-                        className={`absolute z-[9999] p-3 ${getGlassyClasses(40)} border border-[var(--border)] w-60 flex flex-col gap-2.5 shadow-2xl backdrop-blur-xl`}
+                        className={`absolute z-[9999] p-3 ${getGlassyClasses()} border border-[var(--border)] w-60 flex flex-col gap-2.5`}
                         style={{
                             top: panelPos.top,
                             left: panelPos.left,
@@ -289,7 +289,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
                                 <button
                                     type="button"
                                     onClick={handleEyeDropper}
-                                    className={`${getGlassyClasses(20)} p-1 border border-[var(--border)] hover:bg-[var(--border)] text-[var(--text)] flex-shrink-0`}
+                                    className={`${getGlassyClasses()} p-1 border border-[var(--border)] hover:bg-[var(--border)] text-[var(--text)] flex-shrink-0`}
                                     aria-label="Pick color from screen"
                                 >
                                     <Pipette size={14} />
@@ -302,8 +302,8 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
                                 ['G', g],
                                 ['B', b],
                             ].map(([ch, v_rgb]) => (
-                                <div key={ch as string} className={`${getGlassyClasses(10)} py-0.5 border border-[var(--border)]`}>
-                                    <div className='text-[10px] text-[var(--muted)] font-medium'>{ch}</div>
+                                <div key={ch as string} className={`${getGlassyClasses()} py-0.5 border border-[var(--border)]`}>
+                                    <div className='text-2xs text-[var(--muted)] font-medium'>{ch}</div>
                                     <div className='text-xs font-semibold text-[var(--text)]'>{v_rgb}</div>
                                 </div>
                             ))}

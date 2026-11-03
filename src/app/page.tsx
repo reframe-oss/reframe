@@ -1,23 +1,13 @@
 import VideoEditor from "@/components/VideoEditor";
 import Footer from "@/components/Footer";
 
+// The <main id="main-content"> landmark lives in layout.tsx; nesting a second
+// one here produced two main landmarks with the same id. The GitHub link now
+// sits in the header instead of a fixed badge that overlapped the controls.
 export default function Home() {
   return (
     <>
-      <a
-        href="https://github.com/reframe-oss/reframe"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="View Reframe on GitHub"
-        className="hidden sm:flex fixed top-4 right-4 md:right-16 z-50 items-center gap-1.5 px-3 py-1.5 rounded-lg neo-pressable text-[10px] font-heading font-semibold uppercase tracking-wider"
-      >
-        ⭐ Star on GitHub
-      </a>
-
-      <main id="main-content" tabIndex={-1}>
-        <VideoEditor />
-      </main>
-
+      <VideoEditor />
       <Footer />
     </>
   );

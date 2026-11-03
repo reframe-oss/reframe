@@ -17,28 +17,28 @@ interface BaseButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const BaseButton = forwardRef<HTMLButtonElement | HTMLAnchorElement, BaseButtonProps>(
   ({ className, variant = "secondary", size = "md", active, children, as = "button", ...props }, ref) => {
     const Component = as as any;
+    // Maps onto the shared .btn classes in globals.css so every button in the
+    // app has the same shape, states and transitions.
     const variants = {
-      primary: "bg-film-600 text-white shadow-lg shadow-film-200 dark:shadow-none hover:bg-film-700",
-      secondary: active
-        ? "border-film-500 bg-film-50 text-film-700 font-heading font-semibold dark:bg-film-900/20 dark:text-film-400 dark:border-film-700"
-        : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-film-300 hover:bg-film-50/30 dark:hover:bg-film-900/10",
-      ghost: "bg-transparent hover:bg-[var(--surface)]",
-      outline: "border border-[var(--border)] bg-transparent hover:border-film-300",
+      primary: "btn-primary",
+      secondary: "btn-secondary",
+      ghost: "btn-ghost",
+      outline: "btn-secondary bg-transparent",
     };
 
     const sizes = {
-      sm: "px-2 py-1 text-[10px]",
-      md: "px-3 py-2 text-xs",
-      lg: "px-4 py-3 text-sm",
-      xl: "py-5 text-2xl tracking-widest font-display",
+      sm: "btn-sm",
+      md: "",
+      lg: "btn-lg",
+      xl: "btn-lg w-full text-base",
     };
 
     return (
       <Component
         ref={ref}
+        aria-pressed={active}
         className={cn(
-          "flex items-center justify-center gap-2 rounded-lg transition-all duration-200",
-          "hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100",
+          "btn",
           variants[variant],
           sizes[size],
           className

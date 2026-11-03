@@ -17,6 +17,8 @@ const h = vi.hoisted(() => {
     execCalls: string[][] = [];
     deleted: string[] = [];
     files = new Map<string, Uint8Array>();
+    /** Every write, kept after cleanup deletes the file. */
+    writes = new Map<string, Uint8Array>();
     terminated = false;
     constructor() {
       FakeFFmpeg.instances.push(this);
@@ -33,6 +35,7 @@ const h = vi.hoisted(() => {
     }
     async writeFile(name: string, data: Uint8Array) {
       this.files.set(name, data);
+      this.writes.set(name, data);
     }
     async exec(args: string[]) {
       this.execCalls.push(args);
@@ -191,6 +194,30 @@ describe("ffmpeg.worker", () => {
     expect(posted.some((m) => m.type === "heartbeat")).toBe(true);
     // Temp names come from the job id, never the user's file name.
     expect([...ffmpeg().files.keys()].some((name) => name.includes("holiday"))).toBe(false);
+  });
+
+  it("reads the user's File itself when sent one, instead of the page reading it", async () => {
+    await startWorker({ isolated: false });
+    send({ type: "load" });
+    await waitFor("ready");
+    const req = exportRequest();
+    const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+    send({ ...req, file: { name: "clip.mp4", type: "video/mp4", blob: new Blob([bytes]) } });
+    await waitFor("result");
+    const written = [...ffmpeg().writes.entries()].find(([name]) => name.startsWith("input_"));
+    expect(written?.[1]).toEqual(bytes);
+  });
+
+  it("posts the output as a Blob, so the page never copies the file on its thread", async () => {
+    await startWorker({ isolated: false });
+    send({ type: "load" });
+    await waitFor("ready");
+    send(exportRequest());
+    await waitFor("result");
+    const result = posted.find((m) => m.type === "result") as { blob?: unknown; data?: unknown; mimeType?: string };
+    expect(result.blob).toBeInstanceOf(Blob);
+    expect((result.blob as Blob).type).toBe(result.mimeType);
+    expect(result.data).toBeUndefined();
   });
 
   it("reports a wasm trap (a rejected string) with its text, not 'undefined'", async () => {

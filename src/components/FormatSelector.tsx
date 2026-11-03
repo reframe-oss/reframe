@@ -2,7 +2,6 @@
 
 import { EditRecipe } from "@/lib/types";
 import { Film } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface Props {
   recipe: EditRecipe;
@@ -19,33 +18,24 @@ const FORMAT_OPTIONS = [
 export default function FormatSelector({ recipe, onChange }: Props) {
   return (
     <div>
-      <div className="flex items-center gap-1 mb-3">
-        <Film size={10} className="text-film-500 opacity-80" />
-        <div className="text-[10px] font-heading font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Output Format
-        </div>
+      <div id="format-label" className="mb-2 flex items-center gap-2 text-sm font-medium">
+        <Film size={15} aria-hidden="true" className="text-[var(--muted)]" />
+        Format
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div role="group" aria-labelledby="format-label" className="grid grid-cols-4 gap-1.5">
         {FORMAT_OPTIONS.map((option) => (
           <button
             key={option.id}
             type="button"
             onClick={() => onChange({ format: option.id as "mp4" | "webm" | "mkv" | "gif" })}
-            aria-label={`Select ${option.label} format`}
-            aria-pressed={recipe.format === option.id}
-            className={cn(
-              "relative px-3 py-2.5 rounded-lg border-2 border-transparent transition-all",
-              "text-xs font-heading font-semibold uppercase tracking-wider",
-              recipe.format === option.id
-                ? "neo-inset text-film-600"
-                : "neo-pressable text-[var(--muted)] hover:text-film-600"
-            )}
+                        aria-pressed={recipe.format === option.id}
+            className="choice min-h-[36px] px-2 text-xs font-medium"
           >
             {option.label}
           </button>
         ))}
       </div>
-      <p className="text-[10px] text-[var(--muted)] mt-2">
+      <p className="hint mt-2">
         {FORMAT_OPTIONS.find((o) => o.id === recipe.format)?.description}
       </p>
     </div>
