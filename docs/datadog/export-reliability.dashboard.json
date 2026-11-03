@@ -1,0 +1,1014 @@
+{
+  "title": "Reframe — export reliability",
+  "description": "Export outcomes from Reframe's browser RUM events (src/lib/exportTelemetry.ts). Success rate = export_succeeded / (export_succeeded + export_failed); cancellations are excluded. Treat groups with few finished exports as noise. Setup and facets: docs/DATADOG.md.",
+  "layout_type": "ordered",
+  "template_variables": [
+    {
+      "name": "env",
+      "prefix": "env",
+      "available_values": [
+        "production",
+        "preview"
+      ],
+      "default": "production"
+    }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "title": "Export success rate (cancellations excluded)",
+        "type": "query_value",
+        "precision": 1,
+        "custom_unit": "%",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded"
+                },
+                "group_by": []
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": []
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * succeeded / (succeeded + failed)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Finished exports (sample size)",
+        "type": "query_value",
+        "precision": 0,
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded"
+                },
+                "group_by": []
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": []
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "succeeded + failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Export outcomes over time",
+        "type": "timeseries",
+        "show_legend": true,
+        "requests": [
+          {
+            "response_format": "timeseries",
+            "display_type": "bars",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded"
+                },
+                "group_by": []
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": []
+              },
+              {
+                "data_source": "rum",
+                "name": "cancelled",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_cancelled"
+                },
+                "group_by": []
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "succeeded",
+                "alias": "Succeeded"
+              },
+              {
+                "formula": "failed",
+                "alias": "Failed"
+              },
+              {
+                "formula": "cancelled",
+                "alias": "Cancelled by the user"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Success rate by browser",
+        "type": "query_table",
+        "has_search_bar": "auto",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded"
+                },
+                "group_by": [
+                  {
+                    "facet": "@browser.name",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@browser.name",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * succeeded / (succeeded + failed)",
+                "alias": "Success rate (%)"
+              },
+              {
+                "formula": "succeeded + failed",
+                "alias": "Finished exports (sample size)"
+              },
+              {
+                "formula": "failed",
+                "alias": "Failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Success rate by device type",
+        "type": "query_table",
+        "has_search_bar": "auto",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded"
+                },
+                "group_by": [
+                  {
+                    "facet": "@device.type",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@device.type",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * succeeded / (succeeded + failed)",
+                "alias": "Success rate (%)"
+              },
+              {
+                "formula": "succeeded + failed",
+                "alias": "Finished exports (sample size)"
+              },
+              {
+                "formula": "failed",
+                "alias": "Failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Success rate by operating system",
+        "type": "query_table",
+        "has_search_bar": "auto",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded"
+                },
+                "group_by": [
+                  {
+                    "facet": "@os.name",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@os.name",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * succeeded / (succeeded + failed)",
+                "alias": "Success rate (%)"
+              },
+              {
+                "formula": "succeeded + failed",
+                "alias": "Finished exports (sample size)"
+              },
+              {
+                "formula": "failed",
+                "alias": "Failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Success rate by output format",
+        "type": "query_table",
+        "has_search_bar": "auto",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.format",
+                    "limit": 4,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.format",
+                    "limit": 4,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * succeeded / (succeeded + failed)",
+                "alias": "Success rate (%)"
+              },
+              {
+                "formula": "succeeded + failed",
+                "alias": "Finished exports (sample size)"
+              },
+              {
+                "formula": "failed",
+                "alias": "Failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Success rate by output resolution",
+        "type": "query_table",
+        "has_search_bar": "auto",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.resolution",
+                    "limit": 5,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.resolution",
+                    "limit": 5,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * succeeded / (succeeded + failed)",
+                "alias": "Success rate (%)"
+              },
+              {
+                "formula": "succeeded + failed",
+                "alias": "Finished exports (sample size)"
+              },
+              {
+                "formula": "failed",
+                "alias": "Failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Success rate by engine (multi- vs single-threaded)",
+        "type": "query_table",
+        "has_search_bar": "auto",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.engine",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.engine",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * succeeded / (succeeded + failed)",
+                "alias": "Success rate (%)"
+              },
+              {
+                "formula": "succeeded + failed",
+                "alias": "Finished exports (sample size)"
+              },
+              {
+                "formula": "failed",
+                "alias": "Failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "GIF exports: success rate by device type",
+        "type": "query_table",
+        "has_search_bar": "auto",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "succeeded",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded @context.format:gif"
+                },
+                "group_by": [
+                  {
+                    "facet": "@device.type",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed @context.format:gif"
+                },
+                "group_by": [
+                  {
+                    "facet": "@device.type",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * succeeded / (succeeded + failed)",
+                "alias": "Success rate (%)"
+              },
+              {
+                "formula": "succeeded + failed",
+                "alias": "Finished exports (sample size)"
+              },
+              {
+                "formula": "failed",
+                "alias": "Failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Failure categories",
+        "type": "toplist",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.category",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Failure categories by browser",
+        "type": "query_table",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@browser.name",
+                    "limit": 8,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  },
+                  {
+                    "facet": "@context.category",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "failed",
+                "alias": "Failed exports"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Failure categories by device type",
+        "type": "query_table",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@device.type",
+                    "limit": 5,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  },
+                  {
+                    "facet": "@context.category",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "failed",
+                "alias": "Failed exports"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Where exports fail: engine start vs encoding",
+        "type": "toplist",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.stage",
+                    "limit": 2,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Retries: how often a retry recovers",
+        "type": "query_value",
+        "precision": 1,
+        "custom_unit": "%",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "retry_ok",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_succeeded @context.is_retry:true"
+                },
+                "group_by": []
+              },
+              {
+                "data_source": "rum",
+                "name": "retry_failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:export_failed @context.is_retry:true"
+                },
+                "group_by": []
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * retry_ok / (retry_ok + retry_failed)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Engine start failures by cause",
+        "type": "toplist",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "load_failed",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:ffmpeg_load_failure"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.category",
+                    "limit": 6,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "load_failed"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Engine loads that ended single-threaded, by reason",
+        "type": "toplist",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "loads",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "@type:action service:reframe $env @action.target.name:ffmpeg_load_success @context.engine:single"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.single_reason",
+                    "limit": 4,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "loads"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

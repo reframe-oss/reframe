@@ -52,7 +52,8 @@ type WorkerCommand = LoadRequest | ExportRequest | CancelRequest | TerminateRequ
 
 type ProgressPayload = { type: "progress"; percent: number };
 
-type ReadyPayload = { type: "ready" };
+/** `mode`: which core loaded, multi-threaded (cross-origin isolated) or single. */
+type ReadyPayload = { type: "ready"; mode: "multi" | "single" };
 
 type ResultPayload = {
   type: "result";
@@ -73,6 +74,7 @@ type WorkerResponse = ProgressPayload | ReadyPayload | ResultPayload | ErrorPayl
 
 let ffmpeg: FFmpeg | null = null;
 let ffmpegLoaded = false;
+let engineMode: "multi" | "single" = "single";
 let activeExportAbortController: AbortController | null = null;
 let activeExportId: string | null = null;
 
@@ -345,6 +347,7 @@ async function loadCore(onProgress?: (percent: number) => void): Promise<void> {
 
   const isIsolated = typeof self !== "undefined" && self.crossOriginIsolated;
   const baseURL = isIsolated ? MT_CORE_BASE_URL : CORE_BASE_URL;
+  engineMode = isIsolated ? "multi" : "single";
 
   const handleProgress = ({ progress }: { progress: number }) => {
     onProgress?.(Math.round(progress * 100));
@@ -654,7 +657,7 @@ async function handleCommand(message: WorkerCommand) {
     case "load": {
       try {
         await loadCore();
-        postMessage({ type: "ready" });
+        postMessage({ type: "ready", mode: engineMode });
       } catch (error) {
         postMessage({ type: "error", message: (error as Error).message });
       }
