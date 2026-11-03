@@ -55,7 +55,7 @@ function resolutionMultiplier(width: number, height: number): number {
 
 // ---------------------------------------------------------------------------
 // Format overhead factor
-// MP4 and MKV are close; WebM (VP9) tends to produce slightly smaller files
+// MP4 and MKV are close; WebM (VP8) tends to produce slightly smaller files
 // at the same CRF, so we apply a small discount.
 // ---------------------------------------------------------------------------
 function formatFactor(format: string | undefined): number {

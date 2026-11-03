@@ -7,9 +7,9 @@
  * Event names and properties are documented in docs/DATADOG.md.
  */
 import { failureCategory, trackAction, trackVital } from "./telemetry";
+import type { EngineMode } from "./ffmpegArgs";
 
-/** Which FFmpeg core the worker loaded. */
-export type EngineMode = "multi" | "single";
+export type { EngineMode };
 
 export type ExportStage = "engine" | "encode";
 
