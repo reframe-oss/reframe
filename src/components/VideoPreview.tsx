@@ -3,11 +3,12 @@
 
 import { useEffect, useRef, useState, useCallback, RefObject } from "react";
 import { EditRecipe, TextOverlay, TimelineTrack, MultiTrackEditorState } from "@/lib/types";
-import { getPresetById } from "@/lib/presets";
+import { outputFrame, SAFE_AREAS } from "@/lib/framing";
 import { cn } from "@/lib/utils";
-import { Camera, Columns2, Grid3x3, Frame } from "lucide-react";
+import { Camera, Columns2, Grid3x3, Frame, SquareDashed } from "lucide-react";
 import ComparisonPreview from "./ComparisonPreview";
 import DraggableTextOverlays from "./DraggableTextOverlays";
+import { trackFeature } from "@/lib/featureTelemetry";
 
 interface Props {
   file: File | null;
@@ -37,6 +38,9 @@ export default function VideoPreview({
   const [showOverlay, setShowOverlay] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [showGridOverlay, setShowGridOverlay] = useState(false);
+  // Preview-only: never part of the edit, so it can't reach the export.
+  const [showSafeArea, setShowSafeArea] = useState(false);
+  const [sourceRatio, setSourceRatio] = useState(16 / 9);
   const [containerDimensions, setContainerDimensions] = useState({
     width: 0,
     height: 0,
@@ -211,49 +215,10 @@ export default function VideoPreview({
     return () => observer.disconnect();
   }, [file]);
 
-  const overlay = (() => {
-    if (!recipe || !showOverlay) return null;
-
-    const preset = recipe.preset === "custom"
-      ? { width: recipe.customWidth, height: recipe.customHeight }
-      : getPresetById(recipe.preset);
-
-    if (!preset) return null;
-
-    // Preview container is 16:9
-    const containerW = 16;
-    const containerH = 9;
-    const containerRatio = containerW / containerH;   // 1.777…
-    const outputRatio = preset.width / preset.height;
-
-    if (recipe.framing === "fit") {
-      // Letterbox: the output video fits entirely inside 16:9, padded with bars.
-      if (outputRatio > containerRatio) {
-        // Wider output → pillarbox bars on top & bottom
-        const contentH = (containerRatio / outputRatio) * 100;
-        const barH = (100 - contentH) / 2;
-        return { mode: "fit", barTop: `${barH}%`, barBottom: `${barH}%`, barLeft: "0", barRight: "0" };
-      } else {
-        // Taller output → letterbox bars on left & right
-        const contentW = (outputRatio / containerRatio) * 100;
-        const barW = (100 - contentW) / 2;
-        return { mode: "fit", barTop: "0", barBottom: "0", barLeft: `${barW}%`, barRight: `${barW}%` };
-      }
-    } else {
-      // Fill / crop: the output fills the entire 16:9 preview — show a box representing what survives the crop.
-      if (outputRatio < containerRatio) {
-        // Output is taller → crops top & bottom
-        const visibleH = (outputRatio / containerRatio) * 100;
-        const cropH = (100 - visibleH) / 2;
-        return { mode: "fill", barTop: `${cropH}%`, barBottom: `${cropH}%`, barLeft: "0", barRight: "0" };
-      } else {
-        // Output is wider → crops left & right
-        const visibleW = (containerRatio / outputRatio) * 100;
-        const cropW = (100 - visibleW) / 2;
-        return { mode: "fill", barTop: "0", barBottom: "0", barLeft: `${cropW}%`, barRight: `${cropW}%` };
-      }
-    }
-  })();
+  // The output frame inside the viewer, shared by the framing overlay and
+  // the safe-area guides (src/lib/framing.ts).
+  const frame = recipe ? outputFrame(recipe, sourceRatio) : null;
+  const overlay = showOverlay ? frame : null;
 
   if (!file) return null;
 
@@ -313,7 +278,11 @@ export default function VideoPreview({
               ? `brightness(${1 + (recipe.brightness ?? 0)}) contrast(${recipe.contrast ?? 1}) saturate(${recipe.saturation ?? 1})`
               : undefined,
           }}
-          onLoadedData={() => setIsLoading(false)}
+          onLoadedData={(e) => {
+            const { videoWidth, videoHeight } = e.currentTarget;
+            if (videoWidth > 0 && videoHeight > 0) setSourceRatio(videoWidth / videoHeight);
+            setIsLoading(false);
+          }}
           playsInline
           muted={!recipe?.keepAudio}
         >
@@ -363,29 +332,45 @@ export default function VideoPreview({
             {overlay.mode === "fit" ? (
               // Letterbox: the bars the output will add
               <>
-                <div className="absolute left-0 right-0 top-0 bg-black/70" style={{ height: overlay.barTop }} />
-                <div className="absolute left-0 right-0 bottom-0 bg-black/70" style={{ height: overlay.barBottom }} />
-                <div className="absolute top-0 bottom-0 left-0 bg-black/70" style={{ width: overlay.barLeft }} />
-                <div className="absolute top-0 bottom-0 right-0 bg-black/70" style={{ width: overlay.barRight }} />
+                <div className="absolute left-0 right-0 top-0 bg-black/70" style={{ height: overlay.top }} />
+                <div className="absolute left-0 right-0 bottom-0 bg-black/70" style={{ height: overlay.bottom }} />
+                <div className="absolute top-0 bottom-0 left-0 bg-black/70" style={{ width: overlay.left }} />
+                <div className="absolute top-0 bottom-0 right-0 bg-black/70" style={{ width: overlay.right }} />
               </>
             ) : (
               // Fill/crop: dim what will be cropped, outline what survives
               <>
-                <div className="absolute left-0 right-0 top-0 bg-black/60" style={{ height: overlay.barTop }} />
-                <div className="absolute left-0 right-0 bottom-0 bg-black/60" style={{ height: overlay.barBottom }} />
-                <div className="absolute top-0 bottom-0 left-0 bg-black/60" style={{ width: overlay.barLeft }} />
-                <div className="absolute top-0 bottom-0 right-0 bg-black/60" style={{ width: overlay.barRight }} />
+                <div className="absolute left-0 right-0 top-0 bg-black/60" style={{ height: overlay.top }} />
+                <div className="absolute left-0 right-0 bottom-0 bg-black/60" style={{ height: overlay.bottom }} />
+                <div className="absolute top-0 bottom-0 left-0 bg-black/60" style={{ width: overlay.left }} />
+                <div className="absolute top-0 bottom-0 right-0 bg-black/60" style={{ width: overlay.right }} />
                 <div
                   className="absolute border border-dashed border-white/80"
                   style={{
-                    top: overlay.barTop,
-                    bottom: overlay.barBottom,
-                    left: overlay.barLeft,
-                    right: overlay.barRight,
+                    top: overlay.top,
+                    bottom: overlay.bottom,
+                    left: overlay.left,
+                    right: overlay.right,
                   }}
                 />
               </>
             )}
+          </div>
+        )}
+
+        {/* Safe-area guides inside the output frame (preview only) */}
+        {showSafeArea && frame && (
+          <div
+            className="pointer-events-none absolute"
+            style={{ top: frame.top, bottom: frame.bottom, left: frame.left, right: frame.right }}
+            aria-hidden="true"
+            data-testid="safe-area-guides"
+          >
+            {SAFE_AREAS.map((area) => (
+              <div key={area.label} className="absolute border border-dashed border-amber-300/80" style={{ inset: area.inset }}>
+                <span className="absolute left-1 top-0.5 text-[10px] leading-none text-amber-200/90">{area.label}</span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -426,6 +411,19 @@ export default function VideoPreview({
               >
                 <Frame size={14} aria-hidden="true" />
                 Framing guide
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  trackFeature("safe_area", showSafeArea ? "hide" : "show");
+                  setShowSafeArea((v) => !v);
+                }}
+                className={toolButton(showSafeArea)}
+                aria-pressed={showSafeArea}
+                title="Show 90% and 80% safe areas inside the output frame (not exported)"
+              >
+                <SquareDashed size={14} aria-hidden="true" />
+                Safe area
               </button>
               <button
                 type="button"
