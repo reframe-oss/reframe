@@ -112,17 +112,36 @@ example `@context.category:timeout` or `@context.format:gif`. Browser, OS and
 device come from RUM itself: `@browser.name`, `@os.name`, `@device.type`.
 Vitals are `@type:vital @vital.name:export`, with durations in nanoseconds.
 
-The `@context.*` paths come from the RUM context model. Check them in the RUM
-Explorer on a real `export_failed` event before relying on them; if Datadog
-shows them under a different path, update the dashboard JSON to match.
+The `@context.*` paths were checked against real events through the RUM
+search API on 2026-11-03. Grouping by a `@context.*` attribute works in
+queries and dashboards without creating a facet first; facets only make the
+attribute show up in the RUM Explorer's side panel.
+
+## What exists in Datadog
+
+Created through the API on 2026-11-03 (site `datadoghq.com`):
+
+| Item | ID |
+|---|---|
+| Dashboard "Reframe — export reliability" | [`2tw-pge-qkk`](https://app.datadoghq.com/dashboard/2tw-pge-qkk) |
+| Monitor: exports failing in production (> 10 `export_failed` in 1 h; warning at 5) | `340137974` |
+| Monitor: FFmpeg engine failing to load (> 5 `ffmpeg_load_failure` in 1 h) | `340138002` |
+| Monitor: cross-origin isolation missing (> 3 loads with `single_reason:not_isolated` in 1 h) | `340138004` |
+| Monitor: frontend errors spike (> 25 uncaught errors in 1 h) | `340138012` |
+
+The monitors only watch `env:production`, never page anyone, and email the
+maintainer. Their thresholds are absolute counts, chosen for today's low
+traffic; revisit them once there are a few weeks of data.
+
+The management keys live in the `DD_API_KEY` and `DD_APP_KEY` GitHub secrets
+(and in a maintainer's gitignored `.env.local`). They are separate from the
+browser's send-only client token. Never commit them.
 
 ## The dashboard
 
-`docs/datadog/export-reliability.dashboard.json` is a dashboard definition you
-import into Datadog. It has **not** been imported or checked against real
-data, because this repository has no Datadog API or application key; only the
-browser client token and application ID, which can send events but can't read
-or create anything.
+`docs/datadog/export-reliability.dashboard.json` is the source of the
+dashboard above. If you change it, update the live dashboard to match (see
+below, with `PUT /api/v1/dashboard/2tw-pge-qkk`).
 
 What it shows (all for the `$env` template variable, default `production`):
 
@@ -141,32 +160,26 @@ Every success-rate table shows the sample size next to the rate. Ignore groups
 with only a handful of finished exports: a browser with three exports and one
 failure is not a 67% browser.
 
-### Import it
+### Update it
 
-1. In Datadog, create the facets the dashboard groups by: RUM → Explorer →
-   open an `export_failed` event → for each of `context.format`,
-   `context.resolution`, `context.engine`, `context.category`,
-   `context.stage`, `context.is_retry` and `context.single_reason`, choose
-   "Create facet". `@browser.name`, `@os.name` and `@device.type` are default
-   facets. Groups by a property that isn't a facet come back empty.
-2. Dashboards → New Dashboard → the settings cog → **Import dashboard JSON**,
-   and paste the file's contents.
-3. Check that each widget shows data. A widget with no data usually means a
-   missing facet or a different attribute path (see above).
-
-To create it from the command line instead, a maintainer with an API key and
-an application key with the `dashboards_write` scope can run:
+To push a changed definition to the live dashboard, with the keys in your
+environment (an application key with the `dashboards_write` scope):
 
 ```bash
-curl -X POST "https://api.datadoghq.com/api/v1/dashboard" \
+curl -X PUT "https://api.datadoghq.com/api/v1/dashboard/2tw-pge-qkk" \
   -H "Content-Type: application/json" \
   -H "DD-API-KEY: $DD_API_KEY" \
   -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
   --data @docs/datadog/export-reliability.dashboard.json
 ```
 
-Never commit these keys; the RUM client token in `.env.local` is a different,
-send-only credential.
+Without keys, you can paste the file into Dashboards → New Dashboard → the
+settings cog → **Import dashboard JSON** instead.
+
+For filtering in the RUM Explorer, you can also create facets for
+`context.format`, `context.resolution`, `context.engine`, `context.category`,
+`context.stage`, `context.is_retry` and `context.single_reason` (open an
+`export_failed` event → "Create facet"). The dashboard doesn't need them.
 
 ## Testing locally
 
