@@ -82,6 +82,9 @@ type WorkerCommand =
  * `outputSeconds`: how much output has been encoded, so the client can tell an
  * export that is advancing from one that is stuck or running past its end.
  */
+/** Encoded times at or above this (about 11.5 days) are FFmpeg's "no timestamp" marker, not real. */
+const MAX_PLAUSIBLE_TIME_US = 1e12;
+
 type ProgressPayload = { type: "progress"; percent: number; outputSeconds?: number };
 
 type ReadyPayload = { type: "ready"; mode: EngineMode };
@@ -286,7 +289,12 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const handleProgress = ({ progress, time }: { progress: number; time?: number }) => {
     if (activeExportId !== sessionId) return;
     heartbeat();
-    const outputSeconds = typeof time === "number" && Number.isFinite(time) && time > 0 ? time / 1e6 : undefined;
+    // FFmpeg reports "no timestamp" (AV_NOPTS_VALUE, the largest 64-bit
+    // integer) before an output frame has one, e.g. during the GIF palette
+    // pass. Read as microseconds that is ~292,000 years, which tripped the
+    // overrun watchdog, so anything implausible counts as unknown.
+    const outputSeconds =
+      typeof time === "number" && Number.isFinite(time) && time > 0 && time < MAX_PLAUSIBLE_TIME_US ? time / 1e6 : undefined;
     const fraction =
       expectedSeconds !== null && outputSeconds !== undefined
         ? outputSeconds / expectedSeconds

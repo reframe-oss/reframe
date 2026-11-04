@@ -369,4 +369,24 @@ describe("ffmpeg.worker", () => {
       expect(posted.find((m) => m.type === "frames-error")).toMatchObject({ id: "f2", message: "busy" });
     });
   });
+
+  it("never reports FFmpeg's no-timestamp marker as encoded time", async () => {
+    await startWorker({ isolated: false });
+    send({ type: "load" });
+    await waitFor("ready");
+    h.FakeFFmpeg.execImpl = async (args) => {
+      const f = ffmpeg();
+      // INT64_MAX µs, as the core sends it before the palette has a timestamp.
+      f.listeners.progress.forEach((fn) => fn({ progress: 0, time: 9223372036854775807 } as never));
+      f.listeners.progress.forEach((fn) => fn({ progress: 0.5, time: 1_500_000 } as never));
+      f.files.set(args.at(-1)!, new Uint8Array([1]));
+      return 0;
+    };
+    send(exportRequest({ format: "gif", trimEnd: 2 }));
+    await waitFor("result");
+    const seconds = posted.filter((m) => m.type === "progress").map((m) => m.outputSeconds);
+    expect(seconds).toContain(1.5);
+    expect(seconds.every((s) => s === undefined || (s as number) < 1e6)).toBe(true);
+  });
 });
+
