@@ -43,11 +43,14 @@ import {
   ChevronDown,
   Keyboard,
   Bookmark,
+  Files,
 } from "lucide-react";
 import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import HistoryControls from "./HistoryControls";
 import ProjectPanel, { RecoveryNotice } from "./ProjectPanel";
+import BatchExport from "./BatchExport";
+import { useBatchExport } from "@/hooks/useBatchExport";
 
 /**
  * Collapsible tool section. The panel animates open and closed through grid
@@ -234,6 +237,10 @@ export default function VideoEditor() {
     applyExportProfile,
     videoRef,
     seekTo,
+    musicFile,
+    musicVolume,
+    originalAudioVolume,
+    loopMusic,
     overlayFile,
     setOverlayFile,
     overlayPosition,
@@ -290,6 +297,7 @@ export default function VideoEditor() {
     text: false,
     audio: false,
     overlay: false,
+    batch: false,
     export: false,
   });
   // Overlay settings are part of the undoable edit and the saved project
@@ -341,7 +349,8 @@ export default function VideoEditor() {
     setIsMac(typeof navigator !== "undefined" && /Mac/i.test(navigator.platform));
   }, []);
 
-  const timelineFrames = useTimelineFrames(file, duration, isProcessing);
+  const batch = useBatchExport();
+  const timelineFrames = useTimelineFrames(file, duration, isProcessing || batch.running);
 
   const output = useMemo(() => {
     const preset = getPresetById(recipe.preset);
@@ -373,7 +382,8 @@ export default function VideoEditor() {
 
   const isTrimmed = recipe.trimStart > 0 || recipe.trimEnd !== null;
   const textCount = recipe.textOverlays?.length ?? 0;
-  const exportDisabled = !file || isProcessing;
+  // A batch uses the same engine, so the editor's own export waits for it.
+  const exportDisabled = !file || isProcessing || batch.running;
   const exportShortcut = isMac ? "⌘ Enter" : "Ctrl Enter";
 
   return (
@@ -601,6 +611,31 @@ export default function VideoEditor() {
                     setOverlaySize={setOverlaySize}
                     overlayOpacity={overlayOpacity}
                     setOverlayOpacity={setOverlayOpacity}
+                  />
+                </AccordionSection>
+
+                <AccordionSection
+                  id="batch"
+                  icon={<Files size={15} />}
+                  title="Batch export"
+                  summary={
+                    batch.running
+                      ? "Exporting…"
+                      : batch.items.length > 0
+                        ? `${batch.items.length} video${batch.items.length === 1 ? "" : "s"}`
+                        : "Other videos"
+                  }
+                  isOpen={openSections.batch}
+                  onToggle={() => toggleSection("batch")}
+                >
+                  <BatchExport
+                    batch={batch}
+                    editorBusy={isProcessing}
+                    getSettings={() => ({
+                      recipe,
+                      music: { file: musicFile, musicVolume, originalAudioVolume, loopMusic },
+                      overlay: { file: overlayFile, position: overlayPosition, size: overlaySize, opacity: overlayOpacity },
+                    })}
                   />
                 </AccordionSection>
                 </div>
