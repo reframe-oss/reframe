@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import AnalyticsSettings from "@/components/AnalyticsSettings";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — Reframe",
@@ -10,12 +11,12 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <>
-      <main className="min-h-screen bg-[var(--bg)] text-[var(--text)] pt-24 pb-20">
+      <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] pt-24 pb-20">
         {/* Back link - top left below header */}
         <div className="px-6 mb-6">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--muted)] transition-colors hover:text-[var(--text)]"
+            className="inline-flex items-center gap-2 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--text)]"
           >
             <svg
               className="h-3.5 w-3.5"
@@ -135,12 +136,28 @@ export default function PrivacyPage() {
                 Session replay is explicitly disabled — Datadog never
                 records or reconstructs what the editor looked like during
                 your session. Telemetry is limited to metrics and error
-                events; it does not and cannot include your video or audio
-                files, filenames, export settings, or any content you
-                create or edit in the app, since that data never leaves
-                your browser in the first place (see Data Collection
-                above).
+                events. It never includes your video or audio files, file
+                names, captions, folder paths or anything you create in the
+                app. Export events carry only coarse details: the output
+                format, a resolution range (such as 1080p), size and length
+                ranges, whether text, music or an image overlay was added,
+                and whether the
+                export succeeded.
               </p>
+
+              <h2
+                id="settings"
+                className="text-2xl font-semibold mt-12 mb-6 text-[var(--text)] scroll-mt-24"
+              >
+                Settings
+              </h2>
+              <p className="text-[var(--muted)] mb-4">
+                Turn anonymous analytics off here. When it&apos;s off, the
+                Datadog script isn&apos;t loaded at all. Reframe also leaves
+                it off if your browser sends Do Not Track or Global Privacy
+                Control.
+              </p>
+              <AnalyticsSettings />
 
               <h2 className="text-2xl font-semibold mt-12 mb-6 text-[var(--text)]">
                 4. Third-Party Dependencies
@@ -227,7 +244,7 @@ export default function PrivacyPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </>
   );
 }

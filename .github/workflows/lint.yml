@@ -8,6 +8,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+      # No workflow or instruction may merge or push to a PR on its own.
+      - run: node scripts/ci/check-pr-automation.mjs
       - uses: oven-sh/setup-bun@v2
       - run: bun install
       - run: bun run lint

@@ -247,7 +247,7 @@ export default function DraggableTextOverlays({
             }}
             className={`absolute pointer-events-auto ${
               editingId === overlay.id ? "cursor-text" : "cursor-move"
-            } select-none transition-all ${
+            } select-none transition-colors ${
               isDragging ? "scale-105" : "scale-100"
             } ${
               isSelected

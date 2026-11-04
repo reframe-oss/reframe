@@ -8,7 +8,9 @@ vi.mock("@/lib/ffmpeg", () => ({
   loadFFmpeg: vi.fn().mockResolvedValue(true),
   exportVideo: vi.fn().mockResolvedValue({ blobUrl: "blob:test" }),
   terminateFFmpeg: vi.fn(),
+  getEngineMode: vi.fn(() => null),
   FFmpegLoadError: class extends Error {},
+  ExportStalledError: class extends Error {},
 }));
 
 vi.mock("@/lib/sessionDB", () => ({
@@ -39,6 +41,9 @@ describe("useVideoEditor core controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
+    // The hook mirrors the recipe into the query string; without this, one
+    // test's ?speed=2 was read back by the next test's mount.
+    window.history.replaceState(null, "", "/");
   });
 
   it("should initialize with the default recipe", () => {

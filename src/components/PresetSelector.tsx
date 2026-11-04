@@ -41,8 +41,8 @@ function RatioBox({
   return (
     <div
       className={cn(
-        "border-2 flex-shrink-0 rounded-sm transition-colors",
-        active ? "border-film-600" : "border-[var(--muted)] opacity-60",
+        "border-2 flex-shrink-0 rounded-sm",
+        active ? "border-[var(--selected)]" : "border-[var(--muted)] opacity-60",
       )}
       style={{ width: w, height: h }}
     />
@@ -151,18 +151,10 @@ export default function PresetSelector({ recipe, onChange }: Props) {
               aria-label={`${platform} ${label}`}
               aria-pressed={isActive}
               onClick={() => onChange({ preset })}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg border text-center transition-all duration-150 cursor-pointer hover:scale-[1.04] active:scale-[0.97]",
-                isActive
-                  ? "border-film-500 bg-film-50 text-film-600"
-                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-film-300 hover:bg-film-50/30 hover:text-[var(--text)]",
-              )}
+              className="choice flex min-h-[52px] flex-col items-center justify-center gap-1 px-1 py-2 text-center"
             >
               {icon}
-              <span className={cn(
-                "text-[9px] font-heading font-bold uppercase tracking-wide leading-none",
-                isActive ? "text-film-700" : "text-[var(--muted)]",
-              )}>
+              <span className="text-2xs font-medium leading-none">
                 {label}
               </span>
             </button>
@@ -176,10 +168,11 @@ export default function PresetSelector({ recipe, onChange }: Props) {
         </div>
         <input
           type="text"
-          placeholder="Search formats..."
+          placeholder="Search presets"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] py-2 pl-9 pr-3 text-sm font-heading text-[var(--text)] transition-shadow focus:outline-none focus:ring-2 focus:ring-film-400"
+          aria-label="Search presets"
+          className="field pl-9"
         />
       </div>
 
@@ -198,14 +191,11 @@ export default function PresetSelector({ recipe, onChange }: Props) {
                 type="button"
                 onClick={() => handlePresetSelect(preset.id)}
                 title={`${preset.label} — ${preset.width}×${preset.height} — ${getOrientationLabel(preset.width, preset.height)}`}
-                aria-label={`${preset.label.replaceAll(":", " is to ")} output ratio`}
+                // "1 : 1" reads as "one colon one"; two presets share 16 : 9, so
+                // the platform is part of the name too.
+                aria-label={`${preset.label.replaceAll(":", " is to ")} output ratio, ${preset.platform}`}
                 aria-pressed={active}
-                className={cn(
-                  "min-h-[44px] min-w-[44px] flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border text-center transition-all duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98]",
-                  active
-                    ? "border-film-500 bg-film-50"
-                    : "border-[var(--border)] bg-[var(--surface)] hover:border-film-300 hover:bg-film-50/30",
-                )}
+                className="choice flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1.5 p-2.5 text-center"
               >
                 <RatioBox
                   width={preset.width}
@@ -215,15 +205,12 @@ export default function PresetSelector({ recipe, onChange }: Props) {
 
                 <div className="min-w-0 w-full">
                   <p
-                    className={cn(
-                      "text-sm font-heading font-bold leading-tight",
-                      active ? "text-film-700" : "text-[var(--text)]",
-                    )}
+                    className="text-sm font-medium leading-tight text-[var(--text)]"
                   >
                     {preset.label}
                   </p>
 
-                  <p className="mt-0.5 text-[11px] leading-tight text-[var(--muted)]">
+                  <p className="mt-0.5 text-2xs leading-tight text-[var(--muted)]">
                     {preset.platform}
                   </p>
                 </div>
@@ -235,37 +222,26 @@ export default function PresetSelector({ recipe, onChange }: Props) {
         <button
           type="button"
           title="Custom — Set your own dimensions"
-          aria-label="Select custom dimensions preset"
           aria-pressed={recipe.preset === "custom"}
           onClick={() => handlePresetSelect("custom")}
-          className={cn(
-            "min-h-[44px] min-w-[44px] flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border text-center transition-all duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98]",
-            recipe.preset === "custom"
-              ? "border-film-500 bg-film-50"
-              : "border-[var(--border)] bg-[var(--surface)] hover:border-film-300 hover:bg-film-50/30",
-          )}
+          className="choice flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1.5 p-2.5 text-center"
         >
           <Settings2
             size={20}
             className={cn(
               "shrink-0",
               recipe.preset === "custom"
-                ? "text-film-600"
+                ? "text-[var(--selected)]"
                 : "text-[var(--muted)]",
             )}
           />
           <div className="min-w-0 w-full">
             <p
-              className={cn(
-                "text-sm font-heading font-bold",
-                recipe.preset === "custom"
-                  ? "text-film-700"
-                  : "text-[var(--text)]",
-              )}
+              className="text-sm font-medium leading-tight text-[var(--text)]"
             >
               Custom
             </p>
-            <p className="mt-0.5 text-[11px] leading-tight text-[var(--muted)]">
+            <p className="mt-0.5 text-2xs leading-tight text-[var(--muted)]">
               Set your own
             </p>
           </div>
@@ -273,11 +249,11 @@ export default function PresetSelector({ recipe, onChange }: Props) {
       </div>
 
       {recipe.preset === "custom" && (
-        <div className="mt-2 flex items-center gap-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm animate-fade-in">
+        <div className="mt-2 flex items-end gap-3 rounded-control bg-[var(--surface-2)] p-3">
           <div className="flex-1">
             <label
               htmlFor="custom-width"
-              className="mb-1.5 block text-[10px] font-heading font-semibold uppercase tracking-wider text-[var(--muted)]"
+              className="label mb-1 block"
             >
               Width
             </label>
@@ -291,12 +267,12 @@ export default function PresetSelector({ recipe, onChange }: Props) {
               step={2}
               value={recipe.customWidth}
               onChange={(e) => handleWidthChange(Number(e.target.value))}
-              className="w-full min-w-20 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm font-heading transition-all focus:outline-none focus:ring-2 focus:ring-film-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="field tabular min-w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>
 
           <div className="flex h-full flex-col items-center justify-center">
-            <span className="font-heading text-sm font-medium text-[var(--muted)]">
+            <span className="pb-2 text-sm text-[var(--muted)]" aria-hidden="true">
               ×
             </span>
           </div>
@@ -304,7 +280,7 @@ export default function PresetSelector({ recipe, onChange }: Props) {
           <div className="flex-1">
             <label
               htmlFor="custom-height"
-              className="mb-1.5 block text-[10px] font-heading font-semibold uppercase tracking-wider text-[var(--muted)]"
+              className="label mb-1 block"
             >
               Height
             </label>
@@ -318,15 +294,15 @@ export default function PresetSelector({ recipe, onChange }: Props) {
               step={2}
               value={recipe.customHeight}
               onChange={(e) => handleHeightChange(Number(e.target.value))}
-              className="w-full min-w-20 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm font-heading transition-all focus:outline-none focus:ring-2 focus:ring-film-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="field tabular min-w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>
 
           <div className="hidden h-full flex-col justify-end sm:flex">
-            <span className="mb-1.5 block text-center text-[10px] font-heading font-semibold uppercase tracking-wider text-[var(--muted)]">
+            <span className="label mb-1 block text-center">
               Ratio
             </span>
-            <div className="flex h-[38px] items-center rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-xs font-medium text-film-700">
+            <div className="flex h-9 items-center whitespace-nowrap rounded-control border border-[var(--border)] px-2 text-xs text-[var(--text-secondary)]">
               {getOrientationLabel(
                 recipe.customWidth || 0,
                 recipe.customHeight || 0,

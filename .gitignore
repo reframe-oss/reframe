@@ -50,3 +50,14 @@ chromatic.log
 
 # Local Netlify folder
 .netlify
+
+# generated video fixtures (scripts/make-fixtures.sh)
+/test/fixtures/
+
+# playwright
+/test-results/
+/playwright-report/
+
+# local performance measurement output
+scripts/perf/lh/
+scripts/perf/reports/

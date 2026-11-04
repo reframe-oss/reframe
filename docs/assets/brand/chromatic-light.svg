@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40" viewBox="0 0 160 40" role="img" aria-label="Chromatic (placeholder)">
+  <!-- PLACEHOLDER: replace with the official Chromatic logo. See the README PR for where to download it. -->
+  <rect x="0.5" y="0.5" width="159" height="39" rx="6" fill="none" stroke="#1f2328" stroke-dasharray="4 3"/>
+  <text x="80" y="25" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" font-weight="600" fill="#1f2328">Chromatic</text>
+</svg>

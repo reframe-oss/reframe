@@ -146,7 +146,7 @@ export default function FontSelector({
                 <button
                   type="button"
                   onClick={() => onRemoveFont(name)}
-                  className="p-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
+                  className="p-1 rounded text-[var(--error)] hover:bg-[var(--error-bg)] transition-colors"
                   aria-label={`Remove ${name} font`}
                 >
                   <X size={12} />
@@ -163,7 +163,7 @@ export default function FontSelector({
           {errors.map((error, idx) => (
             <p
               key={idx}
-              className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded"
+              className="text-xs text-[var(--error)] bg-[var(--error-bg)] px-2 py-1 rounded"
             >
               {error}
             </p>

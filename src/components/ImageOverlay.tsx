@@ -61,7 +61,7 @@ export default function ImageOverlayPanel({
   const isSolidOpacity = overlayOpacity > 75;
 
   return (
-    <div className="w-full text-[11px] text-[var(--text)] space-y-3">
+    <div className="w-full text-2xs text-[var(--text)] space-y-3">
       
       {/* Side-by-Side Area */}
       <div className="flex gap-2.5 items-center w-full">
@@ -70,7 +70,7 @@ export default function ImageOverlayPanel({
         <label htmlFor="overlay-file-input" className={`w-14 h-11 shrink-0 rounded-lg overflow-hidden flex flex-col items-center justify-center transition border ${
           overlayFile 
             ? "border-[var(--border)] bg-[var(--bg)] pointer-events-none"
-            : "border-dashed border-[var(--border)] hover:bg-[var(--accent-muted)] text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
+            : "border-dashed border-[var(--border)] hover:bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
         }`}>
           {thumbUrl ? (
             <Image
@@ -84,7 +84,7 @@ export default function ImageOverlayPanel({
           ) : (
             <>
               <Upload size={14} className="opacity-80" />
-              <span className="text-[9px] mt-0.5 font-medium tracking-wide">Upload</span>
+              <span className="text-2xs mt-0.5 font-medium">Upload</span>
             </>
           )}
           <input
@@ -107,10 +107,10 @@ export default function ImageOverlayPanel({
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <FileImage size={14} className="text-[var(--muted)] shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-medium text-[var(--text)] truncate">
+                  <p className="text-2xs font-medium text-[var(--text)] truncate">
                     {overlayFile.name}
                   </p>
-                  <p className="text-[9px] text-[var(--muted)] mt-0.5">
+                  <p className="text-2xs text-[var(--muted)] mt-0.5">
                     {(overlayFile.size / 1024).toFixed(0)} KB
                   </p>
                 </div>
@@ -126,7 +126,7 @@ export default function ImageOverlayPanel({
               </button>
             </>
           ) : (
-            <span className="text-[10px] text-[var(--muted)] italic">
+            <span className="text-2xs text-[var(--muted)] italic">
               No asset selected
             </span>
           )}
@@ -145,13 +145,13 @@ export default function ImageOverlayPanel({
                   key={value}
                   type="button"
                   onClick={() => setOverlayPosition(value)}
-                  className={`rounded border py-0.5 text-center text-[10px] transition flex items-center justify-center gap-0.5 ${
+                  className={`rounded border py-0.5 text-center text-2xs transition flex items-center justify-center gap-0.5 ${
                     overlayPosition === value
-                      ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
-                      : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--accent-muted)]"
+                      ? "border-[var(--selected)] text-[var(--text)] bg-[var(--selected-bg)]"
+                      : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)]"
                   }`}
                 >
-                  <span className={overlayPosition === value ? "text-[var(--accent)]" : "text-[var(--muted)]"}>
+                  <span className={overlayPosition === value ? "text-[var(--selected)]" : "text-[var(--muted)]"}>
                     {icon}
                   </span>
                   <span>{label}</span>
@@ -167,10 +167,10 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlaySize(100)}
-                className={`rounded border py-0.5 text-center text-[10px] transition ${
+                className={`rounded border py-0.5 text-center text-2xs transition ${
                   isSmallSize
-                    ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
-                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--accent-muted)]"
+                    ? "border-[var(--selected)] text-[var(--text)] bg-[var(--selected-bg)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)]"
                 }`}
               >
                 Small
@@ -178,10 +178,10 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlaySize(250)}
-                className={`rounded border py-0.5 text-center text-[10px] transition ${
+                className={`rounded border py-0.5 text-center text-2xs transition ${
                   isMediumSize
-                    ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
-                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--accent-muted)]"
+                    ? "border-[var(--selected)] text-[var(--text)] bg-[var(--selected-bg)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)]"
                 }`}
               >
                 Medium
@@ -189,10 +189,10 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlaySize(450)}
-                className={`rounded border py-0.5 text-center text-[10px] transition ${
+                className={`rounded border py-0.5 text-center text-2xs transition ${
                   isLargeSize
-                    ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
-                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--accent-muted)]"
+                    ? "border-[var(--selected)] text-[var(--text)] bg-[var(--selected-bg)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)]"
                 }`}
               >
                 Large
@@ -207,10 +207,10 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlayOpacity(25)}
-                className={`rounded border py-0.5 text-center text-[10px] transition ${
+                className={`rounded border py-0.5 text-center text-2xs transition ${
                   isFaintOpacity
-                    ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
-                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--accent-muted)]"
+                    ? "border-[var(--selected)] text-[var(--text)] bg-[var(--selected-bg)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)]"
                 }`}
               >
                 25%
@@ -218,10 +218,10 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlayOpacity(60)}
-                className={`rounded border py-0.5 text-center text-[10px] transition ${
+                className={`rounded border py-0.5 text-center text-2xs transition ${
                   isMediumOpacity
-                    ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
-                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--accent-muted)]"
+                    ? "border-[var(--selected)] text-[var(--text)] bg-[var(--selected-bg)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)]"
                 }`}
               >
                 60%
@@ -229,10 +229,10 @@ export default function ImageOverlayPanel({
               <button
                 type="button"
                 onClick={() => setOverlayOpacity(100)}
-                className={`rounded border py-0.5 text-center text-[10px] transition ${
+                className={`rounded border py-0.5 text-center text-2xs transition ${
                   isSolidOpacity
-                    ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent-muted)]"
-                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--accent-muted)]"
+                    ? "border-[var(--selected)] text-[var(--text)] bg-[var(--selected-bg)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)]"
                 }`}
               >
                 100%

@@ -21,22 +21,17 @@ export default function FramingControl({ recipe, onChange }: Props) {
             key={mode}
             title={mode === "fit" ? "Fit: Adds black bars (letterbox) to fill empty space" : "Fill: Crops the video to fill the entire frame"}
             onClick={() => onChange({ framing: mode })}
-            className={cn(
-              "flex-1 min-h-[44px] min-w-[44px] flex flex-col items-center justify-center gap-2 py-4 rounded-lg border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98]",
-              active
-                ? "border-film-500 bg-film-50 text-film-700"
-                : "border-[var(--border)] text-[var(--muted)] hover:border-film-300 bg-[var(--surface)]"
-            )}
+            // Explicit: the two-line content gave the button no name in Chrome.
+            aria-label={mode === "fit" ? "Fit, letterbox or pillarbox" : "Fill, crop to frame"}
+            aria-pressed={active}
+            className="choice flex min-h-[44px] min-w-[44px] flex-1 items-center gap-3 px-3 py-2.5 text-left"
           >
-            <Icon size={18} aria-hidden="true" />
-            <span className="sr-only">
-              Set framing to {mode === "fit" ? "fit within frame" : "fill frame by cropping"}
-            </span>
-            <div className="text-center">
-              <p className="text-xs font-heading font-semibold uppercase tracking-wider">
+            <Icon size={16} aria-hidden="true" className={cn("shrink-0", active ? "text-[var(--selected)]" : "text-[var(--muted)]")} />
+            <div>
+              <p className="text-sm font-medium text-[var(--text)]">
                 {mode === "fit" ? "Fit" : "Fill"}
               </p>
-              <p className="text-[10px] text-[var(--muted)] mt-0.5">
+              <p className="text-2xs text-[var(--muted)]">
                 {mode === "fit" ? "Letterbox / pillarbox" : "Crop to frame"}
               </p>
             </div>
