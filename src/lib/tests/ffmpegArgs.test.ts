@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildArguments,
   buildGifArguments,
+  buildFrameArguments,
   outputDurationArgs,
   expectedOutputSeconds,
   withSafeTimes,
@@ -259,5 +260,24 @@ describe("time values never reach FFmpeg as Infinity or NaN", () => {
     expect(() => assertFiniteArgs(["-vf", "trim=start=NaN"])).toThrow();
     // Words that merely contain the letters are fine.
     expect(assertFiniteArgs(["-i", "Nanaimo.mp4", "-metadata", "title=Infinityband"])).toHaveLength(4);
+  });
+});
+
+describe("buildFrameArguments", () => {
+  it("seeks before the input and writes one scaled JPEG", () => {
+    const args = buildFrameArguments({ inputPath: "/frames-src/source.mp4", time: 2.5, outputName: "f.jpg", width: 160, threads: 1 });
+    expect(args.slice(0, 2)).toEqual(["-ss", "2.500"]);
+    expect(args.indexOf("-ss")).toBeLessThan(args.indexOf("-i"));
+    expect(args.join(" ")).toContain("-frames:v 1");
+    expect(args.join(" ")).toContain("scale=160:-2");
+    expect(args.at(-1)).toBe("f.jpg");
+    expect(args.flatMap((a, i) => (a === "-threads" ? [args[i + 1]] : []))).toEqual(["1", "1"]);
+  });
+
+  it("keeps the width even and never seeks to a non-finite time", () => {
+    const args = buildFrameArguments({ inputPath: "in.mp4", time: Number.NaN, outputName: "f.jpg", width: 161, threads: 0 });
+    expect(args.slice(0, 2)).toEqual(["-ss", "0.000"]);
+    expect(args.join(" ")).toContain("scale=162:-2");
+    expect(args).not.toContain("-threads");
   });
 });

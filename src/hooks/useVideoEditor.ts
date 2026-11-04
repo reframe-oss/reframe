@@ -74,6 +74,7 @@ import {
 } from "@/lib/editorPersistence";
 import { saveSessionFile, loadSessionFile, clearSessionFile } from "@/lib/sessionDB";
 import { resolveDuration } from "@/lib/mediaDuration";
+import { clearFrameCache } from "@/lib/frameCache";
 import { trackExportTools, trackFeature } from "@/lib/featureTelemetry";
 
 const DEFAULT_TITLE = "Reframe — Resize, trim, and export videos in your browser";
@@ -130,6 +131,7 @@ function clearSavedEditorData() {
     // ignore
   }
   clearSessionFile().catch(console.error);
+  void clearFrameCache();
 }
 
 /** Mirrors recipe changes into the URL at most this often (slider drags fire per pixel). */

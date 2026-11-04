@@ -64,7 +64,7 @@ Then the stored video copy is read from IndexedDB:
   - A different file keeps the other settings but resets the trim points, like any new video.
   - "Discard saved edits" forgets the project.
 
-The editor no longer has a "Saved on this device" panel, so it has no buttons to save or open project files or to delete saved data. Saving fails quietly: after a refresh the user is asked to choose the video again. Clearing the site's data in the browser removes everything stored. `useVideoEditor` still has `buildProjectFile`, `importProjectFile` and `deleteSavedData`, ready for a future UI.
+The editor no longer has a "Saved on this device" panel, so it has no buttons to save or open project files or to delete saved data. Saving fails quietly: after a refresh the user is asked to choose the video again. Clearing the site's data in the browser removes everything stored. `useVideoEditor` still has `buildProjectFile`, `importProjectFile` and `deleteSavedData` (which also clears the cached timeline frames), ready for a future UI.
 
 ## Project file format
 
