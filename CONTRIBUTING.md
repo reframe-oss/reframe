@@ -95,7 +95,7 @@ docs: explain cross-origin isolation in DEPLOYMENT.md
 ```
 
 Avoid messages like "update", "changes" or "fixed stuff". Pull request titles
-use the same format; the PR validator checks it.
+use the same format.
 
 ## Before you open a pull request
 
@@ -127,9 +127,10 @@ merged until it's added.
    preview, Snyk, and Chromatic visual review.
 3. A maintainer reviews, usually within a few days. Reply to comments and push
    fixes to the same branch; don't open a new PR.
-4. **A maintainer merges every PR, and adds its labels, by hand.** Bots post
-   comments only: they never merge, label or assign. You can't add labels
-   yourself (GitHub only lets maintainers), so there's no need to ask.
+4. **A maintainer reviews, labels and merges every PR by hand.** No bot
+   comments on, reviews, labels or closes pull requests, and inactive PRs are
+   never closed automatically. You can't add labels yourself (GitHub only lets
+   maintainers), so there's no need to ask.
 
 **Visual review (Chromatic).** Every PR's Storybook is screenshotted and
 compared with `main`. Visual changes don't fail your PR; a maintainer accepts
