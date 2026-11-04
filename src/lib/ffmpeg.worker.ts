@@ -1,8 +1,16 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { toBlobURL } from "@ffmpeg/util";
 import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions } from "./types";
-import { getPresetById } from "./presets";
-import { buildTextFilter } from "./text-overlay";
+import { TEXT_FONT_FILE, TEXT_FONT_URL } from "./text-overlay";
+import {
+  buildArguments,
+  buildGifArguments,
+  buildFrameArguments,
+  expectedOutputSeconds,
+  resolveOutputSize,
+  resolveThreadCount,
+  type EngineMode,
+} from "./ffmpegArgs";
 
 const CORE_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
 // MT core aligned to the same version and distribution format as CORE_BASE_URL.
@@ -15,19 +23,25 @@ const CORE_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/um
 const MT_CORE_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.10/dist/umd";
 
 // Keys are full URLs so hashes for the non-MT and MT packages never collide.
-// MT hashes are omitted intentionally: fetchWithIntegrity falls back to a plain
-// fetch when no hash entry exists, which is safe for a trusted CDN origin and
-// avoids the previous bug where a wrong hash caused a hard IntegrityError.
-// Add MT-specific sha384 entries here once they are verified against the CDN.
-const SRI_HASHES: Record<string, string> = {
-  [`${CORE_BASE_URL}/ffmpeg-core.js`]:   "sha384-sKfkiFtvUk+vexk+0EUhEh366190/4WpgUAsUvaxEfyg7+E1Zt5Y5hrsU808g8Q9",
-  [`${CORE_BASE_URL}/ffmpeg-core.wasm`]: "sha384-U1VDhkPYrM3wTCT4/vjSpSsKqG/UjljYrYCI4hBSJ02svbCkxuCi6U6u/peg5vpW",
+// Every engine file is integrity-checked, so a tampered CDN response fails to
+// load instead of running. Each hash was computed from the npm tarball (itself
+// verified against the registry's sha512 `dist.integrity`) and matched against
+// what jsDelivr serves (2026-10-22, docs/SECURITY-PIPELINE.md). When bumping
+// @ffmpeg/core*, recompute all of them the same way.
+export const SRI_HASHES: Record<string, string> = {
+  [`${CORE_BASE_URL}/ffmpeg-core.js`]:          "sha384-sKfkiFtvUk+vexk+0EUhEh366190/4WpgUAsUvaxEfyg7+E1Zt5Y5hrsU808g8Q9",
+  [`${CORE_BASE_URL}/ffmpeg-core.wasm`]:        "sha384-U1VDhkPYrM3wTCT4/vjSpSsKqG/UjljYrYCI4hBSJ02svbCkxuCi6U6u/peg5vpW",
+  [`${MT_CORE_BASE_URL}/ffmpeg-core.js`]:       "sha384-91GpZ3Ow5AIa5wmICIKrQaOAmJPc0sPFNaeuZKtD1Dx7Xr/F8kfGZHM++VOj308v",
+  [`${MT_CORE_BASE_URL}/ffmpeg-core.wasm`]:     "sha384-IXnr5PE2UFcQ5DvI5LyubPqmMF46EkyIMlbdn4CNQR1iQ8/2irEkyhDFnVDxv4f/",
+  [`${MT_CORE_BASE_URL}/ffmpeg-core.worker.js`]: "sha384-h19AXK35916sCbdJrzAeYw2kl/zEt4B6PTy94TTPup7kgO7r/7mwb43Orcu+xTW1",
 };
 
 type SerializedFile = {
   name: string;
   type: string;
-  data: ArrayBuffer;
+  /** The user's File, read here rather than on the page (see ffmpeg.ts). */
+  blob?: Blob;
+  data?: ArrayBuffer;
 };
 
 type ExportRequest = {
@@ -42,17 +56,37 @@ type ExportRequest = {
   overlayOptions?: ImageOverlayOptions;
 };
 
-type LoadRequest = { type: "load" };
+type LoadRequest = {
+  type: "load";
+  /** Load the single-threaded core even when cross-origin isolated (after a stall). */
+  singleThread?: boolean;
+};
 
 type CancelRequest = { type: "cancel" };
 
 type TerminateRequest = { type: "terminate" };
 
-type WorkerCommand = LoadRequest | ExportRequest | CancelRequest | TerminateRequest;
+/** Timeline frames: one small JPEG per time, from the user's file mounted read-only. */
+type FramesRequest = { type: "frames"; id: string; file: File; times: number[]; width: number };
+type CancelFramesRequest = { type: "cancel-frames"; id: string };
 
-type ProgressPayload = { type: "progress"; percent: number };
+type WorkerCommand =
+  | LoadRequest
+  | ExportRequest
+  | CancelRequest
+  | TerminateRequest
+  | FramesRequest
+  | CancelFramesRequest;
 
-type ReadyPayload = { type: "ready" };
+/**
+ * `outputSeconds`: how much output has been encoded, so the client can tell an
+ * export that is advancing from one that is stuck or running past its end.
+ */
+type ProgressPayload = { type: "progress"; percent: number; outputSeconds?: number };
+
+type ReadyPayload = { type: "ready"; mode: EngineMode };
+
+type HeartbeatPayload = { type: "heartbeat" };
 
 type ResultPayload = {
   type: "result";
@@ -69,307 +103,104 @@ type ErrorPayload = { type: "error"; id?: string; message: string };
 
 type CancelledPayload = { type: "cancelled"; id?: string };
 
-type WorkerResponse = ProgressPayload | ReadyPayload | ResultPayload | ErrorPayload | CancelledPayload;
+type WorkerResponse = ProgressPayload | ReadyPayload | HeartbeatPayload | ResultPayload | ErrorPayload | CancelledPayload;
 
 let ffmpeg: FFmpeg | null = null;
 let ffmpegLoaded = false;
+/** Which core actually loaded — decides the thread flags, not crossOriginIsolated alone. */
+let engineMode: EngineMode = "single";
 let activeExportAbortController: AbortController | null = null;
+/** The timeline-frames job in progress; an export cancels it and waits for it. */
+let activeFrames: { id: string; controller: AbortController; done: Promise<void> } | null = null;
 let activeExportId: string | null = null;
+
+/** Liveness signal for the client's stall watchdog (see ffmpeg.ts). */
+const HEARTBEAT_INTERVAL_MS = 2000;
+let lastHeartbeat = 0;
+function heartbeat() {
+  const now = Date.now();
+  if (now - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
+  lastHeartbeat = now;
+  postMessage({ type: "heartbeat" });
+}
 
 async function fetchWithIntegrity(url: string, mimeType: string): Promise<string> {
   // Look up by full URL so non-MT and MT hashes never collide when filenames match.
   const integrity = SRI_HASHES[url];
 
-  // Fallback to standard fetch if SRI is missing (Prevents ffmpeg-core.worker.js from crashing the thread)
-  if (!integrity) {
-    const response = await fetch(url, { credentials: "omit" });
-    const blob = new Blob([await response.arrayBuffer()], { type: mimeType });
-    return URL.createObjectURL(blob);
-  }
+  // Never fetch an engine file unverified.
+  if (!integrity) throw new Error(`No integrity hash for engine file: ${url}`);
 
   const response = await fetch(url, { integrity, credentials: "omit" });
+  if (!response.ok) throw new Error(`Failed to fetch engine file (HTTP ${response.status})`);
   const blob = new Blob([await response.arrayBuffer()], { type: mimeType });
   return URL.createObjectURL(blob);
 }
 
-function buildVideoFilter(recipe: EditRecipe, targetW: number, targetH: number): string {
-  const filters: string[] = [];
-
-  if (recipe.trimStart > 0 || recipe.trimEnd !== null) {
-    const end = recipe.trimEnd !== null ? recipe.trimEnd : 999999;
-    filters.push(`trim=start=${recipe.trimStart}:end=${end}`);
-  }
-
-  if (recipe.stabilization) {
-    filters.push("deshake");
-  }
-
-  if (recipe.rotate === 90) {
-    filters.push("transpose=1");
-  } else if (recipe.rotate === 180) {
-    filters.push("transpose=1,transpose=1");
-  } else if (recipe.rotate === 270) {
-    filters.push("transpose=2");
-  }
-
-  if (recipe.framing === "fit") {
-    filters.push(
-      `scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease`,
-      `pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2:color=black`
-    );
-  } else {
-    filters.push(
-      `scale=${targetW}:${targetH}:force_original_aspect_ratio=increase`,
-      `crop=${targetW}:${targetH}`
-    );
-  }
-
-  if (recipe.trimStart > 0 || recipe.trimEnd !== null || recipe.speed !== 1) {
-    filters.push("setpts=PTS-STARTPTS");
-  }
-
-  if (recipe.speed !== 1) {
-    const pts = (1 / recipe.speed).toFixed(4);
-    filters.push(`setpts=${pts}*PTS`);
-  }
-
-  if (recipe.denoise) {
-    filters.push("hqdn3d=1.5:1.5:6:6");
-  }
-
-  const needsEq =
-    recipe.brightness !== 0 ||
-    recipe.contrast !== 1 ||
-    recipe.saturation !== 1;
-
-  if (needsEq) {
-    filters.push(
-      `eq=brightness=${recipe.brightness}:contrast=${recipe.contrast}:saturation=${recipe.saturation}`
-    );
-  }
-
-  const textOverlays = recipe.textOverlays || [];
-  textOverlays.forEach((overlay) => {
-    filters.push(buildTextFilter(overlay, targetW, targetH));
-  });
-
-  return filters.join(",");
-}
-
-function buildAudioFilter(speed: number, normalizeAudio: boolean): string {
-  if (speed <= 0) return "";
-  const filters: string[] = [];
-
-  let remaining = speed;
-  while (remaining < 0.5) {
-    filters.push("atempo=0.5");
-    remaining /= 0.5;
-  }
-
-  while (remaining > 2.0) {
-    filters.push("atempo=2.0");
-    remaining /= 2.0;
-  }
-
-  if (Math.abs(remaining - 1.0) > 0.001) {
-    filters.push(`atempo=${Number(remaining.toFixed(4))}`);
-  }
-
-  if (normalizeAudio) filters.push("loudnorm=I=-14:TP=-1.5:LRA=11");
-
-  return filters.join(",");
-}
-
-function buildAudioTrimFilter(recipe: EditRecipe): string {
-  if (recipe.trimStart === 0 && recipe.trimEnd === null) return "";
-  const end = recipe.trimEnd !== null ? recipe.trimEnd : 999999;
-  return `atrim=start=${recipe.trimStart}:end=${end},asetpts=PTS-STARTPTS`;
-}
-
-function buildArguments(
-  recipe: EditRecipe,
-  format: "mp4" | "webm" | "mkv" | "gif",
-  outputName: string,
-  inputName: string,
-  targetW: number,
-  targetH: number,
-  hasMusicTrack: boolean,
-  musicInputName: string,
-  musicOptions: BackgroundMusicOptions | undefined,
-  hasOverlay: boolean,
-  overlayInputName: string,
-  overlayOptions: ImageOverlayOptions | undefined,
-  hasOriginalAudio: boolean,
-  videoDuration: number
-): string[] {
-  const vf = buildVideoFilter(recipe, targetW, targetH);
-  const audioTrim = hasOriginalAudio ? buildAudioTrimFilter(recipe) : "";
-  const audioSpeed = hasOriginalAudio ? buildAudioFilter(recipe.speed, recipe.normalizeAudio ?? false) : "";
-  const afParts = [audioTrim, audioSpeed].filter(Boolean);
-  const af = afParts.join(",");
-
-  const musicIdx = 1;
-  const overlayIdx = hasMusicTrack ? 2 : 1;
-
-  const args: string[] = [];
-  args.push("-i", inputName);
-  if (hasMusicTrack) {
-    if (musicOptions!.loopMusic) args.push("-stream_loop", "-1");
-    args.push("-i", musicInputName);
-  }
-  if (hasOverlay) {
-    args.push("-i", overlayInputName);
-  }
-
-  const needsFilterComplex = hasOverlay || hasMusicTrack;
-  const shouldKeepAudio = recipe.keepAudio && (hasOriginalAudio || hasMusicTrack);
-
-  if (needsFilterComplex) {
-    const filterParts: string[] = [];
-    let videoOut = "[0:v]";
-
-    if (vf) {
-      filterParts.push(`[0:v]${vf}[vbase]`);
-      videoOut = "[vbase]";
-    }
-
-if (hasOverlay) {
-  const scaledW = overlayOptions!.size;
-  const alpha = (overlayOptions!.opacity / 100).toFixed(2);
-  const posMap: Record<string, string> = {
-    "top-left":     "20:20",
-    "top-right":    "W-w-20:20",
-    "bottom-left":  "20:H-h-20",
-    "bottom-right": "W-w-20:H-h-20",
-  };
-
-interface PositionCoords {
-    x: number;
-    y: number;
-  }
-
-  const pos = typeof overlayOptions?.position === "string"
-    ? (posMap[overlayOptions.position] ?? "W-w-20:H-h-20")
-    : overlayOptions?.position
-    ? `(W-w)*${(overlayOptions.position as PositionCoords).x}/100:(H-h)*${(overlayOptions.position as PositionCoords).y}/100`
-    : "W-w-20:H-h-20";
-
-  filterParts.push(`[${overlayIdx}:v]scale=${scaledW}:-2,format=rgba,colorchannelmixer=aa=${alpha}[logo]`);
-  filterParts.push(`${videoOut}[logo]overlay=${pos}[vout]`);
-  videoOut = "[vout]";
-}
-
-    let audioOut = "";
-    if (shouldKeepAudio) {
-      if (hasMusicTrack) {
-        const musicVol = (musicOptions!.musicVolume / 100).toFixed(2);
-        if (hasOriginalAudio) {
-          const origVol = (musicOptions!.originalAudioVolume / 100).toFixed(2);
-          const origChain = afParts.length > 0
-            ? `[0:a]${afParts.join(",")},volume=${origVol}[orig]`
-            : `[0:a]volume=${origVol}[orig]`;
-          filterParts.push(origChain);
-          filterParts.push(`[${musicIdx}:a]volume=${musicVol}[music]`);
-          filterParts.push(`[orig][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
-          audioOut = "[aout]";
-        } else {
-          filterParts.push(`[${musicIdx}:a]volume=${musicVol}[aout]`);
-          audioOut = "[aout]";
-        }
-      } else if (hasOriginalAudio && af) {
-        filterParts.push(`[0:a]${af}[aout]`);
-        audioOut = "[aout]";
-      }
-    }
-
-    if (filterParts.length > 0) {
-      args.push("-filter_complex", filterParts.join(";"));
-    }
-    args.push("-map", videoOut === "[0:v]" ? "0:v" : videoOut);
-
-    if (!shouldKeepAudio) {
-      args.push("-an");
-    } else if (audioOut) {
-      args.push("-map", audioOut);
-    } else if (hasOriginalAudio) {
-      args.push("-map", "0:a");
-    }
-  } else {
-    if (vf) args.push("-vf", vf);
-    if (!shouldKeepAudio) {
-      args.push("-an");
-    } else if (af && hasOriginalAudio) {
-      args.push("-af", af);
-    }
-  }
-
-  if (format === "webm") {
-    args.push(
-      "-c:v", "libvpx-vp9",
-      "-b:v", "0",
-      "-crf", String(recipe.quality),
-      "-cpu-used", "4",
-      "-deadline", "realtime"
-    );
-    if (shouldKeepAudio) args.push("-c:a", "libopus");
-  } else if (format === "mkv") {
-    args.push("-c:v", "libx264", "-crf", String(recipe.quality), "-preset", "ultrafast");
-    if (shouldKeepAudio) args.push("-c:a", "aac", "-b:a", "128k");
-  } else {
-    args.push("-c:v", "libx264", "-crf", String(recipe.quality), "-preset", "ultrafast", "-movflags", "+faststart");
-    if (shouldKeepAudio) args.push("-c:a", "aac", "-b:a", "128k");
-  }
-
-  if (recipe.speed !== 1) {
-    const sourceDuration = (recipe.trimEnd ?? videoDuration) - recipe.trimStart;
-    // Skip -t when sourceDuration <= 0 (happens when video metadata fails to
-    // load and videoDuration falls back to 0). Passing -t 0 to FFmpeg produces
-    // a zero-length output file; omitting it lets FFmpeg encode the full stream.
-    if (sourceDuration > 0) {
-      const outputDuration = sourceDuration / recipe.speed;
-      args.push("-t", outputDuration.toFixed(6));
-    }
-  }
-
-  args.push(outputName);
-  return args;
-}
-
-async function loadCore(onProgress?: (percent: number) => void): Promise<void> {
-  if (ffmpegLoaded) {
-    onProgress?.(100);
-    return;
-  }
-
+async function loadCoreFrom(mode: EngineMode): Promise<void> {
   ffmpeg = new FFmpeg();
-
-  const isIsolated = typeof self !== "undefined" && self.crossOriginIsolated;
-  const baseURL = isIsolated ? MT_CORE_BASE_URL : CORE_BASE_URL;
-
-  const handleProgress = ({ progress }: { progress: number }) => {
-    onProgress?.(Math.round(progress * 100));
-  };
-
-  ffmpeg.on("progress", handleProgress);
-
+  const baseURL = mode === "multi" ? MT_CORE_BASE_URL : CORE_BASE_URL;
   try {
     await ffmpeg.load({
       coreURL: await fetchWithIntegrity(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
       wasmURL: await fetchWithIntegrity(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-      ...(isIsolated && {
+      ...(mode === "multi" && {
         workerURL: await fetchWithIntegrity(`${baseURL}/ffmpeg-core.worker.js`, "text/javascript"),
       }),
     });
+  } catch (error) {
+    ffmpeg.terminate();
+    ffmpeg = null;
+    throw error;
+  }
+  engineMode = mode;
+  ffmpegLoaded = true;
+}
 
-    ffmpegLoaded = true;
-    onProgress?.(100);
-  } finally {
-    ffmpeg.off("progress", handleProgress);
+async function loadCore(singleThread = false): Promise<void> {
+  if (ffmpegLoaded) return;
+
+  // The multi-threaded core needs SharedArrayBuffer, which only exists when
+  // the page is cross-origin isolated (COOP + COEP headers).
+  const canUseMulti = !singleThread && typeof self !== "undefined" && self.crossOriginIsolated;
+  if (!canUseMulti) {
+    await loadCoreFrom("single");
+    return;
+  }
+  try {
+    await loadCoreFrom("multi");
+  } catch {
+    // e.g. the MT files failed to download or instantiate. The single-threaded
+    // core is slower but works everywhere, so fall back rather than fail.
+    await loadCoreFrom("single");
   }
 }
 
-function serializeFileBuffer(file: SerializedFile): Uint8Array {
-  return new Uint8Array(file.data);
+/** ffmpeg.exec rejects with a plain string when the wasm core traps. */
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** The bundled text font, fetched once per worker (~125 KB). */
+let textFontBytes: Promise<Uint8Array> | null = null;
+function loadTextFont(): Promise<Uint8Array> {
+  textFontBytes ??= fetch(new URL(TEXT_FONT_URL, self.location.origin))
+    .then((response) => {
+      if (!response.ok) throw new Error(`Couldn't load the text font (HTTP ${response.status})`);
+      return response.arrayBuffer();
+    })
+    .then((buffer) => new Uint8Array(buffer))
+    .catch((error) => {
+      textFontBytes = null; // try again next export
+      throw error;
+    });
+  return textFontBytes;
+}
+
+async function readFileBytes(file: SerializedFile): Promise<Uint8Array> {
+  if (file.data) return new Uint8Array(file.data);
+  if (file.blob) return new Uint8Array(await file.blob.arrayBuffer());
+  return new Uint8Array(0);
 }
 
 function getOutputConfig(format: string, sessionId: string) {
@@ -402,20 +233,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
 
   const sessionId = request.id;
   const recipe = request.recipe;
-  let targetW: number;
-  let targetH: number;
-
-  if (recipe.preset === "custom") {
-    targetW = recipe.customWidth;
-    targetH = recipe.customHeight;
-  } else {
-    const preset = getPresetById(recipe.preset);
-    targetW = preset?.width ?? 1920;
-    targetH = preset?.height ?? 1080;
-  }
-
-  targetW = Math.round(targetW / 2) * 2;
-  targetH = Math.round(targetH / 2) * 2;
+  const { width: targetW, height: targetH } = resolveOutputSize(recipe);
 
   const ext = request.file.name.split(".").pop() ?? "mp4";
   const inputName = `input_${sessionId}.${ext}`;
@@ -425,14 +243,20 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const paletteName = `palette_${sessionId}.png`;
   const cleanupFiles = new Set<string>([inputName, outputName, fallbackOutputName, paletteName]);
 
-  const fileBytes = serializeFileBuffer(request.file);
+  // drawtext needs a font file; FFmpeg.wasm has no system fonts.
+  if ((recipe.textOverlays?.length ?? 0) > 0) {
+    cleanupFiles.add(TEXT_FONT_FILE);
+    await ffmpeg.writeFile(TEXT_FONT_FILE, (await loadTextFont()).slice(), { signal: activeExportAbortController?.signal });
+  }
+
+  const fileBytes = await readFileBytes(request.file);
   await ffmpeg.writeFile(inputName, fileBytes, { signal: activeExportAbortController?.signal });
 
   const hasMusicTrack = !!(request.musicFile && recipe.keepAudio);
   const musicInputName = `music_input_${sessionId}.mp3`;
   if (hasMusicTrack) {
     cleanupFiles.add(musicInputName);
-    await ffmpeg.writeFile(musicInputName, serializeFileBuffer(request.musicFile!), {
+    await ffmpeg.writeFile(musicInputName, await readFileBytes(request.musicFile!), {
       signal: activeExportAbortController?.signal,
     });
   }
@@ -442,58 +266,84 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const overlayInputName = `overlay_${sessionId}.${overlayExt}`;
   if (hasOverlay) {
     cleanupFiles.add(overlayInputName);
-    await ffmpeg.writeFile(overlayInputName, serializeFileBuffer(request.overlayFile!), {
+    await ffmpeg.writeFile(overlayInputName, await readFileBytes(request.overlayFile!), {
       signal: activeExportAbortController?.signal,
     });
   }
 
   const videoDuration = request.videoDuration;
+  const threads = resolveThreadCount(engineMode, self.navigator?.hardwareConcurrency);
+  const signal = activeExportAbortController?.signal;
 
-  const handleProgress = ({ progress }: { progress: number }) => {
+  // FFmpeg's own `progress` divides by the duration in the file header, which
+  // live-recorded files (MediaRecorder) don't have. Prefer encoded time over
+  // the length we expect, which also accounts for trim and speed.
+  const expectedSeconds = expectedOutputSeconds(recipe, videoDuration);
+  // FFmpeg emits progress per frame; post only when the whole percentage or
+  // the encoded second changes so the main thread isn't flooded.
+  let lastPercent = -1;
+  let lastSecond = -1;
+  const handleProgress = ({ progress, time }: { progress: number; time?: number }) => {
     if (activeExportId !== sessionId) return;
-    postMessage({ type: "progress", percent: Math.min(99, Math.round(progress * 100)) });
+    heartbeat();
+    const outputSeconds = typeof time === "number" && Number.isFinite(time) && time > 0 ? time / 1e6 : undefined;
+    const fraction =
+      expectedSeconds !== null && outputSeconds !== undefined
+        ? outputSeconds / expectedSeconds
+        : Number.isFinite(progress)
+          ? progress
+          : 0;
+    const percent = Math.max(0, Math.min(99, Math.round(fraction * 100)));
+    const second = outputSeconds === undefined ? -1 : Math.floor(outputSeconds);
+    if (percent === lastPercent && second === lastSecond) return;
+    lastPercent = percent;
+    lastSecond = second;
+    postMessage({ type: "progress", percent, outputSeconds });
   };
 
-  let logListener: ((event: { message: string }) => void) | null = null;
+  // FFmpeg prints a stats line about twice a second while it works, so log
+  // output doubles as a heartbeat even when progress can't be computed.
+  let missingAudioDetected = false;
+  const handleLog = ({ message }: { message: string }) => {
+    heartbeat();
+    const msg = message.toLowerCase();
+    if (
+      msg.includes("matches no streams") ||
+      msg.includes("specifier '0:a'") ||
+      msg.includes("input pad 0 on filter src")
+    ) {
+      missingAudioDetected = true;
+    }
+  };
+
   ffmpeg.on("progress", handleProgress);
+  ffmpeg.on("log", handleLog);
+  lastHeartbeat = 0;
+  heartbeat();
+
+  const read = async (name: string) => {
+    const data = await ffmpeg!.readFile(name, undefined, { signal });
+    return (data as Uint8Array).buffer as ArrayBuffer;
+  };
 
   try {
     if (recipe.format === "gif") {
-      const vf = buildVideoFilter(recipe, targetW, targetH);
-      const vfWithPalette = vf ? `${vf},palettegen` : "palettegen";
-      const vfWithPaletteUse = vf
-        ? `[0:v]${vf}[x];[x][1:v]paletteuse`
-        : "[0:v][1:v]paletteuse";
-
-      const gifDurationArgs = recipe.speed !== 1
-        ? (() => {
-            const sourceDuration = (recipe.trimEnd ?? videoDuration) - recipe.trimStart;
-            // Skip -t when sourceDuration <= 0 (metadata load failure fallback)
-            // to avoid producing a zero-length GIF.
-            if (sourceDuration <= 0) return [];
-            const outputDuration = sourceDuration / recipe.speed;
-            return ["-t", outputDuration.toFixed(6)];
-          })()
-        : [];
-
-      const pass1Code = await ffmpeg.exec(
-        ["-i", inputName, "-vf", vfWithPalette, ...gifDurationArgs, "-y", paletteName],
-        undefined,
-        { signal: activeExportAbortController?.signal }
-      );
+      const gif = buildGifArguments({
+        recipe,
+        inputName,
+        paletteName,
+        outputName,
+        targetW,
+        targetH,
+        videoDuration,
+        threads,
+      });
+      const pass1Code = await ffmpeg.exec(gif.palette, undefined, { signal });
       if (pass1Code !== 0) throw new Error("GIF palette generation failed");
-
-      const pass2Code = await ffmpeg.exec(
-        ["-i", inputName, "-i", paletteName, "-lavfi", vfWithPaletteUse, ...gifDurationArgs, "-y", outputName],
-        undefined,
-        { signal: activeExportAbortController?.signal }
-      );
+      const pass2Code = await ffmpeg.exec(gif.render, undefined, { signal });
       if (pass2Code !== 0) throw new Error("GIF export failed");
 
-      const data = await ffmpeg.readFile(outputName, undefined, {
-        signal: activeExportAbortController?.signal,
-      });
-      const payload = (data as Uint8Array).buffer as ArrayBuffer;
+      const payload = await read(outputName);
       return {
         type: "result",
         id: sessionId,
@@ -506,90 +356,38 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
       };
     }
 
-    let missingAudioDetected = false;
-    const logListener = ({ message }: { message: string }) => {
-      const msg = message.toLowerCase();
-      if (
-        msg.includes("matches no streams") ||
-        msg.includes("specifier '0:a'") ||
-        msg.includes("input pad 0 on filter src")
-      ) {
-        missingAudioDetected = true;
-      }
-    };
-    ffmpeg.on("log", logListener);
-
-    let args = buildArguments(
-      recipe,
-      recipe.format,
-      outputName,
-      inputName,
-      targetW,
-      targetH,
-      hasMusicTrack,
-      musicInputName,
-      request.musicOptions,
-      hasOverlay,
-      overlayInputName,
-      request.overlayOptions,
-      true,
-      videoDuration
-    );
-
-    let exitCode = await ffmpeg.exec(args, undefined, {
-      signal: activeExportAbortController?.signal,
-    });
-
-    if (exitCode !== 0 && missingAudioDetected) {
-      missingAudioDetected = false;
-      args = buildArguments(
+    const argsFor = (format: "mp4" | "webm" | "mkv", output: string, hasOriginalAudio: boolean) =>
+      buildArguments({
         recipe,
-        recipe.format,
-        outputName,
+        format,
         inputName,
+        outputName: output,
         targetW,
         targetH,
-        hasMusicTrack,
-        musicInputName,
-        request.musicOptions,
-        hasOverlay,
-        overlayInputName,
-        request.overlayOptions,
-        false,
-        videoDuration
-      );
-      exitCode = await ffmpeg.exec(args, undefined, {
-        signal: activeExportAbortController?.signal,
+        videoDuration,
+        hasOriginalAudio,
+        music: hasMusicTrack ? { inputName: musicInputName, options: request.musicOptions! } : undefined,
+        overlay: hasOverlay ? { inputName: overlayInputName, options: request.overlayOptions! } : undefined,
+        threads,
       });
+
+    let exitCode = await ffmpeg.exec(argsFor(recipe.format, outputName, true), undefined, { signal });
+
+    if (exitCode !== 0 && missingAudioDetected) {
+      // Retry without the original audio track (the source has none).
+      exitCode = await ffmpeg.exec(argsFor(recipe.format, outputName, false), undefined, { signal });
     }
 
     if (exitCode !== 0) {
-      args = buildArguments(
-        recipe,
-        "webm",
-        fallbackOutputName,
-        inputName,
-        targetW,
-        targetH,
-        hasMusicTrack,
-        musicInputName,
-        request.musicOptions,
-        hasOverlay,
-        overlayInputName,
-        request.overlayOptions,
-        !missingAudioDetected,
-        videoDuration
+      // Last resort: WebM (VP8), for inputs the H.264 path rejects.
+      const fallbackCode = await ffmpeg.exec(
+        argsFor("webm", fallbackOutputName, !missingAudioDetected),
+        undefined,
+        { signal }
       );
-
-      const fallbackCode = await ffmpeg.exec(args, undefined, {
-        signal: activeExportAbortController?.signal,
-      });
       if (fallbackCode !== 0) throw new Error("Export failed");
 
-      const data = await ffmpeg.readFile(fallbackOutputName, undefined, {
-        signal: activeExportAbortController?.signal,
-      });
-      const payload = (data as Uint8Array).buffer as ArrayBuffer;
+      const payload = await read(fallbackOutputName);
       return {
         type: "result",
         id: sessionId,
@@ -602,10 +400,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
       };
     }
 
-    const data = await ffmpeg.readFile(outputName, undefined, {
-      signal: activeExportAbortController?.signal,
-    });
-    const payload = (data as Uint8Array).buffer as ArrayBuffer;
+    const payload = await read(outputName);
     return {
       type: "result",
       id: sessionId,
@@ -617,8 +412,10 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
       format: recipe.format,
     };
   } finally {
+    // Both listeners must come off: the worker outlives each export, and a
+    // leaked log listener used to accumulate on every run.
     ffmpeg.off("progress", handleProgress);
-    if (logListener) ffmpeg.off("log", logListener);
+    ffmpeg.off("log", handleLog);
     for (const path of cleanupFiles) {
       await removeFile(path);
     }
@@ -649,14 +446,58 @@ function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
   }
 }
 
+const FRAMES_MOUNT = "/frames-src";
+
+async function runFrames(request: FramesRequest, signal: AbortSignal): Promise<void> {
+  if (!ffmpeg) throw new Error("FFmpeg engine is not loaded.");
+  // A new File over the same bytes (no copy) with a neutral name: the user's
+  // file name never enters FFmpeg's filesystem.
+  const ext = (request.file.name.split(".").pop() ?? "mp4").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "mp4";
+  const source = new File([request.file], `source.${ext}`, { type: request.file.type });
+  // One thread on the multi-threaded core: never FFmpeg's automatic count,
+  // which deadlocks core-mt (see MT_THREAD_CAP).
+  const threads = engineMode === "multi" ? 1 : 0;
+  await ffmpeg.createDir(FRAMES_MOUNT).catch(() => {});
+  await ffmpeg.mount("WORKERFS" as never, { files: [source] }, FRAMES_MOUNT);
+  let skipped = 0;
+  try {
+    for (const [index, time] of request.times.entries()) {
+      if (signal.aborted) throw new DOMException("Frames cancelled", "AbortError");
+      const outputName = `frame_${request.id}_${index}.jpg`;
+      try {
+        const code = await ffmpeg.exec(
+          buildFrameArguments({ inputPath: `${FRAMES_MOUNT}/${source.name}`, time, outputName, width: request.width, threads }),
+          undefined,
+          { signal }
+        );
+        if (code !== 0) {
+          skipped++;
+          continue;
+        }
+        const data = (await ffmpeg.readFile(outputName, undefined, { signal })) as Uint8Array<ArrayBuffer>;
+        postMessage({ type: "frame", id: request.id, index, time, blob: new Blob([data], { type: "image/jpeg" }) });
+      } catch (error) {
+        if (signal.aborted) throw error;
+        skipped++;
+      } finally {
+        await removeFile(outputName);
+      }
+    }
+  } finally {
+    await ffmpeg.unmount(FRAMES_MOUNT).catch(() => {});
+    await ffmpeg.deleteDir(FRAMES_MOUNT).catch(() => {});
+  }
+  postMessage({ type: "frames-done", id: request.id, skipped });
+}
+
 async function handleCommand(message: WorkerCommand) {
   switch (message.type) {
     case "load": {
       try {
-        await loadCore();
-        postMessage({ type: "ready" });
+        await loadCore(message.singleThread);
+        postMessage({ type: "ready", mode: engineMode });
       } catch (error) {
-        postMessage({ type: "error", message: (error as Error).message });
+        postMessage({ type: "error", message: errorMessage(error) });
       }
       return;
     }
@@ -670,6 +511,12 @@ async function handleCommand(message: WorkerCommand) {
         return;
       }
 
+      // One FFmpeg instance runs one command at a time: stop timeline frames first.
+      if (activeFrames) {
+        activeFrames.controller.abort();
+        await activeFrames.done;
+      }
+
       activeExportAbortController = new AbortController();
       activeExportId = message.id;
 
@@ -679,17 +526,49 @@ async function handleCommand(message: WorkerCommand) {
           postMessage({ type: "cancelled", id: message.id });
           return;
         }
-        postMessage({ ...result }, [result.data]);
+        // Wrap the output in a Blob here, off the main thread: building it on
+        // the main thread copied the whole file synchronously (over a second
+        // for a large export). A Blob crosses to the page by reference.
+        const { data, ...rest } = result;
+        postMessage({ ...rest, blob: new Blob([data], { type: result.mimeType }) });
       } catch (error) {
         if (activeExportAbortController?.signal.aborted) {
           postMessage({ type: "cancelled", id: message.id });
         } else {
-          postMessage({ type: "error", id: message.id, message: (error as Error).message });
+          postMessage({ type: "error", id: message.id, message: errorMessage(error) });
         }
       } finally {
         activeExportAbortController = null;
         activeExportId = null;
       }
+      return;
+    }
+    case "frames": {
+      if (!ffmpeg) {
+        postMessage({ type: "frames-error", id: message.id, message: "FFmpeg engine is not loaded." });
+        return;
+      }
+      if (activeExportId || activeFrames) {
+        postMessage({ type: "frames-error", id: message.id, message: "busy" });
+        return;
+      }
+      const controller = new AbortController();
+      const done = runFrames(message, controller.signal)
+        .catch((error) => {
+          postMessage(
+            controller.signal.aborted
+              ? { type: "frames-cancelled", id: message.id }
+              : { type: "frames-error", id: message.id, message: errorMessage(error) }
+          );
+        })
+        .finally(() => {
+          if (activeFrames?.id === message.id) activeFrames = null;
+        });
+      activeFrames = { id: message.id, controller, done };
+      return;
+    }
+    case "cancel-frames": {
+      if (activeFrames?.id === message.id) activeFrames.controller.abort();
       return;
     }
     case "cancel": {
@@ -710,6 +589,6 @@ async function handleCommand(message: WorkerCommand) {
 
 self.addEventListener("message", (event) => {
   handleCommand(event.data as WorkerCommand).catch((error) => {
-    postMessage({ type: "error", message: (error as Error).message });
+    postMessage({ type: "error", message: errorMessage(error) });
   });
 });

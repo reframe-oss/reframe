@@ -14,22 +14,23 @@ import {
   Lock,
   Mail,
   HeartHandshake,
+  Settings,
 } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-[var(--neo-bg)] text-[var(--text)] shadow-[0_-8px_18px_var(--neo-lo)] px-6 py-16 mt-20 transition-colors duration-300">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-y-12 md:gap-x-12">
+    <footer className="w-full border-t border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-6 py-12 mt-16">
+      <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-y-12 md:gap-x-12 lg:px-2">
         {/* Brand Section */}
         <div className="md:col-span-5 space-y-6">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Reframe</h2>
-            <p className="text-[10px] font-mono tracking-[0.35em] uppercase opacity-50 mt-1">
+            <h2 className="display text-4xl">Reframe</h2>
+            <p className="text-xs text-[var(--muted)] mt-1">
               Browser Video Studio
             </p>
           </div>
 
-          <p className="text-sm opacity-70 leading-relaxed max-w-md">
+          <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-md">
             Professional video processing directly in your browser using{" "}
             <span className="font-medium opacity-100">FFmpeg.wasm</span> — fast, private, and open
             source.
@@ -43,7 +44,7 @@ export default function Footer() {
             ].map((tag) => (
               <span
                 key={tag.label}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[10px] font-semibold tracking-wide uppercase opacity-80 hover:opacity-100 hover:border-[var(--accent)] transition-all"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-pill border border-[var(--border)] text-2xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)] transition-colors"
               >
                 {tag.icon}
                 {tag.label}
@@ -54,9 +55,7 @@ export default function Footer() {
 
         {/* Navigation */}
         <div className="md:col-span-3 space-y-5">
-          <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">
-            Navigation
-          </h3>
+          <h3 className="marker"><span aria-hidden="true">(</span>Navigation<span aria-hidden="true">)</span></h3>
 
           <nav className="flex flex-col gap-3 text-sm">
             <a
@@ -64,7 +63,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="GitHub repository"
-              className="flex items-center gap-2 opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
             >
               <Github size={14} />
               GitHub
@@ -74,7 +73,7 @@ export default function Footer() {
             <Link
               href="/contact"
               aria-label="Contact page"
-              className="flex items-center gap-2 opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
             >
               <Mail size={14} />
               Contact
@@ -83,21 +82,30 @@ export default function Footer() {
             <Link
               href="/privacy"
               aria-label="Privacy policy"
-              className="flex items-center gap-2 opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
             >
               <Lock size={14} />
               Privacy Policy
+            </Link>
+
+            <Link
+              href="/privacy#settings"
+              aria-label="Settings: anonymous analytics"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
+            >
+              <Settings size={14} />
+              Settings
             </Link>
 
             {/* Netlify's open source plan expects a publicly reachable Code of
                 Conduct. Points at the repo file rather than an in-site route,
                 since CODE_OF_CONDUCT.md is the canonical copy. */}
             <a
-              href="https://github.com/magic-peach/reframe/blob/main/CODE_OF_CONDUCT.md"
+              href="https://github.com/reframe-oss/reframe/blob/main/CODE_OF_CONDUCT.md"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Code of Conduct"
-              className="flex items-center gap-2 opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all w-fit focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+              className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors w-fit rounded"
             >
               <HeartHandshake size={14} />
               Code of Conduct
@@ -111,10 +119,10 @@ export default function Footer() {
           {/* Newsletter */}
 
           <div className="space-y-3">
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">Updates</h3>
+            <h3 className="marker"><span aria-hidden="true">(</span>Updates<span aria-hidden="true">)</span></h3>
 
             <form
-              className="flex items-center w-full sm:w-80 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)] transition"
+              className="flex items-center w-full sm:w-80 bg-[var(--surface)] border border-[var(--border)] rounded-pill px-4 focus-within:border-[var(--focus)] focus-within:ring-1 focus-within:ring-[var(--accent)] transition"
               onSubmit={(e) => e.preventDefault()}
               aria-label="Newsletter signup"
             >
@@ -123,14 +131,14 @@ export default function Footer() {
                 required
                 placeholder="Enter your email"
                 aria-label="Email address"
-                className="w-full bg-transparent py-3 px-1 text-[11px] font-semibold tracking-widest uppercase placeholder:opacity-30 outline-none focus:outline-none focus:ring-0 border-none"
+                className="w-full bg-transparent py-3 px-1 text-2xs font-semibold placeholder:text-[var(--muted)] outline-none focus:outline-none focus:ring-0 border-none"
               />
 
               <button
                 type="submit"
                 aria-label="Subscribe to updates"
                 onMouseDown={(e) => e.preventDefault()}
-                className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded ml-1"
+                className="text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors p-2 rounded-full ml-1"
               >
                 <ArrowRight size={16} />
               </button>
@@ -140,9 +148,7 @@ export default function Footer() {
           {/* Community */}
 
           <div className="space-y-3">
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">
-              Community
-            </h3>
+            <h3 className="marker"><span aria-hidden="true">(</span>Community<span aria-hidden="true">)</span></h3>
 
             <div className="flex items-center gap-3 flex-wrap">
               {[
@@ -173,7 +179,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={social.label}
-                  className="relative group p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+                  className="relative group p-2.5 rounded-full border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] transition-colors "
                 >
                   <span className="opacity-70 group-hover:opacity-100">{social.icon}</span>
                 </a>
@@ -184,12 +190,27 @@ export default function Footer() {
       </div>
 
       {/* Bottom Bar */}
-      <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-semibold uppercase tracking-[0.25em] opacity-50">
-        <p>© {new Date().getFullYear()} Reframe · MIT License</p>
+      <div className="max-w-[1440px] mx-auto mt-16 pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[var(--muted)]">
+        <nav aria-label="Credits and license" className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          <span>© {new Date().getFullYear()} Reframe</span>
+          <a href="https://github.com/reframe-oss/reframe/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--text)] underline-offset-4 hover:underline transition-colors rounded">
+            MIT License
+          </a>
+          <a href="https://github.com/reframe-oss/reframe" target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--text)] underline-offset-4 hover:underline transition-colors rounded">
+            GitHub
+          </a>
+          {/* Netlify's open source plan asks for this wording and link. */}
+          <a href="https://www.netlify.com" target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--text)] underline-offset-4 hover:underline transition-colors rounded">
+            This site is powered by Netlify
+          </a>
+          <a href="https://snyk.io" target="_blank" rel="noopener noreferrer" className="text-[var(--text-secondary)] hover:text-[var(--text)] underline-offset-4 hover:underline transition-colors rounded">
+            Security by Snyk
+          </a>
+        </nav>
 
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
             Processing happens locally
           </div>
 
@@ -206,7 +227,7 @@ export default function Footer() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Deploys by Netlify"
-            className="opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] rounded"
+            className="opacity-100  rounded"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

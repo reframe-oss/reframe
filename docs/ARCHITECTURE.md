@@ -79,7 +79,7 @@ Reframe uses FFmpeg.wasm to process videos entirely in the browser. The processi
    - **Fill mode**: Video is scaled to fill the target dimensions and cropped
 5. **Speed Adjustment** — Playback speed is adjusted using `setpts` (video) and `atempo` (audio) filters
 6. **Audio Processing** — Audio is either kept (with speed adjustment) or removed based on user preference
-7. **Encoding** — Final video is encoded to MP4 (H.264) or WebM (VP9) format
+7. **Encoding** — Final video is encoded to MP4 (H.264) or WebM (VP8 + Vorbis) format
 8. **Download** — Processed video is made available as a Blob URL for download
 
 ---
@@ -97,7 +97,7 @@ Reframe uses FFmpeg.wasm to process videos entirely in the browser. The processi
 
 - **Zero backend** — Entire app is static HTML/CSS/JS
 - **Fast deployment** — Can be hosted on any static file server
-- **Offline-capable** — Works offline after initial load (with service worker)
+- **Could work offline** — There is no service worker yet, so Reframe needs a connection to load. Offline support (a PWA that keeps the page cross-origin isolated) is planned
 - **SEO-friendly** — Static pages are easily crawlable
 
 ### Why Single-threaded FFmpeg?

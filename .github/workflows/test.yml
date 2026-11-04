@@ -1,0 +1,81 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests (Vitest)
+    env:
+      # CI Visibility uploads; empty on forks, so those steps are skipped.
+      DATADOG_API_KEY: ${{ secrets.DD_API_KEY }}
+      DATADOG_SITE: datadoghq.com
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run test --run --reporter=default --reporter=junit --outputFile.junit=test-results/vitest-junit.xml
+
+      # CI Visibility: test results in Datadog. Skipped for forks (no secret).
+      - name: Upload test results to Datadog
+        if: always() && env.DATADOG_API_KEY != ''
+        continue-on-error: true
+        run: npx --yes @datadog/datadog-ci@5.25.0 junit upload --service reframe --tags "suite:unit" test-results/vitest-junit.xml
+
+  e2e:
+    name: Export end-to-end (Playwright)
+    env:
+      # CI Visibility uploads; empty on forks, so those steps are skipped.
+      DATADOG_API_KEY: ${{ secrets.DD_API_KEY }}
+      DATADOG_SITE: datadoghq.com
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      # ffmpeg makes the input fixtures and ffprobe checks the exported files.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Make video fixtures
+        run: scripts/make-fixtures.sh --small
+
+      # Telemetry off: CI must never report to Datadog.
+      - name: Build the static site
+        run: bun run build
+        env:
+          NEXT_PUBLIC_DATADOG_ENV: "off"
+
+      - name: Install Chromium for Playwright
+        run: bunx playwright install --with-deps chromium
+
+      # Served with COOP/COEP (multi-threaded core, as in production) and
+      # without (single-threaded core); see playwright.config.ts.
+      - name: Run Playwright
+        run: bunx playwright test
+
+      - name: Upload test results to Datadog
+        if: always() && env.DATADOG_API_KEY != ''
+        continue-on-error: true
+        run: npx --yes @datadog/datadog-ci@5.25.0 junit upload --service reframe --tags "suite:e2e" test-results/e2e-junit.xml
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7

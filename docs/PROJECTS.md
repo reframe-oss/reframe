@@ -19,7 +19,7 @@ Not included, on purpose:
 - **The completion-sound preference.** It's a setting, not an edit, so undo never flips it.
 - **Files** (the source video, the image overlay file, background music). They are binary assets, not edit values, so adding or removing the image file is not an undo step.
 - **Transient UI state.** Hover, open panels, the selected text overlay, export progress, object URLs and worker state.
-- **The multi-track timeline state.** It isn't connected to the UI or the export yet (see `PHASE_1_MVP.md`).
+- **The multi-track timeline state.** It isn't connected to the UI or the export yet (see [history/PHASE_1_MVP.md](history/PHASE_1_MVP.md)).
 
 `useVideoEditor` exposes `recipe` derived from `EditState`. `handleExport` passes that same object, plus the image overlay settings, to `exportVideo`. So after an undo the preview and the export can't disagree.
 
@@ -69,7 +69,7 @@ Then the stored video copy is read from IndexedDB:
 - If the video copy can't be stored, the user is told they'll need to choose the file again after a refresh.
 - If the edit record can't be written, they're told to use "Save project file".
 
-**Delete saved data** asks for confirmation. It then removes the project record, the recipe and overlay records and the stored video copy, closes the video and resets the editor. Project files the user saved are not affected.
+**Delete saved data** asks for confirmation. It then removes the project record, the recipe and overlay records, the stored video copy and the cached timeline frames, closes the video and resets the editor. Project files the user saved are not affected.
 
 ## Project file format
 
@@ -129,13 +129,6 @@ Documents from a newer schema than the page knows are refused with "saved by a n
 
 A change to `EditRecipe` fields needs a project schema bump, because the validator requires every field.
 
-## Not done yet: export profiles
+## Export profiles
 
-Reusable export profiles were scoped out of this change so undo/redo and recovery could land as one coherent slice. The suggested next slice:
-
-- **Profiles.** A profile is a named subset of `EditState["recipe"]`: preset or custom size, framing, format, quality and audio options. It is stored in its own localStorage key with its own schema version, and never includes trims, overlays or media.
-- **Built-in profiles.** Landscape 1920×1080, square 1080×1080 and portrait 1080×1920, plus 1080×1350. Label them by shape and size, not by platform name, to avoid implying endorsement.
-- **Applying a profile.** Applying one is one undoable `updateEdit` step. Manual controls stay as they are.
-- **Command-builder tests.** A test runs every profile through the worker's `buildArguments`/`buildVideoFilter` and asserts the scale and pad output matches the declared dimensions.
-- **Safe-area guides.** A CSS overlay on the preview only. It is not part of `EditState`, so it can't reach the export.
-- **Batch export, if added.** Encode one profile at a time through the existing worker, never concurrently, and report each output's success or failure separately.
+Implemented separately; see [EXPORT_PROFILES.md](EXPORT_PROFILES.md). Applying a profile is one undo step and changes only the output fields of `EditState`. Profiles are stored apart from projects, and a project file doesn't include them.

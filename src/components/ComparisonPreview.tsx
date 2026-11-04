@@ -216,7 +216,7 @@ export default function ComparisonPreview({ file, recipe, videoRef }: Props) {
         >
           <track kind="captions" />
         </video>
-        <span className="absolute top-2 left-2 px-2 py-1 rounded bg-black/60 text-white text-[10px] font-heading font-bold uppercase tracking-wider pointer-events-none">
+        <span className="absolute top-2 left-2 px-2 py-1 rounded bg-black/60 text-white text-2xs font-bold pointer-events-none">
           Original
         </span>
       </div>
@@ -237,7 +237,7 @@ export default function ComparisonPreview({ file, recipe, videoRef }: Props) {
           </div>
         </div>
 
-        <span className="absolute top-2 right-2 px-2 py-1 rounded bg-black/60 text-white text-[10px] font-heading font-bold uppercase tracking-wider pointer-events-none text-right">
+        <span className="absolute top-2 right-2 px-2 py-1 rounded bg-black/60 text-white text-2xs font-bold pointer-events-none text-right">
           Reframed
           {targetDims && (
             <>

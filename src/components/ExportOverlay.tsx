@@ -3,15 +3,40 @@
 import FocusTrap from "focus-trap-react";
 import { useEffect, useRef, useCallback, useState } from "react";
 import { ExportStatus } from "@/lib/types";
-import LottiePlayer from "./LottiePlayer";
-import spinnerAnim from "@/lib/lottie/spinner.json";
 import TipCarousel from "./TipCarousel";
+
+export interface ExportSummary {
+  /** e.g. "MP4" */
+  format: string;
+  /** e.g. "1080 × 1920" */
+  resolution: string;
+  /** e.g. "Balanced (CRF 23)" */
+  quality: string;
+}
 
 interface Props {
   status: ExportStatus;
   progress: number;
   exportStartedAt?: number | null;
   onCancel?: () => void;
+  summary?: ExportSummary;
+  /** One line about a change mid-export, e.g. the engine fallback. */
+  notice?: string | null;
+}
+
+/**
+ * Time left, extrapolated from progress so far, or null while it would be a
+ * guess: before 3% or 3 s, and once it's nearly done.
+ */
+export function estimateRemainingMs(progress: number, elapsedMs: number): number | null {
+  if (progress < 3 || progress >= 99 || elapsedMs < 3000) return null;
+  return (elapsedMs * (100 - progress)) / progress;
+}
+
+function formatRemaining(ms: number): string {
+  const seconds = Math.ceil(ms / 1000);
+  if (seconds < 60) return `about ${Math.max(5, Math.ceil(seconds / 5) * 5)} s left`;
+  return `about ${Math.ceil(seconds / 60)} min left`;
 }
 
 function formatElapsed(ms: number): string {
@@ -21,7 +46,7 @@ function formatElapsed(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-export default function ExportOverlay({ status, progress, exportStartedAt, onCancel }: Props) {
+export default function ExportOverlay({ status, progress, exportStartedAt, onCancel, summary, notice }: Props) {
   const visible = status === "loading-engine" || status === "exporting";
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const focusAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -80,6 +105,9 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
   if (!visible) return null;
 
   const isLoading = status === "loading-engine";
+  const clamped = Math.max(0, Math.min(100, progress));
+  const remainingMs = estimateRemainingMs(clamped, elapsedMs);
+  const timeText = `${formatElapsed(elapsedMs)} elapsed${remainingMs === null ? "" : `, ${formatRemaining(remainingMs)}`}`;
 
   return (
     <FocusTrap
@@ -94,79 +122,95 @@ export default function ExportOverlay({ status, progress, exportStartedAt, onCan
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby="export-overlay-title"
+        aria-describedby="export-overlay-desc"
         tabIndex={-1}
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--bg)]/95 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-fade-in"
       >
-        <div
-          className="text-center space-y-6 max-w-xs px-6 animate-fade-in"
-          aria-live="polite"
-        >
-          <div
-            ref={focusAnchorRef}
-            tabIndex={-1}
-            className="sr-only"
-            aria-hidden="true"
-          />
-          <div className="mx-auto w-20 h-20">
-            <LottiePlayer
-              animationData={spinnerAnim}
-              loop
-              autoplay
-              aria-hidden="true"
-            />
-          </div>
-          <div className="export-text">
-            <h2 className="font-heading font-bold text-xl tracking-tight text-[var(--text)]">
-              {isLoading ? "Loading engine" : "Exporting"}
-            </h2>
-            <p className="text-sm text-[var(--muted)] mt-1">
-              {isLoading
-                ? "Downloading the video engine. This only happens once."
-                : "Processing your video locally."}
+        <div className="panel enter max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 shadow-[var(--shadow-overlay)] sm:p-7">
+          <div ref={focusAnchorRef} tabIndex={-1} className="sr-only" aria-hidden="true" />
+
+          {/* Two real stages, so they're numbered: (1) engine, (2) encode. */}
+          <p className="marker" aria-hidden="true">
+            ({isLoading ? "1" : "2"} of 2)
+          </p>
+          <h2 id="export-overlay-title" className="serif mt-2 text-3xl leading-tight">
+            {isLoading ? "Starting the video engine" : "Exporting"}
+          </h2>
+          <p id="export-overlay-desc" className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            {isLoading
+              ? "Downloading FFmpeg (about 30 MB) the first time. After that it loads from your browser cache."
+              : "Your video is processed on this device. Keep this tab open until it finishes."}
+          </p>
+          {notice && (
+            <p role="status" className="mt-3 text-sm leading-6 text-[var(--text)]">
+              {notice}
             </p>
-            <p className="text-xs font-heading font-semibold text-film-600 mt-2 uppercase tracking-wide">
-              Do not close or refresh this tab
-            </p>
-          </div>
-          <span className="sr-only">
-            {status === "loading-engine"
-              ? `Loading video engine: ${progress}%`
-              : `Exporting: ${progress}%, ${formatElapsed(elapsedMs)} elapsed`}
-          </span>
-            <div className="w-full space-y-2">
-              <div className="h-1 w-full bg-film-100 rounded-full overflow-hidden">
+          )}
+
+          <div className="mt-6">
+            {isLoading ? (
+              // The engine download doesn't report byte progress, so this is
+              // an honest indeterminate state rather than a fake percentage.
+              <>
+                <div className="progress-track progress-indeterminate" aria-hidden="true" />
+                <p className="mt-3 text-sm text-[var(--text-secondary)]">Loading engine…</p>
+              </>
+            ) : (
+              <>
+                {/* Large serif figure with a small italic unit, as in the reference. */}
+                <p aria-hidden="true" className="flex items-baseline gap-1.5 text-[var(--text)]">
+                  <span className="display text-6xl [font-variant-numeric:lining-nums_tabular-nums]">{clamped}</span>
+                  <span className="marker text-3xl text-[var(--text-secondary)]">%</span>
+                  <span className="tabular ml-auto text-right text-xs text-[var(--muted)]">{timeText}</span>
+                </p>
                 <div
+                  className="progress-track mt-4"
                   role="progressbar"
-                  aria-valuenow={progress}
+                  aria-valuenow={clamped}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-label={isLoading ? "Engine download progress" : "Export progress"}
-                  className="h-full bg-film-600 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4 text-xs font-heading font-semibold text-[var(--muted)]">
-                <span>{progress}%</span>
-                {!isLoading && (
-                  <span>{formatElapsed(elapsedMs)} elapsed</span>
-                )}
-              </div>
-              <TipCarousel />
-              {!isLoading && (
-              <div className="flex flex-col items-center gap-3 mt-4">
-                <button
-                  type="button"
-                  onClick={() => onCancel?.()}
-                  className="inline-flex items-center justify-center rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-4 py-2 text-sm font-semibold text-[var(--error)] transition-colors hover:bg-[var(--error-hover)] active:scale-[0.98]"
+                  aria-valuetext={`${clamped}%, ${timeText}`}
+                  aria-label="Export progress"
                 >
-                  Cancel Export
-                </button>
-                <p className="text-[var(--text)] text-xs">
-                  Press Escape to cancel
-                </p>
+                  <div className="progress-fill" style={{ transform: `scaleX(${clamped / 100})` }} />
+                </div>
+              </>
+            )}
+            {/* Announces the stage only. Percentages are announced in 10% steps
+                by the editor's live region, not on every update. */}
+            <span className="sr-only" role="status">
+              {isLoading ? "Loading video engine" : "Exporting video"}
+            </span>
+          </div>
+
+          {summary && (
+            <dl className="mt-6 grid grid-cols-3 divide-x divide-[var(--border)] border-y border-[var(--border)] py-3 text-xs">
+              <div className="pr-3">
+                <dt className="text-[var(--muted)]">Format</dt>
+                <dd className="mt-0.5 font-medium">{summary.format}</dd>
               </div>
-              )}
-            </div>
+              <div className="px-3">
+                <dt className="text-[var(--muted)]">Size</dt>
+                <dd className="tabular mt-0.5 font-medium">{summary.resolution}</dd>
+              </div>
+              <div className="pl-3">
+                <dt className="text-[var(--muted)]">Quality</dt>
+                <dd className="mt-0.5 font-medium">{summary.quality}</dd>
+              </div>
+            </dl>
+          )}
+
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <span className="text-xs text-[var(--muted)]">
+              <kbd className="kbd">Esc</kbd> to cancel
+            </span>
+            <button type="button" onClick={() => onCancel?.()} className="btn btn-secondary">
+              Cancel export
+            </button>
+          </div>
+
+          {!isLoading && <TipCarousel />}
         </div>
       </div>
     </FocusTrap>

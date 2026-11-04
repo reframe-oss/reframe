@@ -27,11 +27,11 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
   // ----------------------------------------
 
   const getSpeedDescription = (speed: number) => {
-    if (speed <= 0.5) return "Very Slow";
+    if (speed <= 0.5) return "Very slow";
     if (speed < 1) return "Slow";
     if (speed === 1) return "Normal";
     if (speed <= 1.5) return "Fast";
-    return "Very Fast";
+    return "Very fast";
   };
 
   const isModified = recipe.speed !== 1 || !recipe.keepAudio;
@@ -42,19 +42,19 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
   return (
     <div className="space-y-4">
       {/* CLS FIX: Fixed height wrapper (h-6) ensures the layout never jumps. */}
-      <div className="h-6 flex justify-end">
+      <div className="flex h-8 justify-end">
         <button
           type="button"
           aria-label="Reset audio settings to default"
           onClick={() => onChange({ speed: 1, keepAudio: true })}
           className={cn(
-            "text-sm font-heading font-semibold uppercase tracking-wider text-film-600 hover:text-film-700 hover:underline transition-all duration-300 ease-in-out",
-            isModified 
-              ? "opacity-100 translate-y-0 pointer-events-auto delay-200" 
-              : "opacity-0 -translate-y-1 pointer-events-none"
+            "btn btn-ghost btn-sm transition-opacity duration-fast",
+            isModified ? "opacity-100" : "pointer-events-none opacity-0"
           )}
+          tabIndex={isModified ? undefined : -1}
+          aria-hidden={!isModified}
         >
-          Reset to Default
+          Reset audio and speed
         </button>
       </div>
 
@@ -63,13 +63,7 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
         onClick={() => onChange({ keepAudio: !recipe.keepAudio })}
         aria-label={recipe.keepAudio ? "Mute video audio (M)" : "Unmute video audio (M)"}
         aria-pressed={recipe.keepAudio}
-        className={cn(
-          "w-full flex items-center gap-3 p-3 rounded-lg border transition-all duration-150",
-          "hover:scale-[1.01] active:scale-[0.99]",
-          recipe.keepAudio
-            ? "border-film-300 bg-film-50 text-film-700"
-            : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
-        )}
+        className="choice flex w-full items-center gap-3 px-3 py-2.5 text-left"
       >
         {recipe.keepAudio ? (
           <Volume2 size={16} aria-hidden="true" />
@@ -79,12 +73,12 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
         <span className="sr-only">
           {recipe.keepAudio ? "Turn audio off" : "Turn audio on"}
         </span>
-        <span className="text-sm font-heading font-semibold flex-1 text-left">
+        <span className="flex-1 text-left text-sm font-medium">
           {recipe.keepAudio ? "Audio on" : "Muted"}
         </span>
         <kbd
           aria-hidden="true"
-          className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded border border-current opacity-40"
+          className="kbd ml-auto"
         >
           M
         </kbd>
@@ -95,16 +89,16 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
           <label
             id="speed-label"
             htmlFor="speed-control"
-            className="text-sm font-heading font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center gap-2"
+            className="label flex items-center gap-1.5"
           >
-            <Gauge size={10} aria-hidden="true" /> Speed
+            <Gauge size={13} aria-hidden="true" /> Speed
           </label>
 
           <div className="text-right">
-            <span className="text-sm font-heading font-bold text-film-600 block">
+            <span className="tabular block text-sm font-medium text-[var(--text)]">
               {currentSpeed}x
             </span>
-            <span id="speed-description" className="text-sm text-[var(--muted)]">
+            <span id="speed-description" className="hint">
               {getSpeedDescription(currentSpeed)}
             </span>
           </div>
@@ -130,9 +124,9 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
           aria-labelledby="speed-label"
           aria-describedby="speed-description"
           aria-valuetext={`${currentSpeed}x speed, ${getSpeedDescription(currentSpeed)}`}
-          className="w-full h-11 accent-film-600 cursor-pointer"
+          className="h-8 w-full cursor-pointer"
         />
-        <div className="flex gap-2 mt-3">
+        <div className="mt-2 flex gap-1.5">
   {[0.5, 1, 1.5, 2].map((speed) => (
     <button
       key={speed}
@@ -140,13 +134,7 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
       onClick={() => onChange({ speed })}
       aria-label={`Set speed to ${speed}x`}
       aria-pressed={recipe.speed === speed}
-      className={cn(
-        "flex-1 py-1.5 rounded-lg text-xs font-heading font-bold transition-all duration-150",
-        "hover:scale-[1.02] active:scale-[0.98]",
-        recipe.speed === speed
-          ? "bg-film-600 text-white"
-          : "bg-[var(--border)] text-[var(--muted)] hover:bg-film-50 hover:text-film-600"
-      )}
+      className="choice tabular min-h-[32px] flex-1 text-xs font-medium"
     >
       {speed}x
     </button>
@@ -156,7 +144,7 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
           {SPEED_STEPS.map((s) => (
             <span
               key={s}
-              className="text-sm text-[var(--muted)] truncate text-center min-w-0 px-[1px]"
+              className="tabular min-w-0 truncate px-[1px] text-center text-2xs text-[var(--muted)]"
             >
               {s}x
             </span>
@@ -164,16 +152,16 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
         </div>
       </div>
 
-      <div className={cn("transition-opacity duration-200", !recipe.keepAudio && "opacity-50 pointer-events-none")}>
+      <div className={cn(!recipe.keepAudio && "opacity-50 pointer-events-none")}>
         <div className="flex items-center justify-between mb-2">
           <label
             htmlFor="volume-control"
-            className="text-sm font-heading font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center gap-2"
+            className="label flex items-center gap-1.5"
           >
-            <Volume2 size={10} aria-hidden="true" /> Volume
+            <Volume2 size={13} aria-hidden="true" /> Volume
           </label>
 
-          <span className="text-sm font-heading font-bold text-film-600 block">
+          <span className="tabular block text-sm font-medium text-[var(--text)]">
             {recipe.volume}%
           </span>
         </div>
@@ -186,7 +174,7 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
           disabled={!recipe.keepAudio}
           value={recipe.volume ?? 100}
           onChange={(e) => onChange({ volume: Number(e.target.value) })}
-          className="w-full h-11 accent-film-600 cursor-pointer"
+          className="h-8 w-full cursor-pointer"
         />
       </div>
 
@@ -201,20 +189,14 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
           }
           aria-pressed={recipe.normalizeAudio}
           aria-describedby="normalize-audio-description"
-          className={cn(
-            "w-full flex items-center gap-3 p-3 rounded-lg border transition-all duration-150",
-            "hover:scale-[1.01] active:scale-[0.99]",
-            recipe.normalizeAudio
-              ? "border-film-300 bg-film-50 text-film-700"
-              : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
-          )}
+          className="choice flex w-full items-center gap-3 px-3 py-2.5 text-left"
         >
           <Gauge size={16} aria-hidden="true" />
           <div className="flex-1 text-left">
-            <span className="text-sm font-heading font-semibold block">
-              Normalize Audio
+            <span className="block text-sm font-medium">
+              Normalize loudness
             </span>
-            <span id="normalize-audio-description" className="text-[10px] text-[var(--muted)]">
+            <span id="normalize-audio-description" className="text-2xs text-[var(--muted)]">
               {recipe.normalizeAudio ? "–14 LUFS (streaming standard)" : "Off"}
             </span>
           </div>
@@ -222,7 +204,7 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
       )}
 
       {recipe.keepAudio && (recipe.trimStart !== 0 || recipe.trimEnd !== null) && (
-        <div role="note" className="mt-3 p-3 bg-[var(--accent-muted)] border border-[var(--border)] rounded text-sm text-[var(--text)] leading-relaxed flex items-start gap-2 animate-fade-in">
+        <div role="note" className="callout callout-info text-xs">
           <AlertTriangle size={12} aria-hidden="true" className="shrink-0 mt-0.5" />
           <p>
             Note: If audio doesn&apos;t start within the selected range, the output will be silent.
