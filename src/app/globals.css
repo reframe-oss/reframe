@@ -59,8 +59,6 @@
   --accent-muted: rgba(196, 47, 58, 0.09);
   --accent-text: #a8242e;
   --on-accent: #ffffff;
-  --film-600: #c42f3a;
-  --film-400: #de5560;
 
   --focus: var(--slate);
   --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus);
@@ -129,8 +127,6 @@
   --accent-muted: rgba(208, 52, 63, 0.14);
   --accent-text: #f08088;
   --on-accent: #ffffff;
-  --film-600: #d0343f;
-  --film-400: #f08088;
 
   --focus: var(--ivory);
 
@@ -176,8 +172,6 @@
   --accent-muted: rgba(255, 255, 0, 0.22);
   --accent-text: #ffff00;
   --on-accent: #000000;
-  --film-600: #ffff00;
-  --film-400: #ffff00;
 
   --focus: #00ffff;
 
