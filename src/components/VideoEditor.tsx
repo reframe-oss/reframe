@@ -24,6 +24,7 @@ import { useExportProfiles } from "@/hooks/useExportProfiles";
 import { BUILT_IN_PROFILES, profileMatches } from "@/lib/exportProfiles";
 import { resolveOutputSize } from "@/lib/ffmpegArgs";
 import { trackFeature } from "@/lib/featureTelemetry";
+import { installSelfTest } from "@/lib/selfTest";
 import { deepEqual } from "@/lib/editHistory";
 import { getPresetById } from "@/lib/presets";
 import { pickThumbnailInterval } from "@/lib/thumbnails";
@@ -260,6 +261,8 @@ export default function VideoEditor() {
 
   const exportProfiles = useExportProfiles();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // window.__reframeSelfTest for the Datadog Synthetic check (src/lib/selfTest.ts).
+  useEffect(() => installSelfTest(), []);
   const toggleShortcuts = useCallback(() => setShortcutsOpen((v) => !v), []);
 
   useKeyboardShortcuts({

@@ -5,6 +5,7 @@ import {
   exportFailureCategory,
   resetEngineLoadCountForTests,
   startEngineLoad,
+  speedBucket,
   type ExportContext,
 } from "../exportTelemetry";
 import { HANDLED_ERROR_PREFIX, registerRum, resetTelemetryForTests, sanitizeRumEvent } from "../telemetry";
@@ -31,6 +32,7 @@ const ALLOWED_KEYS = new Set([
   "durationMs",
   "encode_ms",
   "output_size",
+  "speed",
   "stage",
   "category",
   "load_number",
@@ -42,7 +44,7 @@ const ALLOWED_KEYS = new Set([
   "stuck",
 ]);
 
-let rum: { addAction: ReturnType<typeof vi.fn>; addDurationVital: ReturnType<typeof vi.fn> };
+let rum: { addAction: ReturnType<typeof vi.fn>; addDurationVital: ReturnType<typeof vi.fn>; addError: ReturnType<typeof vi.fn> };
 const events = () => rum.addAction.mock.calls.map(([name, ctx]) => ({ name: name as string, ctx: ctx as Record<string, unknown> }));
 const names = () => events().map((e) => e.name);
 
@@ -52,7 +54,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_DATADOG_APPLICATION_ID", "app");
   vi.stubEnv("NEXT_PUBLIC_DATADOG_CLIENT_TOKEN", "token");
   vi.stubEnv("NEXT_PUBLIC_DATADOG_ENV", "unit-test");
-  rum = { addAction: vi.fn(), addDurationVital: vi.fn() };
+  rum = { addAction: vi.fn(), addDurationVital: vi.fn(), addError: vi.fn() };
   registerRum(rum as unknown as DatadogRum);
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -245,5 +247,43 @@ describe("handled errors", () => {
     expect(sanitizeRumEvent(unhandled)).toBe(true);
     // Only console copies are dropped; a real exception always reaches RUM.
     expect(sanitizeRumEvent(thrown)).toBe(true);
+  });
+});
+
+describe("Phase 4 additions", () => {
+  it("reports processing speed as a bucket, never the clip length", () => {
+    expect(speedBucket(10, 5_000)).toBe("2-4x");
+    expect(speedBucket(10, 40_000)).toBe("0.25-0.5x");
+    expect(speedBucket(60, 10_000)).toBe("4x+");
+    expect(speedBucket(undefined, 5_000)).toBe("unknown");
+    expect(speedBucket(Infinity, 5_000)).toBe("unknown");
+    const attempt = new ExportAttempt(context);
+    attempt.encoding("multi");
+    attempt.succeeded("<25MB", 12.345);
+    const ctx = events().find((e) => e.name === "export_succeeded")!.ctx;
+    expect(typeof ctx.speed).toBe("string");
+    expect(JSON.stringify(ctx)).not.toContain("12.345");
+  });
+
+  it("each failure is also an Error Tracking issue named by its category, with no raw message", () => {
+    const attempt = new ExportAttempt(context);
+    attempt.encoding("multi");
+    attempt.failed(new Error("/Users/alice/clip.mp4: Invalid data found when processing input"));
+    expect(rum.addError).toHaveBeenCalledTimes(1);
+    const [error, ctx] = rum.addError.mock.calls[0]!;
+    expect((error as Error).name).toBe("ExportFailure");
+    expect((error as Error).message).toBe("Export failed: encode_error");
+    expect(ctx).toMatchObject({ category: "encode_error", stage: "encode", engine: "multi", format: "mp4" });
+    expect(JSON.stringify(rum.addError.mock.calls)).not.toContain("alice");
+  });
+
+  it("a cancellation is not an error", () => {
+    new ExportAttempt(context).cancelled();
+    expect(rum.addError).not.toHaveBeenCalled();
+  });
+
+  it("an engine load failure is an Error Tracking issue too", () => {
+    startEngineLoad("multi").failed(new Error("Failed to fetch engine file (HTTP 503)"));
+    expect(rum.addError.mock.calls[0]![0]).toMatchObject({ name: "EngineLoadFailure", message: "FFmpeg engine failed to load: network" });
   });
 });

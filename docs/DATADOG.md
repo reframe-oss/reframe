@@ -109,6 +109,83 @@ Builds before this change send `export_start`, `export_success` and
 transition, query both, for example
 `@action.target.name:(export_success OR export_succeeded)`.
 
+## Releases, timings, errors and feature usage
+
+**Release tracking.** Every event carries `@version` = the commit SHA (first
+12 characters). `next.config.ts` reads Netlify's `COMMIT_REF` (or GitHub's
+`GITHUB_SHA`) at build time; local builds report `dev`. The dashboard compares
+export success and errors by version.
+
+**Source maps.** The build generates them (`productionBrowserSourceMaps`), and
+Netlify deletes them before publishing (`scripts/strip-sourcemaps.mjs`), so
+they are never served. `.github/workflows/sourcemaps.yml` runs on every push
+to `main`:
+
+1. it rebuilds the same commit with Netlify's toolchain (Node 22, Bun 1.4.0);
+2. it waits until production serves exactly the chunks it built;
+3. it uploads the maps with `datadog-ci` for release = the SHA.
+
+The build ID is the SHA, so the same commit builds to byte-identical files.
+The public RUM application ID and client token come from the repository
+variables `DD_RUM_APPLICATION_ID` and `DD_RUM_CLIENT_TOKEN`; the upload uses
+the `DD_API_KEY` secret.
+
+**Timings** (duration vitals, durations in nanoseconds):
+
+| Vital | Measures | Context |
+|---|---|---|
+| `ffmpeg_init` | Engine start-up | `engine`, `load_number` |
+| `first_preview_frame` | Choosing a video to its first frame in the preview | `input_size` |
+| `export` | Encoding (engine start-up excluded) | export context, `engine` |
+
+`export_succeeded.speed` is the processing speed (seconds of output per second
+of encoding) as a bucket: `<0.25x`, `0.25-0.5x`, `0.5-1x`, `1-2x`, `2-4x`,
+`4x+`. It is a bucket on purpose: an exact ratio together with `encode_ms`
+would reveal the clip's length.
+
+**Error Tracking.** Each failed export is also a RUM error named
+`ExportFailure` with the message `Export failed: <category>`, and each engine
+load failure is `EngineLoadFailure` / `FFmpeg engine failed to load:
+<category>`. The messages are fixed text, never FFmpeg's output or a file name,
+so Error Tracking groups one issue per cause. Context: category, stage, engine,
+format, stall reason.
+
+**Feature usage** (`feature_used`, `src/lib/featureTelemetry.ts`). One event
+per editing tool an export uses (`action: exported`): trim, rotate, speed,
+mute, volume, normalize_audio, text_overlay, image_overlay, background_music,
+color_adjustments, sharpen, denoise, stabilization, fill_framing,
+custom_size. Interactive features: `history` (undo, redo), `project_file`
+(save, open), `preview_tool` (compare, grid, framing_guide, save_frame),
+`safe_area`, `export_profile`. Only these names are ever sent; never values,
+names or text.
+
+**Synthetic check.** A Datadog Synthetic browser test opens production every
+4 hours and runs `window.__reframeSelfTest()` (`src/lib/selfTest.ts`). It
+asserts that the page is cross-origin isolated and that the multi-threaded
+FFmpeg engine loads, and emails the maintainer if not. It does not upload a
+video: browser tests can only add file uploads through the visual recorder, so
+the check covers the load path only.
+
+**CI Visibility.** The Tests workflow uploads Vitest and Playwright JUnit
+results with `datadog-ci junit upload` (service `reframe`, tags `suite:unit`
+and `suite:e2e`). Pipeline (workflow) visibility needs the Datadog GitHub
+integration, which a maintainer installs from Datadog's UI.
+
+### Privacy rules for telemetry
+
+- Never send video content, file names, folder paths, captions or any text a
+  person typed, including profile names.
+- Video properties only as coarse buckets: format, resolution range, size
+  range, length range, speed range.
+- No user identity: no `setUser`, and `trackAnonymousUser: false`.
+- Session replay stays off; `defaultPrivacyLevel: "mask"` in case it is ever
+  enabled.
+- Respect the viewer's choice (Settings) and Do Not Track / Global Privacy
+  Control: RUM doesn't load at all.
+- New events go through `trackAction` / `trackFeature` / `trackError` with
+  fixed names and closed value lists, and get a test that checks nothing else
+  is sent.
+
 ## Querying in Datadog
 
 Custom actions sent with `addAction` are searched by

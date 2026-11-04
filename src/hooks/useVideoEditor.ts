@@ -45,6 +45,7 @@ import {
   HANDLED_ERROR_PREFIX,
   resolutionBucket,
   sizeBucket,
+  trackVital,
 } from "@/lib/telemetry";
 import { ExportAttempt, type ExportFailureCategory } from "@/lib/exportTelemetry";
 import { resolveOutputSize } from "@/lib/ffmpegArgs";
@@ -73,6 +74,7 @@ import {
 } from "@/lib/editorPersistence";
 import { saveSessionFile, loadSessionFile, clearSessionFile } from "@/lib/sessionDB";
 import { resolveDuration } from "@/lib/mediaDuration";
+import { trackExportTools, trackFeature } from "@/lib/featureTelemetry";
 
 const DEFAULT_TITLE = "Reframe — Resize, trim, and export videos in your browser";
 const PROJECT_SAVE_DELAY_MS = 500;
@@ -373,6 +375,8 @@ export function useVideoEditor() {
   // is reported as a retry; cleared by a success or a new source video.
   const lastFailureRef = useRef<ExportFailureCategory | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  /** performance.now() when the current video was chosen (first_preview_frame). */
+  const fileChosenAtRef = useRef<number | null>(null);
 
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicVolume, setMusicVolume] = useState(70);
@@ -579,6 +583,25 @@ export function useVideoEditor() {
     };
   }, [resetEdit, updateRecovery]);
 
+  // Time from choosing a video to its first frame in the preview: the
+  // editor's "ready" moment. Input size bucket only.
+  useEffect(() => {
+    const video = videoRef.current;
+    const startedAt = fileChosenAtRef.current;
+    if (!file || !video || startedAt === null) return;
+    const report = () => {
+      if (fileChosenAtRef.current !== startedAt) return;
+      fileChosenAtRef.current = null;
+      trackVital("first_preview_frame", startedAt, { input_size: sizeBucket(file.size) });
+    };
+    if (video.readyState >= 2) {
+      report();
+      return;
+    }
+    video.addEventListener("loadeddata", report, { once: true });
+    return () => video.removeEventListener("loadeddata", report);
+  }, [file]);
+
   // Debounced: replaceState on every slider tick is wasted work and Safari
   // throws after 100 calls in 30 seconds.
   useEffect(() => {
@@ -635,6 +658,7 @@ export function useVideoEditor() {
   }, [videoMetadata]);
 
   const handleFileSelect = useCallback((selectedFile: File | null) => {
+    fileChosenAtRef.current = selectedFile ? performance.now() : null;
     setResult(null);
     setStatus("idle");
     setError(null);
@@ -776,6 +800,8 @@ export function useVideoEditor() {
       lastFailureRef.current
     );
     exportAttemptRef.current = attempt;
+    // Anonymous counts of which tools exports use (never their values).
+    trackExportTools(recipe, { music: Boolean(musicFile), imageOverlay: Boolean(overlayFile) });
 
     try {
       setStatus("loading-engine");
@@ -828,7 +854,7 @@ export function useVideoEditor() {
         exportDurationMs: Date.now() - startedAt,
       });
       setStatus("done");
-      attempt.succeeded(sizeBucket(exportResult.size));
+      attempt.succeeded(sizeBucket(exportResult.size), clipSeconds);
       lastFailureRef.current = null;
     } catch (err) {
       // A cancellation was already reported by cancelExport; a settled
@@ -1043,10 +1069,14 @@ export function useVideoEditor() {
   // Undo is blocked mid-export: the running export has already captured its
   // settings, and the result has to match what the controls showed.
   const undoEdit = useCallback(() => {
-    if (!isBusy) dispatchHistory({ type: "undo" });
+    if (isBusy) return;
+    dispatchHistory({ type: "undo" });
+    trackFeature("history", "undo");
   }, [isBusy]);
   const redoEdit = useCallback(() => {
-    if (!isBusy) dispatchHistory({ type: "redo" });
+    if (isBusy) return;
+    dispatchHistory({ type: "redo" });
+    trackFeature("history", "redo");
   }, [isBusy]);
 
   const currentSource = useMemo(
@@ -1105,6 +1135,7 @@ export function useVideoEditor() {
   const buildProjectFile = useCallback(() => {
     const source = currentSource ?? recoveryRef.current?.source ?? null;
     const doc = createProjectDocument(edit, source, new Date());
+    trackFeature("project_file", "save");
     return { fileName: projectFileName(source), contents: serializeProject(doc) };
   }, [currentSource, edit]);
 
@@ -1119,6 +1150,7 @@ export function useVideoEditor() {
         // Nothing open yet: hold the edits until the matching video is chosen.
         resetEdit(() => project.edit);
         if (project.source) updateRecovery({ source: project.source, origin: "imported" });
+        trackFeature("project_file", "open");
         return {
           ok: true,
           message: project.source
@@ -1136,6 +1168,7 @@ export function useVideoEditor() {
           message: `Edits applied. This project was made for “${project.source.name}”, so check the trim points.`,
         };
       }
+      trackFeature("project_file", "open");
       return { ok: true, message: "Project opened and applied to this video." };
     },
     [currentSource, isBusy, resetEdit, updateEdit, updateRecovery]

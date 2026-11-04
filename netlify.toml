@@ -8,7 +8,9 @@
   # Bun is pre-installed in Netlify's build image, but Netlify's automatic
   # package-manager detection keys off `bun.lockb`, and this repo uses the newer
   # text-format `bun.lock`. Rather than depend on detection, install explicitly.
-  command = "bun install && bun run build"
+  # Source maps are built for the Datadog upload in CI, then removed here so
+  # they are never served publicly (scripts/strip-sourcemaps.mjs).
+  command = "bun install && bun run build && node scripts/strip-sourcemaps.mjs out"
 
   # `output: "export"` writes the static site here.
   publish = "out"

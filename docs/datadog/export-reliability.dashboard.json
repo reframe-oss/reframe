@@ -1,6 +1,6 @@
 {
   "title": "Reframe \u2014 export reliability",
-  "description": "Export outcomes from Reframe's browser RUM events (src/lib/exportTelemetry.ts). Success rate = export_succeeded / (export_succeeded + export_failed); cancellations are excluded. Treat groups with few finished exports as noise. Setup and facets: docs/DATADOG.md.",
+  "description": "Export outcomes from Reframe's browser RUM events (src/lib/exportTelemetry.ts). Success rate = export_succeeded / (export_succeeded + export_failed); cancellations are excluded. Treat groups with few finished exports as noise. Setup and facets: docs/DATADOG.md. Release = commit SHA (@version).",
   "layout_type": "ordered",
   "template_variables": [
     {
@@ -1054,6 +1054,583 @@
               {
                 "formula": "stalled",
                 "alias": "Stalled exports"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "FFmpeg engine load time (p50 / p95, seconds) by engine",
+        "type": "query_table",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "p50",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "pc50",
+                  "metric": "@vital.duration"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:vital @vital.name:ffmpeg_init"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.engine",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "p95",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "pc95",
+                  "metric": "@vital.duration"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:vital @vital.name:ffmpeg_init"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.engine",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "n",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:vital @vital.name:ffmpeg_init"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.engine",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "p50 / 1000000000",
+                "alias": "p50 (s)"
+              },
+              {
+                "formula": "p95 / 1000000000",
+                "alias": "p95 (s)"
+              },
+              {
+                "formula": "n",
+                "alias": "Loads"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Time to first preview frame (p50 / p95, seconds) by input size",
+        "type": "query_table",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "p50",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "pc50",
+                  "metric": "@vital.duration"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:vital @vital.name:first_preview_frame"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.input_size",
+                    "limit": 6,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "p95",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "pc95",
+                  "metric": "@vital.duration"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:vital @vital.name:first_preview_frame"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.input_size",
+                    "limit": 6,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "p50 / 1000000000",
+                "alias": "p50 (s)"
+              },
+              {
+                "formula": "p95 / 1000000000",
+                "alias": "p95 (s)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Export speed (output seconds per second) by engine",
+        "type": "query_table",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "n",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:action @action.target.name:export_succeeded"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.engine",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  },
+                  {
+                    "facet": "@context.speed",
+                    "limit": 7,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "n",
+                "alias": "Exports"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Export duration (p50 / p95, seconds) by engine and resolution",
+        "type": "query_table",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "p50",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "pc50",
+                  "metric": "@vital.duration"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:vital @vital.name:export"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.engine",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  },
+                  {
+                    "facet": "@context.resolution",
+                    "limit": 5,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "p95",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "pc95",
+                  "metric": "@vital.duration"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:vital @vital.name:export"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.engine",
+                    "limit": 3,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  },
+                  {
+                    "facet": "@context.resolution",
+                    "limit": 5,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "p50 / 1000000000",
+                "alias": "p50 (s)"
+              },
+              {
+                "formula": "p95 / 1000000000",
+                "alias": "p95 (s)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Errors by release",
+        "type": "timeseries",
+        "show_legend": true,
+        "requests": [
+          {
+            "response_format": "timeseries",
+            "display_type": "bars",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "errors",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:error"
+                },
+                "group_by": [
+                  {
+                    "facet": "version",
+                    "limit": 8,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "errors"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Export failures in Error Tracking, by issue",
+        "type": "toplist",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "n",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:error @error.type:(ExportFailure OR EngineLoadFailure)"
+                },
+                "group_by": [
+                  {
+                    "facet": "@error.message",
+                    "limit": 10,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Release comparison: export success rate by version",
+        "type": "query_table",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "ok",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:action @action.target.name:export_succeeded"
+                },
+                "group_by": [
+                  {
+                    "facet": "version",
+                    "limit": 8,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "bad",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:action @action.target.name:export_failed"
+                },
+                "group_by": [
+                  {
+                    "facet": "version",
+                    "limit": 8,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              },
+              {
+                "data_source": "rum",
+                "name": "started",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:action @action.target.name:export_started"
+                },
+                "group_by": [
+                  {
+                    "facet": "version",
+                    "limit": 8,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "100 * ok / started",
+                "alias": "Started \u2192 succeeded (%)"
+              },
+              {
+                "formula": "100 * ok / (ok + bad)",
+                "alias": "Success, cancellations excluded (%)"
+              },
+              {
+                "formula": "started",
+                "alias": "Exports started"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Feature usage",
+        "type": "toplist",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "n",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:action @action.target.name:feature_used"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.feature",
+                    "limit": 25,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Feature usage by action",
+        "type": "query_table",
+        "requests": [
+          {
+            "response_format": "scalar",
+            "queries": [
+              {
+                "data_source": "rum",
+                "name": "n",
+                "indexes": [
+                  "*"
+                ],
+                "compute": {
+                  "aggregation": "count"
+                },
+                "search": {
+                  "query": "service:reframe $env @type:action @action.target.name:feature_used"
+                },
+                "group_by": [
+                  {
+                    "facet": "@context.feature",
+                    "limit": 25,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  },
+                  {
+                    "facet": "@context.action",
+                    "limit": 6,
+                    "sort": {
+                      "aggregation": "count",
+                      "order": "desc"
+                    }
+                  }
+                ]
+              }
+            ],
+            "formulas": [
+              {
+                "formula": "n",
+                "alias": "Uses"
               }
             ]
           }

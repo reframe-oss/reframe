@@ -404,7 +404,10 @@ export default function VideoPreview({
             <>
               <button
                 type="button"
-                onClick={() => setShowOverlay((v) => !v)}
+                onClick={() => {
+                  if (!showOverlay) trackFeature("preview_tool", "framing_guide");
+                  setShowOverlay((v) => !v);
+                }}
                 className={toolButton(showOverlay)}
                 aria-pressed={showOverlay}
                 title="Show how the output frame crops or letterboxes the video"
@@ -427,7 +430,10 @@ export default function VideoPreview({
               </button>
               <button
                 type="button"
-                onClick={() => setShowGridOverlay((v) => !v)}
+                onClick={() => {
+                  if (!showGridOverlay) trackFeature("preview_tool", "grid");
+                  setShowGridOverlay((v) => !v);
+                }}
                 className={toolButton(showGridOverlay)}
                 aria-pressed={showGridOverlay}
                 title="Rule-of-thirds grid"
@@ -437,7 +443,10 @@ export default function VideoPreview({
               </button>
               <button
                 type="button"
-                onClick={() => setShowComparison((v) => !v)}
+                onClick={() => {
+                  if (!showComparison) trackFeature("preview_tool", "compare");
+                  setShowComparison((v) => !v);
+                }}
                 className={toolButton(showComparison)}
                 aria-pressed={showComparison}
                 title="Compare the original with your adjustments side by side"
@@ -449,7 +458,10 @@ export default function VideoPreview({
           )}
           <button
             type="button"
-            onClick={handleGrabFrame}
+            onClick={() => {
+              trackFeature("preview_tool", "save_frame");
+              handleGrabFrame();
+            }}
             className="btn btn-ghost btn-sm ml-auto"
             title="Download the current frame as a PNG"
           >
