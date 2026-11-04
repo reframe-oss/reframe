@@ -1098,7 +1098,7 @@ export function useVideoEditor() {
     setStorageStatus((prev) =>
       ok
         ? { ...prev, savedAt: Date.parse(doc.savedAt), error: null }
-        : { ...prev, error: "Couldn't save your edits in this browser. Use “Save project file” to keep them." }
+        : { ...prev, error: "Couldn't save your edits in this browser, so a refresh will lose them." }
     );
   }, []);
 
