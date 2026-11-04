@@ -101,13 +101,15 @@ jobs:
             const commitSha = context.sha ? context.sha.substring(0, 7) : 'unknown';
             const MARKER = '<!-- snyk-vulnerability-alert -->';
 
-            // Check if an open alert issue already exists to avoid spamming duplicates
+            // Check if an open alert issue already exists to avoid spamming
+            // duplicates. Found by its author and marker, not by label: no
+            // workflow applies labels (maintainers label by hand).
             const { data: issues } = await github.rest.issues.listForRepo({
               owner,
               repo,
               state: 'open',
-              labels: 'security',
-              per_page: 50,
+              creator: 'github-actions[bot]',
+              per_page: 100,
             });
 
             const existingIssue = issues.find(i => i.body && i.body.includes(MARKER));
@@ -135,7 +137,6 @@ jobs:
                 owner,
                 repo,
                 title: '🔒 [Security Alert] High/Critical vulnerabilities detected by Snyk',
-                labels: ['security', 'dependencies', 'type:security', 'level:intermediate'],
                 body: [
                   MARKER,
                   `## 🔒 Snyk Security Scan Alert`,

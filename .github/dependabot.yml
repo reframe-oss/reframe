@@ -5,11 +5,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - gssoc'26
+    # No labels: maintainers label by hand. An empty list stops Dependabot
+    # applying its default "dependencies" label.
+    labels: []
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    labels: []
