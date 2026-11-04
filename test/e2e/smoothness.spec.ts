@@ -83,7 +83,11 @@ test.describe("smoothness", () => {
 
   test("cancel while the engine loads, then while encoding: the editor stays usable and frees what it made", async ({ page }) => {
     await load(page, "normal.mp4");
-    // The preview and the filmstrip thumbnails hold URLs while the video is open.
+    // The preview and the timeline filmstrip hold URLs while the video is open;
+    // let the filmstrip finish first so its frames don't count as leaks.
+    const trim = page.getByRole("button", { name: /^Trim\b/i }).first();
+    if ((await trim.getAttribute("aria-expanded")) === "false") await trim.click();
+    await expect(page.getByTestId("timeline-filmstrip")).toHaveAttribute("data-status", "ready", { timeout: 90_000 });
     const before = await settledUrls(page);
     const exportButton = page.getByRole("button", { name: "Export video" }).first();
     const cancel = page.getByRole("button", { name: /^Cancel( export)?$/i });

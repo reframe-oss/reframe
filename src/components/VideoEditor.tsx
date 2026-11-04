@@ -6,7 +6,6 @@ import { TextOverlay } from "@/lib/types";
 import FileUpload from "./FileUpload";
 import PrivacyBanner from "./PrivacyBanner";
 import VideoPreview from "./VideoPreview";
-import ThumbnailStrip from "./ThumbnailStrip";
 import PresetSelector from "./PresetSelector";
 import FramingControl from "./FramingControl";
 import TrimControl from "./TrimControl";
@@ -27,7 +26,7 @@ import { trackFeature } from "@/lib/featureTelemetry";
 import { installSelfTest } from "@/lib/selfTest";
 import { deepEqual } from "@/lib/editHistory";
 import { getPresetById } from "@/lib/presets";
-import { pickThumbnailInterval } from "@/lib/thumbnails";
+import { useTimelineFrames } from "@/hooks/useTimelineFrames";
 
 import { cn, formatDuration } from "@/lib/utils";
 import {
@@ -343,9 +342,7 @@ export default function VideoEditor() {
     setIsMac(typeof navigator !== "undefined" && /Mac/i.test(navigator.platform));
   }, []);
 
-  const intervalSeconds = useMemo(() => pickThumbnailInterval(duration), [duration]);
-
-  const videoSrc = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  const timelineFrames = useTimelineFrames(file, duration, isProcessing);
 
   const output = useMemo(() => {
     const preset = getPresetById(recipe.preset);
@@ -374,11 +371,6 @@ export default function VideoEditor() {
     recipe.framing,
   ]);
 
-  useEffect(() => {
-    return () => {
-      if (videoSrc) URL.revokeObjectURL(videoSrc);
-    };
-  }, [videoSrc]);
 
   const isTrimmed = recipe.trimStart > 0 || recipe.trimEnd !== null;
   const textCount = recipe.textOverlays?.length ?? 0;
@@ -464,17 +456,6 @@ export default function VideoEditor() {
                     />
                   </div>
 
-                  <div className="border-t border-[var(--border)] pt-3">
-                    <ThumbnailStrip
-                      videoSrc={videoSrc}
-                      duration={duration}
-                      videoRef={videoRef}
-                      trimStart={recipe.trimStart ?? 0}
-                      trimEnd={recipe.trimEnd ?? duration}
-                      onSeek={seekTo}
-                      intervalSeconds={intervalSeconds}
-                    />
-                  </div>
                 </>
               )}
             </section>
@@ -563,7 +544,14 @@ export default function VideoEditor() {
                   isOpen={openSections.trim}
                   onToggle={() => toggleSection("trim")}
                 >
-                  <TrimControl recipe={recipe} onChange={updateRecipe} duration={duration} file={file} />
+                  <TrimControl
+                    recipe={recipe}
+                    onChange={updateRecipe}
+                    duration={duration}
+                    file={file}
+                    frames={timelineFrames}
+                    onSeek={seekTo}
+                  />
                 </AccordionSection>
 
                 <AccordionSection

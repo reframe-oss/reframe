@@ -19,6 +19,16 @@ processed on your device by FFmpeg running as WebAssembly.
 The first export downloads the video engine (about 30 MB), so it takes longer.
 Later exports reuse it.
 
+## Trim timeline
+
+Once a video is open, the trim timeline fills with frames from the video,
+so you can see where to cut. They're made by the video engine in the
+background (the first time, that includes downloading it) and kept in this
+browser, so the same video shows them at once next time. The parts outside
+the trim are dimmed. Click the strip to move the preview there, and drag the
+handles (or use the arrow keys on them) to set the start and end. While an
+export runs, making frames pauses and carries on afterwards.
+
 ## Export profiles
 
 The **Profile** section at the top of the output panel applies a whole set of
@@ -34,7 +44,8 @@ and 80% safe zones; it's preview-only and never exported. More in
 
 - Every edit can be undone and redone. A slider drag counts as one step.
 - Your edits and a copy of the open video are kept in this browser, so a
-  refresh doesn't lose work. **Delete saved data** in the editor removes them.
+  refresh doesn't lose work. **Delete saved data** in the editor removes them,
+  along with the cached timeline frames.
 - **Save project file** writes your edits (not the video) to a
   `.reframe.json` file you can reopen later. See [PROJECTS.md](PROJECTS.md).
 

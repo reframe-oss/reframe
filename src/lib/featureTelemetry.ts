@@ -15,6 +15,7 @@ export const FEATURE_ACTIONS = {
   history: ["undo", "redo"],
   project_file: ["save", "open"],
   preview_tool: ["compare", "grid", "framing_guide", "save_frame"],
+  trim_timeline: ["seek", "drag_handle"],
   // One event per editing tool an export used (see toolsUsed).
   trim: ["exported"],
   rotate: ["exported"],
