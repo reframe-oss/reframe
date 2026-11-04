@@ -51,6 +51,16 @@ const h = vi.hoisted(() => {
     async deleteFile(name: string) {
       this.deleted.push(name);
     }
+    mounts: { type: string; files: File[]; dir: string }[] = [];
+    unmounted: string[] = [];
+    async createDir() {}
+    async deleteDir() {}
+    async mount(type: string, opts: { files: File[] }, dir: string) {
+      this.mounts.push({ type, files: opts.files, dir });
+    }
+    async unmount(dir: string) {
+      this.unmounted.push(dir);
+    }
     terminate() {
       this.terminated = true;
     }
@@ -259,5 +269,88 @@ describe("ffmpeg.worker", () => {
     expect(palette!.join(" ")).toContain("palettegen");
     expect(render!.join(" ")).toContain("paletteuse");
     expect(render).toContain("-filter_complex_threads");
+  });
+
+  describe("timeline frames", () => {
+    const framesRequest = (id = "f1") => ({
+      type: "frames",
+      id,
+      file: new File([new Uint8Array(8)], "My holiday.mov", { type: "video/quicktime" }),
+      times: [0, 2.5, 5],
+      width: 160,
+    });
+
+    it("mounts the file under a neutral name and makes one small JPEG per time", async () => {
+      await startWorker({ isolated: true, cores: 16 });
+      send({ type: "load" });
+      await waitFor("ready");
+      send(framesRequest());
+      await waitFor("frames-done");
+
+      const { mounts, unmounted, execCalls } = ffmpeg();
+      expect(mounts).toHaveLength(1);
+      expect(mounts[0]!.type).toBe("WORKERFS");
+      expect(mounts[0]!.files[0]!.name).toBe("source.mov");
+      expect(unmounted).toEqual([mounts[0]!.dir]);
+      expect(execCalls).toHaveLength(3);
+      for (const args of execCalls) {
+        expect(args.join(" ")).not.toContain("My holiday");
+        expect(args.slice(0, 2)).toEqual(["-ss", expect.any(String)]);
+        expect(args).toContain("-frames:v");
+        // One thread on the MT core, never FFmpeg's automatic count.
+        expect(args.flatMap((a, i) => (a === "-threads" ? [args[i + 1]] : []))).toEqual(["1", "1"]);
+      }
+      const frames = posted.filter((m) => m.type === "frame");
+      expect(frames.map((m) => [m.index, m.time])).toEqual([[0, 0], [1, 2.5], [2, 5]]);
+      expect(frames.every((m) => m.blob instanceof Blob && (m.blob as Blob).type === "image/jpeg")).toBe(true);
+      expect(posted.find((m) => m.type === "frames-done")).toMatchObject({ id: "f1", skipped: 0 });
+    });
+
+    it("skips a frame FFmpeg can't make instead of failing the strip", async () => {
+      await startWorker({ isolated: false });
+      send({ type: "load" });
+      await waitFor("ready");
+      let n = 0;
+      h.FakeFFmpeg.execImpl = async (args) => {
+        if (n++ === 1) return 1;
+        ffmpeg().files.set(args.at(-1)!, new Uint8Array([1]));
+        return 0;
+      };
+      send(framesRequest());
+      await waitFor("frames-done");
+      expect(posted.filter((m) => m.type === "frame").map((m) => m.index)).toEqual([0, 2]);
+      expect(posted.find((m) => m.type === "frames-done")).toMatchObject({ skipped: 1 });
+    });
+
+    it("an export takes the engine: the frame job is cancelled first", async () => {
+      await startWorker({ isolated: true });
+      send({ type: "load" });
+      await waitFor("ready");
+      let release: () => void = () => {};
+      h.FakeFFmpeg.execImpl = (args) =>
+        args.includes("-frames:v") && args.at(-1)!.startsWith("frame_")
+          ? new Promise((resolve) => (release = () => resolve(0)))
+          : (ffmpeg().files.set(args.at(-1)!, new Uint8Array([1, 2, 3])), Promise.resolve(0));
+      send(framesRequest());
+      await vi.waitFor(() => expect(ffmpeg().execCalls).toHaveLength(1));
+      send(exportRequest());
+      release();
+      await waitFor("frames-cancelled");
+      await waitFor("result");
+      expect(posted.findIndex((m) => m.type === "frames-cancelled")).toBeLessThan(posted.findIndex((m) => m.type === "result"));
+      expect(ffmpeg().unmounted).toHaveLength(1);
+    });
+
+    it("refuses frames while an export is running", async () => {
+      await startWorker({ isolated: false });
+      send({ type: "load" });
+      await waitFor("ready");
+      h.FakeFFmpeg.execImpl = () => new Promise(() => {});
+      send(exportRequest());
+      await vi.waitFor(() => expect(ffmpeg().execCalls).toHaveLength(1));
+      send(framesRequest("f2"));
+      await waitFor("frames-error");
+      expect(posted.find((m) => m.type === "frames-error")).toMatchObject({ id: "f2", message: "busy" });
+    });
   });
 });
