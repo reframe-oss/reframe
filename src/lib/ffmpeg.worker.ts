@@ -465,16 +465,18 @@ async function runFrames(request: FramesRequest, signal: AbortSignal): Promise<v
       if (signal.aborted) throw new DOMException("Frames cancelled", "AbortError");
       const outputName = `frame_${request.id}_${index}.jpg`;
       try {
+        // No abort signal here: aborting only rejects the promise while FFmpeg
+        // keeps running the command, and its log and progress output would
+        // then reach the export that pre-empted it. Each frame is quick, so a
+        // cancel takes effect between frames and the export waits for it.
         const code = await ffmpeg.exec(
-          buildFrameArguments({ inputPath: `${FRAMES_MOUNT}/${source.name}`, time, outputName, width: request.width, threads }),
-          undefined,
-          { signal }
+          buildFrameArguments({ inputPath: `${FRAMES_MOUNT}/${source.name}`, time, outputName, width: request.width, threads })
         );
         if (code !== 0) {
           skipped++;
           continue;
         }
-        const data = (await ffmpeg.readFile(outputName, undefined, { signal })) as Uint8Array<ArrayBuffer>;
+        const data = (await ffmpeg.readFile(outputName)) as Uint8Array<ArrayBuffer>;
         postMessage({ type: "frame", id: request.id, index, time, blob: new Blob([data], { type: "image/jpeg" }) });
       } catch (error) {
         if (signal.aborted) throw error;

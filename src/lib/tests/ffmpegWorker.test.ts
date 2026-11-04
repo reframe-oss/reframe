@@ -37,9 +37,21 @@ const h = vi.hoisted(() => {
       this.files.set(name, data);
       this.writes.set(name, data);
     }
-    async exec(args: string[]) {
+    async exec(args: string[], _timeout?: number, opts?: { signal?: AbortSignal }) {
       this.execCalls.push(args);
-      if (FakeFFmpeg.execImpl) return FakeFFmpeg.execImpl(args);
+      if (FakeFFmpeg.execImpl) {
+        // Like @ffmpeg/ffmpeg: an abort rejects the call, but the command
+        // itself keeps running in the engine.
+        const run = FakeFFmpeg.execImpl(args);
+        const signal = opts?.signal;
+        if (!signal) return run;
+        return Promise.race([
+          run,
+          new Promise<number>((_, reject) =>
+            signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true })
+          ),
+        ]);
+      }
       this.listeners.log.forEach((fn) => fn({ message: "frame=  1 fps=0.0 time=00:00:00.04" }));
       this.listeners.progress.forEach((fn) => fn({ progress: 0.5 }));
       this.files.set(args.at(-1)!, new Uint8Array([1, 2, 3]));
@@ -334,6 +346,10 @@ describe("ffmpeg.worker", () => {
       send(framesRequest());
       await vi.waitFor(() => expect(ffmpeg().execCalls).toHaveLength(1));
       send(exportRequest());
+      // The running frame command is never abandoned: the export's command
+      // waits until it has really finished, so their output can't mix.
+      await new Promise((r) => setTimeout(r, 50));
+      expect(ffmpeg().execCalls).toHaveLength(1);
       release();
       await waitFor("frames-cancelled");
       await waitFor("result");
