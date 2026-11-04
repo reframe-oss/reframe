@@ -4,11 +4,12 @@
 
 # Reframe
 
-**Resize, trim and convert videos in your browser. Nothing is uploaded.**
+**Resize, trim and convert videos in your browser. Your video never leaves your device.**
 
 [![Stars](https://img.shields.io/github/stars/reframe-oss/reframe?style=flat-square&logo=github)](https://github.com/reframe-oss/reframe/stargazers)
 [![Issues](https://img.shields.io/github/issues/reframe-oss/reframe?style=flat-square)](https://github.com/reframe-oss/reframe/issues)
 [![License](https://img.shields.io/github/license/reframe-oss/reframe?style=flat-square)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org)
 [![CI](https://github.com/reframe-oss/reframe/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/reframe-oss/reframe/actions/workflows/main.yml?query=branch%3Amain)
 [![Netlify Status](https://api.netlify.com/api/v1/badges/fc902da9-9876-4298-9aea-f930075f8d95/deploy-status)](https://app.netlify.com/sites/reframe-os/deploys)
 [![Known Vulnerabilities](https://snyk.io/test/github/reframe-oss/reframe/badge.svg)](https://snyk.io/test/github/reframe-oss/reframe)
@@ -42,13 +43,15 @@ single-threaded build. The details are in [docs/ARCHITECTURE.md](docs/ARCHITECTU
 
 ## Quick start
 
+You need [Bun](https://bun.sh) 1.x and Node.js 20.9 or newer.
+
 ```bash
 git clone https://github.com/reframe-oss/reframe.git && cd reframe
 bun install
 bun run dev
 ```
 
-Then open http://localhost:3000. Deploying your own copy: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Then open http://localhost:3000. Deploying your own copy: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Something not working? See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Privacy
 
@@ -72,8 +75,10 @@ to set up, claim an issue with `/assign`, and open a pull request.
   </picture>
 </a>
 
-Reframe is an official GSSoC'26 project. Start with the
-[`gssoc'26` issues](https://github.com/reframe-oss/reframe/issues?q=is%3Aopen+label%3A%22gssoc%2726%22).
+Reframe is an official GSSoC'26 project. Pick one of the
+[`gssoc'26` issues](https://github.com/reframe-oss/reframe/issues?q=is%3Aopen+label%3A%22gssoc%2726%22)
+and claim it by commenting `/assign` ([how claiming works](CONTRIBUTING.md#claim-an-issue)).
+Maintainers add the labels.
 
 ## Supported by
 

@@ -36,9 +36,9 @@ export default function DatadogInit() {
             // The commit SHA (next.config.ts): errors and vitals group by release.
             version: process.env.NEXT_PUBLIC_RELEASE || "dev",
             sessionSampleRate: 100,
-            // Reframe advertises itself as 100% private client-side video editing —
-            // session replay would visually record the editor UI, which cuts
-            // against that claim. Metrics/errors only.
+            // Off: session replay would visually record the editor (and the
+            // video in the preview), which videos never leaving the device rules
+            // out. Metrics and errors only.
             sessionReplaySampleRate: 0,
             // Replay is off; if it were ever enabled, text and inputs stay masked.
             defaultPrivacyLevel: "mask",

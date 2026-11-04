@@ -19,8 +19,8 @@ concrete tasks go to [issues](https://github.com/reframe-oss/reframe/issues).
 
 ## Set up
 
-You need [Git](https://git-scm.com), [Bun](https://bun.sh) 1.x and a recent
-Chrome, Firefox or Safari. This project uses **Bun and `bun.lock` only**: don't
+You need [Git](https://git-scm.com), [Bun](https://bun.sh) 1.x, Node.js 20.9 or
+newer, and a recent Chrome, Firefox or Safari. This project uses **Bun and `bun.lock` only**: don't
 use npm or yarn, and never commit `package-lock.json` or `yarn.lock`.
 
 ```bash
