@@ -42,7 +42,7 @@ graph TD
 
 | Tool | Frequency | Target | Action on Finding |
 |---|---|---|---|
-| **Snyk Scan** (`.github/workflows/snyk.yml`) | Every Monday at 06:00 UTC & on push to `main` | Production & transitive dependencies (`package-lock.json` generated from `package.json`) | Fails CI and automatically opens or updates a GitHub issue labeled `security` & `dependencies`. |
+| **Snyk Scan** (`.github/workflows/snyk.yml`) | Every Monday at 06:00 UTC & on push to `main` | Production & transitive dependencies (`package-lock.json` generated from `package.json`) | Fails CI and opens or updates a GitHub security alert issue (unlabelled; a maintainer labels it). |
 | **Dependabot** (`.github/dependabot.yml`) | Every Monday | `npm` packages & `github-actions` | Opens up to 5 automated update PRs. |
 | **Manual Scan** (`npm run security`) | On demand | Local developer workspace | Outputs detailed vulnerability breakdown and path traces. |
 
@@ -77,7 +77,7 @@ When Snyk detects vulnerabilities on `main`:
 
 ### Step 2: Cross-Reference Dependabot PRs for Overlap
 
-Before manually updating dependencies, check open [Dependabot PRs](https://github.com/reframe-oss/reframe/pulls?q=is%3Apr+is%3Aopen+label%3Adependencies):
+Before manually updating dependencies, check open [Dependabot PRs](https://github.com/reframe-oss/reframe/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot):
 - Dependabot often opens an automated bump PR for the exact vulnerable package on Monday mornings.
 - If a Dependabot PR addresses the flagged package:
   1. Review the PR's CI checks and changelog.

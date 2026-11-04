@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
-import { checkInstructions, checkRepository, checkWorkflow } from "../../../scripts/ci/check-pr-automation.mjs";
+import { checkDependabot, checkInstructions, checkRepository, checkWorkflow } from "../../../scripts/ci/check-pr-automation.mjs";
 
 const root = path.resolve(__dirname, "../../..");
 
@@ -59,5 +59,38 @@ describe("PR automation safety check", () => {
     expect(checkInstructions("CLAUDE.md", "If checks pass, merge the PR immediately using a squash merge.")).toHaveLength(1);
     expect(checkInstructions("CLAUDE.md", "Never merge PRs or enable auto-merge; a maintainer merges.")).toEqual([]);
     expect(checkInstructions("CLAUDE.md", "Uses `clsx` + `tailwind-merge`.")).toEqual([]);
+  });
+});
+
+describe("nothing applies labels automatically", () => {
+  const script = (body: string) => `name: T
+on: [issues]
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+${body}
+`;
+
+  it("flags workflows that add or set labels", () => {
+    expect(checkWorkflow("w.yml", script("            await github.rest.issues.addLabels({ owner, repo, issue_number: 1, labels: ['x'] });"))).not.toEqual([]);
+    expect(checkWorkflow("w.yml", script("            gh issue edit 1 --add-label bug"))).not.toEqual([]);
+    expect(checkWorkflow("w.yml", script("            await github.rest.issues.create({ owner, repo, title: 't',\n              labels: ['security'] });"))).not.toEqual([]);
+  });
+
+  it("allows comments, assignment and label filters that don't write", () => {
+    expect(checkWorkflow("w.yml", script("            await github.rest.issues.createComment({ owner, repo, issue_number: 1, body: 'hi' });"))).toEqual([]);
+    expect(checkWorkflow("w.yml", script("            await github.rest.issues.addAssignees({ owner, repo, issue_number: 1, assignees: ['a'] });"))).toEqual([]);
+    expect(checkWorkflow("w.yml", script("            // labels are applied by maintainers"))).toEqual([]);
+  });
+
+  it("requires every Dependabot entry to set labels: []", () => {
+    const entry = (labels: string) => `  - package-ecosystem: npm\n    directory: /\n${labels}`;
+    expect(checkDependabot("d.yml", `version: 2\nupdates:\n${entry("    labels: []\n")}`)).toEqual([]);
+    expect(checkDependabot("d.yml", `version: 2\nupdates:\n${entry("")}`)).toHaveLength(1);
+    expect(checkDependabot("d.yml", `version: 2\nupdates:\n${entry("    labels:\n      - dependencies\n")}`)).toHaveLength(1);
   });
 });

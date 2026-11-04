@@ -1,36 +1,17 @@
-\---
-
+---
 name: GSSoC Contribution Request
-
 about: Request to work on an issue for GirlScript Summer of Code 2026
+---
 
-labels: gssoc'26, help wanted
+## Issue I want to work on
 
-\---
+<!-- Link the issue number, e.g. #123. To claim it, comment /assign on that issue. -->
 
-
-
-\## Issue I want to work on
-
-
-
-<!-- Link the issue number -->
-
-
-
-\## My approach
-
-
+## My approach
 
 <!-- Brief description of how you plan to solve it -->
 
+## GSSoC participant info
 
-
-\## GSSoC Participant Info
-
-
-
-\- GitHub username:
-
-\- Contribution level (Beginner/Intermediate/Advanced):
-
+- GitHub username:
+- Contribution level (Beginner/Intermediate/Advanced):

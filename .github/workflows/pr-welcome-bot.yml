@@ -49,16 +49,17 @@ jobs:
               ``,
               `### What happens next`,
               ``,
-              `1. 🤖 **Automated checks** — build & TypeScript typecheck will run automatically`,
-              `2. ✅ **Vercel preview** — a preview deployment will be created (requires maintainer authorization for fork PRs)`,
-              `3. 👀 **Code review** — a maintainer will review your changes`,
-              `4. 🚀 **Merge** — once approved, your PR will be merged!`,
+              `1. 🤖 **Automated checks** — lint, typecheck, unit and end-to-end tests, and the build run automatically`,
+              `2. ✅ **Netlify deploy preview** — Netlify builds a preview of your change and links it in a comment`,
+              `3. 👀 **Code review** — a maintainer reviews your changes and adds the labels`,
+              `4. 🚀 **Merge** — once approved, a maintainer merges your PR`,
               ``,
               `### Quick checklist`,
               ``,
               `- [ ] PR title follows [Conventional Commits](https://www.conventionalcommits.org/) (e.g. \`feat: add dark mode\`)`,
               `- [ ] Linked the issue this PR closes (e.g. \`Closes #123\`)`,
               `- [ ] Tested the changes locally (\`bun run dev\`)`,
+              `- [ ] Lint, typecheck and tests pass (\`bun run lint\`, \`bunx tsc --noEmit\`, \`bun run test\`)`,
               `- [ ] Build passes (\`bun run build\`)`,
               ``,
               `### Useful links`,
@@ -70,16 +71,7 @@ jobs:
               `Happy coding! 🎉`,
             ].join('\n');
 
+            // Comment only: maintainers apply labels by hand.
             await github.rest.issues.createComment({
               owner, repo, issue_number: number, body: comment
             });
-
-            if (isGssoc) {
-              try {
-                await github.rest.issues.addLabels({
-                  owner, repo, issue_number: number, labels: ["gssoc'26"]
-                });
-              } catch (e) {
-                core.warning(`Failed adding gssoc label: ${e?.message}`);
-              }
-            }
