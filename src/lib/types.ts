@@ -1,3 +1,5 @@
+import { isValidCrop, type CropRect } from "./crop";
+
 export const RECIPE_VERSION = 1;
 
 /**
@@ -37,6 +39,8 @@ export interface EditRecipe {
   soundOnCompletion: boolean;
   sharpness: number;
   textOverlays: TextOverlay[];
+  /** The part of the source kept (src/lib/crop.ts). Missing or null keeps the whole frame. */
+  crop?: CropRect | null;
   version: number;
 }
 
@@ -147,6 +151,7 @@ export function isValidRecipe(value: unknown): value is EditRecipe {
   if (typeof v.saturation !== "number" || !isFinite(v.saturation)) return false;
   if (typeof v.soundOnCompletion !== "boolean") return false;
   if (!Array.isArray(v.textOverlays)) return false;
+  if (!isValidCrop(v.crop)) return false;
 
   for (const overlay of v.textOverlays) {
     if (!overlay || typeof overlay !== "object") return false;

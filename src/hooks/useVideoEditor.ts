@@ -115,6 +115,7 @@ function withNewSource(edit: EditState, width: number, height: number): EditStat
       ...edit.recipe,
       trimStart: 0,
       trimEnd: null,
+      crop: null,
       ...(edit.recipe.preset === DEFAULT_RECIPE.preset ? { preset: suggested } : {}),
     },
   };
