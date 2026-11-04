@@ -42,7 +42,7 @@ jobs:
           cp -a "$GITHUB_WORKSPACE" /opt/build/repo
 
       # Same toolchain as Netlify (netlify.toml), so the build is identical.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - uses: oven-sh/setup-bun@v2
