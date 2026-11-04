@@ -1,6 +1,6 @@
 # Using Reframe
 
-Reframe edits a video in your browser. Nothing is uploaded: the file is
+Reframe edits a video in your browser. Your video is never uploaded: it is
 processed on your device by FFmpeg running as WebAssembly.
 
 ## Basic flow
