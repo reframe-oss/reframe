@@ -1,6 +1,7 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { toBlobURL } from "@ffmpeg/util";
 import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions } from "./types";
+import { TEXT_FONT_FILE, TEXT_FONT_URL } from "./text-overlay";
 import {
   buildArguments,
   buildGifArguments,
@@ -167,6 +168,22 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** The bundled text font, fetched once per worker (~125 KB). */
+let textFontBytes: Promise<Uint8Array> | null = null;
+function loadTextFont(): Promise<Uint8Array> {
+  textFontBytes ??= fetch(new URL(TEXT_FONT_URL, self.location.origin))
+    .then((response) => {
+      if (!response.ok) throw new Error(`Couldn't load the text font (HTTP ${response.status})`);
+      return response.arrayBuffer();
+    })
+    .then((buffer) => new Uint8Array(buffer))
+    .catch((error) => {
+      textFontBytes = null; // try again next export
+      throw error;
+    });
+  return textFontBytes;
+}
+
 async function readFileBytes(file: SerializedFile): Promise<Uint8Array> {
   if (file.data) return new Uint8Array(file.data);
   if (file.blob) return new Uint8Array(await file.blob.arrayBuffer());
@@ -212,6 +229,12 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const fallbackOutputName = `fallback_${sessionId}.webm`;
   const paletteName = `palette_${sessionId}.png`;
   const cleanupFiles = new Set<string>([inputName, outputName, fallbackOutputName, paletteName]);
+
+  // drawtext needs a font file; FFmpeg.wasm has no system fonts.
+  if ((recipe.textOverlays?.length ?? 0) > 0) {
+    cleanupFiles.add(TEXT_FONT_FILE);
+    await ffmpeg.writeFile(TEXT_FONT_FILE, (await loadTextFont()).slice(), { signal: activeExportAbortController?.signal });
+  }
 
   const fileBytes = await readFileBytes(request.file);
   await ffmpeg.writeFile(inputName, fileBytes, { signal: activeExportAbortController?.signal });
