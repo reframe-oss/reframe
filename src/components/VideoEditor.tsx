@@ -280,7 +280,6 @@ export default function VideoEditor() {
     redo,
   });
 
-  const [copied, setCopied] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState({
@@ -494,31 +493,13 @@ export default function VideoEditor() {
                     {error.includes("Validation Failed") ? "This file can't be opened" : "Export didn't finish"}
                   </p>
                   <p className="mt-0.5 text-[var(--text-secondary)]">{error}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {!error.includes("Validation Failed") && (
+                  {!error.includes("Validation Failed") && (
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <button type="button" onClick={handleExport} className="btn btn-primary btn-sm">
                         Retry export
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard
-                          .writeText(error)
-                          .then(() => {
-                            setCopied(true);
-                            setTimeout(() => setCopied(false), 2000);
-                          })
-                          .catch((err) => {
-                            console.error("Failed to copy error to clipboard:", err);
-                          });
-                      }}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      {copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
-                      {copied ? "Copied" : "Copy error details"}
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

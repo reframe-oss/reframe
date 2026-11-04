@@ -169,6 +169,32 @@ test.describe("export", () => {
     expect(topStripLuma(out)).toBeLessThan(25);
   });
 
+  // Text overlays never exported: drawtext had an invalid option and no font.
+  test("a text overlay exports and is drawn into the video", async ({ page }, testInfo) => {
+    const exportWith = async (withText: boolean, name: string) => {
+      await loadEditor(page, "normal.mp4");
+      await openSection(page, /^Trim\b/i);
+      await page.getByLabel("Trim end time in seconds").fill("1");
+      if (withText) {
+        await openSection(page, /^Text\b/i);
+        await page.getByRole("button", { name: /Add Text/i }).click();
+      }
+      const out = testInfo.outputPath(name);
+      await exportAndDownload(page, out);
+      return out;
+    };
+    const plain = await exportWith(false, "plain.mp4");
+    const withText = await exportWith(true, "text.mp4");
+    // The default overlay starts at the horizontal centre, 20% from the top.
+    const strip = (file: string) =>
+      execFileSync("ffmpeg", ["-v", "error", "-ss", "0.5", "-i", file, "-frames:v", "1", "-vf", "crop=iw*0.12:ih*0.05:iw*0.5:ih*0.195,scale=32:8,format=gray", "-f", "rawvideo", "-"]);
+    const a = strip(plain);
+    const b = strip(withText);
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff += Math.abs(a[i]! - b[i]!);
+    expect(diff / a.length, "mean pixel difference where the text is").toBeGreaterThan(5);
+  });
+
   test("no-duration.webm: the editor finds the real length", async ({ page }) => {
     await loadEditor(page, "no-duration.webm");
     await openSection(page, /^Trim\b/i);

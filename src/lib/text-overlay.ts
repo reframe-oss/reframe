@@ -1,5 +1,10 @@
 import { TextOverlay } from "./types";
-import { getFFmpegFontArg } from "@/utils/fontLoader";
+/**
+ * Name of the font file in FFmpeg's virtual filesystem, and where the worker
+ * fetches it from. Geist Regular, SIL Open Font License (public/fonts/Geist-OFL.txt).
+ */
+export const TEXT_FONT_FILE = "reframe-text.ttf";
+export const TEXT_FONT_URL = "/fonts/Geist-Regular.ttf";
 
 /**
  * Generates a unique ID for a text overlay.
@@ -79,30 +84,14 @@ export function buildTextFilter(
   const pixelX = Math.round((overlay.x / 100) * targetWidth);
   const pixelY = Math.round((overlay.y / 100) * targetHeight);
 
-  // Build font parameters
-  const fontWeightParam = overlay.fontWeight === "900"
-    ? "bold"
-    : overlay.fontWeight === "bold"
-    ? "bold"
-    : "normal";
-
-  // Get font file parameter for custom fonts (if available)
-  const fontFileParam = getFFmpegFontArg(overlay.fontFamily, overlay.fontPath);
-
-  // Build the drawtext filter with font support
-  let filter = `drawtext=text='${escapedText}':x=${pixelX}:y=${pixelY}:fontsize=${overlay.fontSize}:fontcolor=${overlay.color}:fontweight=${fontWeightParam}`;
-
-  // Add font family if specified
-  if (overlay.fontFamily && !fontFileParam) {
-    // Sanitize font name for FFmpeg
-    const safeFontName = overlay.fontFamily.replace(/[^a-zA-Z0-9-]/g, "");
-    filter += `:font='${safeFontName}'`;
+  // FFmpeg.wasm has no system fonts and no fontconfig, so `font=` can't
+  // resolve and drawtext needs a font file: the worker writes the bundled one
+  // (public/fonts) into FFmpeg's filesystem as TEXT_FONT_FILE. drawtext has
+  // no weight option either; bold is drawn as a thin outline in the text colour.
+  let filter = `drawtext=fontfile=${TEXT_FONT_FILE}:text='${escapedText}':x=${pixelX}:y=${pixelY}:fontsize=${overlay.fontSize}:fontcolor=${overlay.color}`;
+  if (overlay.fontWeight === "bold" || overlay.fontWeight === "900") {
+    const width = Math.max(1, Math.round(overlay.fontSize / (overlay.fontWeight === "900" ? 18 : 28)));
+    filter += `:borderw=${width}:bordercolor=${overlay.color}`;
   }
-
-  // Add custom font file path if available
-  if (fontFileParam) {
-    filter += `:${fontFileParam}`;
-  }
-
   return filter;
 }

@@ -208,6 +208,22 @@ describe("ffmpeg.worker", () => {
     expect(written?.[1]).toEqual(bytes);
   });
 
+  it("writes the bundled font into FFmpeg's filesystem only for exports with text", async () => {
+    await startWorker({ isolated: false });
+    send({ type: "load" });
+    await waitFor("ready");
+    send(exportRequest());
+    await waitFor("result");
+    expect([...ffmpeg().writes.keys()]).not.toContain("reframe-text.ttf");
+
+    posted.length = 0;
+    send({ ...exportRequest({ textOverlays: [{ id: "t", text: "Hi", x: 50, y: 20, fontSize: 48, color: "#fff", fontWeight: "normal" }] }), id: "job2" });
+    await waitFor("result");
+    expect([...ffmpeg().writes.keys()]).toContain("reframe-text.ttf");
+    expect(ffmpeg().execCalls.at(-1)!.join(" ")).toContain("fontfile=reframe-text.ttf");
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/fonts/Geist-Regular.ttf"))).toBe(true);
+  });
+
   it("posts the output as a Blob, so the page never copies the file on its thread", async () => {
     await startWorker({ isolated: false });
     send({ type: "load" });
