@@ -508,11 +508,7 @@ async function exportOnce(
     // Any change counts: the GIF export restarts its clock for the second pass.
     encodedSeconds = outputSeconds;
     lastAdvance = now;
-    if (expectedSeconds !== null && outputSeconds > overrunLimitSeconds(expectedSeconds) && !overrun) {
-      overrun = true;
-      // Numbers only (no names or content): what the watchdog judged on.
-      console.warn("[reframe] export overrun", { outputSeconds, expectedSeconds, videoDuration });
-    }
+    if (expectedSeconds !== null && outputSeconds > overrunLimitSeconds(expectedSeconds)) overrun = true;
   };
   const watchdog = setInterval(() => {
     const now = Date.now();
