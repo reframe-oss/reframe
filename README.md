@@ -75,7 +75,7 @@ to set up, claim an issue with `/assign`, and open a pull request.
   </picture>
 </a>
 
-Reframe is an official GSSoC'26 project. Pick one of the
+Reframe was an official GSSoC'26 project. Pick one of the
 [`gssoc'26` issues](https://github.com/reframe-oss/reframe/issues?q=is%3Aopen+label%3A%22gssoc%2726%22)
 and claim it by commenting `/assign` ([how claiming works](CONTRIBUTING.md#claim-an-issue)).
 Maintainers add the labels.
