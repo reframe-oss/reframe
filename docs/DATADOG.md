@@ -136,6 +136,7 @@ the `DD_API_KEY` secret.
 |---|---|---|
 | `ffmpeg_init` | Engine start-up | `engine`, `load_number` |
 | `first_preview_frame` | Choosing a video to its first frame in the preview | `input_size` |
+| `timeline_frames` | Making the trim timeline's frames with FFmpeg (not sent for a cache hit) | `frames` (how many were made) |
 | `export` | Encoding (engine start-up excluded) | export context, `engine` |
 
 `export_succeeded.speed` is the processing speed (seconds of output per second
@@ -156,7 +157,7 @@ mute, volume, normalize_audio, text_overlay, image_overlay, background_music,
 color_adjustments, sharpen, denoise, stabilization, fill_framing,
 custom_size, crop. Interactive features: `history` (undo, redo), `project_file`
 (save, open), `preview_tool` (compare, grid, framing_guide, save_frame),
-`safe_area`, `export_profile`, `crop_tool` (aspect, drag, reset). Only these names are ever sent; never values,
+`safe_area`, `export_profile`, `trim_timeline` (seek, drag_handle), `crop_tool` (aspect, drag, reset). Only these names are ever sent; never values,
 names or text.
 
 **Synthetic check.** A Datadog Synthetic browser test opens production every

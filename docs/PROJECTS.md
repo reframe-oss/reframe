@@ -70,7 +70,7 @@ Then the stored video copy is read from IndexedDB:
 - If the video copy can't be stored, the user is told they'll need to choose the file again after a refresh.
 - If the edit record can't be written, they're told to use "Save project file".
 
-**Delete saved data** asks for confirmation. It then removes the project record, the recipe and overlay records and the stored video copy, closes the video and resets the editor. Project files the user saved are not affected.
+**Delete saved data** asks for confirmation. It then removes the project record, the recipe and overlay records, the stored video copy and the cached timeline frames, closes the video and resets the editor. Project files the user saved are not affected.
 
 ## Project file format
 

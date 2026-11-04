@@ -111,13 +111,38 @@ type WorkerResultResponse = {
 type WorkerErrorResponse = { type: "error"; id?: string; message: string };
 type WorkerCancelledResponse = { type: "cancelled"; id?: string };
 
+type WorkerFramesResponse =
+  | { type: "frame"; id: string; index: number; time: number; blob: Blob }
+  | { type: "frames-done"; id: string; skipped: number }
+  | { type: "frames-error"; id: string; message: string }
+  | { type: "frames-cancelled"; id: string };
+
 type WorkerResponse =
   | WorkerLoadResponse
   | WorkerHeartbeatResponse
   | WorkerProgressResponse
   | WorkerResultResponse
   | WorkerErrorResponse
-  | WorkerCancelledResponse;
+  | WorkerCancelledResponse
+  | WorkerFramesResponse;
+
+/** A timeline frame from FFmpeg: a small JPEG for `time` seconds. */
+export interface TimelineFrame {
+  index: number;
+  time: number;
+  blob: Blob;
+}
+
+/** The worker is exporting (or making frames); ask again later. */
+export class EngineBusyError extends Error {
+  name = "EngineBusyError";
+}
+
+/** Frame jobs waiting on the worker, by id. */
+const pendingFrames = new Map<
+  string,
+  { onFrame: (frame: TimelineFrame) => void; resolve: (skipped: number) => void; reject: (reason: unknown) => void }
+>();
 
 let ffmpegWorker: Worker | null = null;
 let workerReady: Promise<void> | null = null;
@@ -200,10 +225,26 @@ function resetWorker() {
   workerReadyReject = null;
   pendingExport = null;
   pendingProgress = null;
+  for (const job of pendingFrames.values()) job.reject(new DOMException("Engine restarted", "AbortError"));
+  pendingFrames.clear();
 }
 
 function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
   const data = event.data;
+
+  if (data.type === "frame" || data.type === "frames-done" || data.type === "frames-error" || data.type === "frames-cancelled") {
+    const job = pendingFrames.get(data.id);
+    if (!job) return;
+    if (data.type === "frame") {
+      job.onFrame({ index: data.index, time: data.time, blob: data.blob });
+      return;
+    }
+    pendingFrames.delete(data.id);
+    if (data.type === "frames-done") job.resolve(data.skipped);
+    else if (data.type === "frames-cancelled") job.reject(new DOMException("Frames cancelled", "AbortError"));
+    else job.reject(data.message === "busy" ? new EngineBusyError("The engine is busy") : new Error(data.message));
+    return;
+  }
 
   if (data.type === "ready") {
     engineMode = data.mode ?? "single";
@@ -553,6 +594,39 @@ export function getFFmpegClientState() {
     hasPendingExport: pendingExport !== null,
     hasPendingProgress: pendingProgress !== null,
   };
+}
+
+/**
+ * Makes small JPEG frames of `file` at `times` with FFmpeg, in the worker,
+ * reporting each as it is ready. Loads the engine if needed. Rejects with an
+ * AbortError if `signal` aborts or an export takes the engine, and with
+ * EngineBusyError if an export is running. Resolves with the number of times
+ * that couldn't be captured.
+ */
+export async function extractFrames(
+  file: File,
+  times: number[],
+  width: number,
+  onFrame: (frame: TimelineFrame) => void,
+  signal?: AbortSignal
+): Promise<number> {
+  await loadFFmpeg(signal);
+  if (!ffmpegWorker) throw new Error("FFmpeg worker is not available.");
+  if (pendingExport) throw new EngineBusyError("The engine is busy");
+  if (signal?.aborted) throw new DOMException("Frames cancelled", "AbortError");
+  const id = buildSessionId();
+  const worker = ffmpegWorker;
+  const done = new Promise<number>((resolve, reject) => {
+    pendingFrames.set(id, { onFrame, resolve, reject });
+  });
+  const onAbort = () => worker.postMessage({ type: "cancel-frames", id });
+  signal?.addEventListener("abort", onAbort, { once: true });
+  worker.postMessage({ type: "frames", id, file, times, width });
+  try {
+    return await done;
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+  }
 }
 
 /** The loaded core ("multi" | "single"), or null before the engine is ready. */

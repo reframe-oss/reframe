@@ -447,3 +447,36 @@ export function buildGifArguments({
     ]),
   };
 }
+
+/**
+ * One timeline frame: seek before the input (fast, from the nearest
+ * keyframe), decode a single frame, scale it down and write a small JPEG.
+ * Runs against the user's file mounted read-only (WORKERFS), so it is never
+ * copied into memory.
+ */
+export function buildFrameArguments({
+  inputPath,
+  time,
+  outputName,
+  width,
+  threads,
+}: {
+  inputPath: string;
+  time: number;
+  outputName: string;
+  /** Output width in pixels; height keeps the aspect ratio. */
+  width: number;
+  threads: number;
+}): string[] {
+  const seconds = Number.isFinite(time) && time > 0 ? time : 0;
+  return assertFiniteArgs([
+    "-ss", seconds.toFixed(3),
+    ...inputThreadArgs(threads), "-i", inputPath,
+    "-frames:v", "1",
+    "-an", "-sn",
+    "-vf", `scale=${Math.max(16, Math.round(width / 2) * 2)}:-2`,
+    "-q:v", "6",
+    ...outputThreadArgs(threads, false),
+    "-y", outputName,
+  ]);
+}

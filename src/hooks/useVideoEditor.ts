@@ -74,6 +74,7 @@ import {
 } from "@/lib/editorPersistence";
 import { saveSessionFile, loadSessionFile, clearSessionFile } from "@/lib/sessionDB";
 import { resolveDuration } from "@/lib/mediaDuration";
+import { clearFrameCache } from "@/lib/frameCache";
 import { trackExportTools, trackFeature } from "@/lib/featureTelemetry";
 import { clampCrop, isFullFrame, isValidCrop } from "@/lib/crop";
 
@@ -132,6 +133,7 @@ function clearSavedEditorData() {
     // ignore
   }
   clearSessionFile().catch(console.error);
+  void clearFrameCache();
 }
 
 /** Mirrors recipe changes into the URL at most this often (slider drags fire per pixel). */

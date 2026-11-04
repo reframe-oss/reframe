@@ -17,6 +17,7 @@ export const FEATURE_ACTIONS = {
   project_file: ["save", "open"],
   preview_tool: ["compare", "grid", "framing_guide", "save_frame"],
   crop_tool: ["aspect", "drag", "reset"],
+  trim_timeline: ["seek", "drag_handle"],
   // One event per editing tool an export used (see toolsUsed).
   trim: ["exported"],
   rotate: ["exported"],

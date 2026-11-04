@@ -5,6 +5,7 @@ import { TEXT_FONT_FILE, TEXT_FONT_URL } from "./text-overlay";
 import {
   buildArguments,
   buildGifArguments,
+  buildFrameArguments,
   expectedOutputSeconds,
   resolveOutputSize,
   resolveThreadCount,
@@ -65,7 +66,17 @@ type CancelRequest = { type: "cancel" };
 
 type TerminateRequest = { type: "terminate" };
 
-type WorkerCommand = LoadRequest | ExportRequest | CancelRequest | TerminateRequest;
+/** Timeline frames: one small JPEG per time, from the user's file mounted read-only. */
+type FramesRequest = { type: "frames"; id: string; file: File; times: number[]; width: number };
+type CancelFramesRequest = { type: "cancel-frames"; id: string };
+
+type WorkerCommand =
+  | LoadRequest
+  | ExportRequest
+  | CancelRequest
+  | TerminateRequest
+  | FramesRequest
+  | CancelFramesRequest;
 
 /**
  * `outputSeconds`: how much output has been encoded, so the client can tell an
@@ -99,6 +110,8 @@ let ffmpegLoaded = false;
 /** Which core actually loaded — decides the thread flags, not crossOriginIsolated alone. */
 let engineMode: EngineMode = "single";
 let activeExportAbortController: AbortController | null = null;
+/** The timeline-frames job in progress; an export cancels it and waits for it. */
+let activeFrames: { id: string; controller: AbortController; done: Promise<void> } | null = null;
 let activeExportId: string | null = null;
 
 /** Liveness signal for the client's stall watchdog (see ffmpeg.ts). */
@@ -433,6 +446,50 @@ function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
   }
 }
 
+const FRAMES_MOUNT = "/frames-src";
+
+async function runFrames(request: FramesRequest, signal: AbortSignal): Promise<void> {
+  if (!ffmpeg) throw new Error("FFmpeg engine is not loaded.");
+  // A new File over the same bytes (no copy) with a neutral name: the user's
+  // file name never enters FFmpeg's filesystem.
+  const ext = (request.file.name.split(".").pop() ?? "mp4").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "mp4";
+  const source = new File([request.file], `source.${ext}`, { type: request.file.type });
+  // One thread on the multi-threaded core: never FFmpeg's automatic count,
+  // which deadlocks core-mt (see MT_THREAD_CAP).
+  const threads = engineMode === "multi" ? 1 : 0;
+  await ffmpeg.createDir(FRAMES_MOUNT).catch(() => {});
+  await ffmpeg.mount("WORKERFS" as never, { files: [source] }, FRAMES_MOUNT);
+  let skipped = 0;
+  try {
+    for (const [index, time] of request.times.entries()) {
+      if (signal.aborted) throw new DOMException("Frames cancelled", "AbortError");
+      const outputName = `frame_${request.id}_${index}.jpg`;
+      try {
+        const code = await ffmpeg.exec(
+          buildFrameArguments({ inputPath: `${FRAMES_MOUNT}/${source.name}`, time, outputName, width: request.width, threads }),
+          undefined,
+          { signal }
+        );
+        if (code !== 0) {
+          skipped++;
+          continue;
+        }
+        const data = (await ffmpeg.readFile(outputName, undefined, { signal })) as Uint8Array<ArrayBuffer>;
+        postMessage({ type: "frame", id: request.id, index, time, blob: new Blob([data], { type: "image/jpeg" }) });
+      } catch (error) {
+        if (signal.aborted) throw error;
+        skipped++;
+      } finally {
+        await removeFile(outputName);
+      }
+    }
+  } finally {
+    await ffmpeg.unmount(FRAMES_MOUNT).catch(() => {});
+    await ffmpeg.deleteDir(FRAMES_MOUNT).catch(() => {});
+  }
+  postMessage({ type: "frames-done", id: request.id, skipped });
+}
+
 async function handleCommand(message: WorkerCommand) {
   switch (message.type) {
     case "load": {
@@ -452,6 +509,12 @@ async function handleCommand(message: WorkerCommand) {
       if (activeExportAbortController?.signal.aborted) {
         postMessage({ type: "cancelled", id: message.id });
         return;
+      }
+
+      // One FFmpeg instance runs one command at a time: stop timeline frames first.
+      if (activeFrames) {
+        activeFrames.controller.abort();
+        await activeFrames.done;
       }
 
       activeExportAbortController = new AbortController();
@@ -478,6 +541,34 @@ async function handleCommand(message: WorkerCommand) {
         activeExportAbortController = null;
         activeExportId = null;
       }
+      return;
+    }
+    case "frames": {
+      if (!ffmpeg) {
+        postMessage({ type: "frames-error", id: message.id, message: "FFmpeg engine is not loaded." });
+        return;
+      }
+      if (activeExportId || activeFrames) {
+        postMessage({ type: "frames-error", id: message.id, message: "busy" });
+        return;
+      }
+      const controller = new AbortController();
+      const done = runFrames(message, controller.signal)
+        .catch((error) => {
+          postMessage(
+            controller.signal.aborted
+              ? { type: "frames-cancelled", id: message.id }
+              : { type: "frames-error", id: message.id, message: errorMessage(error) }
+          );
+        })
+        .finally(() => {
+          if (activeFrames?.id === message.id) activeFrames = null;
+        });
+      activeFrames = { id: message.id, controller, done };
+      return;
+    }
+    case "cancel-frames": {
+      if (activeFrames?.id === message.id) activeFrames.controller.abort();
       return;
     }
     case "cancel": {
