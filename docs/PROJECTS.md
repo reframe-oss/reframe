@@ -12,6 +12,7 @@ This covers how Reframe keeps edit history, what it saves in the browser, and th
 | Keep audio, normalise, volume, speed | `recipe` |
 | Quality, format, brightness, contrast, saturation, sharpness, stabilisation, denoise | `recipe` |
 | Text overlays (text, position, size, colour, weight, font name) | `recipe.textOverlays` |
+| Crop: the kept rectangle as fractions (0–1) of the source frame; missing means the whole frame, so older files still open | `recipe.crop` |
 | Image overlay position, size and opacity | `imageOverlay` |
 
 Not included, on purpose:

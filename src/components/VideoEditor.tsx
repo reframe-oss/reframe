@@ -44,11 +44,14 @@ import {
   ChevronDown,
   Keyboard,
   Bookmark,
+  Crop,
 } from "lucide-react";
 import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import HistoryControls from "./HistoryControls";
 import ProjectPanel, { RecoveryNotice } from "./ProjectPanel";
+import CropControl, { aspectRatio } from "./CropControl";
+import { cropPixels, isFullFrame, type CropAspectId } from "@/lib/crop";
 
 /**
  * Collapsible tool section. The panel animates open and closed through grid
@@ -257,6 +260,7 @@ export default function VideoEditor() {
     buildProjectFile,
     importProjectFile,
     deleteSavedData,
+    videoMetadata,
   } = useVideoEditor();
 
   const exportProfiles = useExportProfiles();
@@ -282,10 +286,12 @@ export default function VideoEditor() {
 
   const [shareCopied, setShareCopied] = useState(false);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
+  const [cropAspect, setCropAspect] = useState<CropAspectId>("free");
   const [openSections, setOpenSections] = useState({
     profile: false,
     resize: true,
     trim: false,
+    crop: false,
     rotation: false,
     adjust: false,
     text: false,
@@ -345,6 +351,21 @@ export default function VideoEditor() {
   const intervalSeconds = useMemo(() => pickThumbnailInterval(duration), [duration]);
 
   const videoSrc = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+
+  const outputRatio = useMemo(() => {
+    const { width, height } = resolveOutputSize({
+      preset: recipe.preset,
+      customWidth: recipe.customWidth,
+      customHeight: recipe.customHeight,
+    });
+    return width / height;
+  }, [recipe.preset, recipe.customWidth, recipe.customHeight]);
+
+  const cropSummary = useMemo(() => {
+    if (!recipe.crop || !videoMetadata) return "Custom";
+    const { width, height } = cropPixels(recipe.crop, videoMetadata.width, videoMetadata.height);
+    return `${width} × ${height}`;
+  }, [recipe.crop, videoMetadata]);
 
   const output = useMemo(() => {
     const preset = getPresetById(recipe.preset);
@@ -460,6 +481,11 @@ export default function VideoEditor() {
                       selectedTextId={selectedTextId}
                       onSelectText={setSelectedTextId}
                       onUpdateText={handleUpdateTextOverlay}
+                      cropEditor={
+                        openSections.crop
+                          ? { ratio: aspectRatio(cropAspect, outputRatio), onChange: (crop) => updateRecipe({ crop }) }
+                          : null
+                      }
                     />
                   </div>
 
@@ -545,6 +571,24 @@ export default function VideoEditor() {
                   onToggle={() => toggleSection("trim")}
                 >
                   <TrimControl recipe={recipe} onChange={updateRecipe} duration={duration} file={file} />
+                </AccordionSection>
+
+                <AccordionSection
+                  id="crop"
+                  icon={<Crop size={15} />}
+                  title="Crop"
+                  summary={isFullFrame(recipe.crop) ? "None" : cropSummary}
+                  isOpen={openSections.crop}
+                  onToggle={() => toggleSection("crop")}
+                >
+                  <CropControl
+                    crop={recipe.crop}
+                    aspect={cropAspect}
+                    outputRatio={outputRatio}
+                    source={videoMetadata}
+                    onAspectChange={setCropAspect}
+                    onChange={(crop) => updateRecipe({ crop })}
+                  />
                 </AccordionSection>
 
                 <AccordionSection

@@ -13,6 +13,7 @@
  */
 import { resolveOutputSize } from "./ffmpegArgs";
 import type { EditRecipe } from "./types";
+import { isFullFrame } from "./crop";
 
 export interface OutputFrame {
   mode: "fit" | "fill";
@@ -35,8 +36,13 @@ function centred(ratio: number, outer: number) {
   return { top: 0, bottom: 0, left: band, right: band };
 }
 
+/** Where the source picture sits in the 16:9 viewer (it is shown `object-contain`), as % insets. */
+export function sourceRect(sourceRatio: number) {
+  return centred(sourceRatio > 0 ? sourceRatio : VIEWER_RATIO, VIEWER_RATIO);
+}
+
 export function outputFrame(
-  recipe: Pick<EditRecipe, "preset" | "customWidth" | "customHeight" | "framing">,
+  recipe: Pick<EditRecipe, "preset" | "customWidth" | "customHeight" | "framing" | "crop">,
   sourceRatio: number = VIEWER_RATIO
 ): OutputFrame {
   const { width, height } = resolveOutputSize(recipe);
@@ -47,9 +53,23 @@ export function outputFrame(
     return { mode: "fit", top: pct(box.top), bottom: pct(box.bottom), left: pct(box.left), right: pct(box.right) };
   }
 
-  // Fill: the source's rectangle in the viewer, then the kept part of it.
-  const source = centred(sourceRatio > 0 ? sourceRatio : VIEWER_RATIO, VIEWER_RATIO);
-  const kept = centred(outputRatio, sourceRatio > 0 ? sourceRatio : VIEWER_RATIO);
+  // Fill: the source's rectangle in the viewer, narrowed to the crop, then
+  // the kept part of that.
+  const ratio = sourceRatio > 0 ? sourceRatio : VIEWER_RATIO;
+  const full = centred(ratio, VIEWER_RATIO);
+  const fw = 100 - full.left - full.right;
+  const fh = 100 - full.top - full.bottom;
+  const crop = recipe.crop && !isFullFrame(recipe.crop) ? recipe.crop : null;
+  const source = crop
+    ? {
+        left: full.left + crop.x * fw,
+        right: full.right + (1 - crop.x - crop.width) * fw,
+        top: full.top + crop.y * fh,
+        bottom: full.bottom + (1 - crop.y - crop.height) * fh,
+      }
+    : full;
+  const keptRatio = crop ? (ratio * crop.width) / crop.height : ratio;
+  const kept = centred(outputRatio, keptRatio);
   const sw = 100 - source.left - source.right;
   const sh = 100 - source.top - source.bottom;
   return {

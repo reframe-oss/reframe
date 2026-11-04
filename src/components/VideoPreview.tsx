@@ -3,6 +3,8 @@
 
 import { useEffect, useRef, useState, useCallback, RefObject } from "react";
 import { EditRecipe, TextOverlay, TimelineTrack, MultiTrackEditorState } from "@/lib/types";
+import CropOverlay from "./CropOverlay";
+import type { CropRect } from "@/lib/crop";
 import { outputFrame, SAFE_AREAS } from "@/lib/framing";
 import { cn } from "@/lib/utils";
 import { Camera, Columns2, Grid3x3, Frame, SquareDashed } from "lucide-react";
@@ -20,6 +22,8 @@ interface Props {
   // Phase 1 MVP: Multi-track support
   multiTrackState?: MultiTrackEditorState | null;
   multiTrackVideoRefs?: Record<string, RefObject<HTMLVideoElement | null>>;
+  /** While the Crop section is open: the crop box to draw, and where its changes go. */
+  cropEditor?: { ratio: number | null; onChange: (crop: CropRect) => void } | null;
 }
 
 export default function VideoPreview({
@@ -31,6 +35,7 @@ export default function VideoPreview({
   onUpdateText,
   multiTrackState,
   multiTrackVideoRefs,
+  cropEditor = null,
 }: Props) {
   const lastId = useRef(0);
   const urlRef = useRef<string | null>(null);
@@ -326,8 +331,12 @@ export default function VideoPreview({
           </div>
         )}
 
+        {cropEditor && recipe && (
+          <CropOverlay crop={recipe.crop} ratio={cropEditor.ratio} sourceRatio={sourceRatio} onChange={cropEditor.onChange} />
+        )}
+
         {/* Letterbox / Crop overlay */}
-        {overlay && (
+        {overlay && !cropEditor && (
           <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
             {overlay.mode === "fit" ? (
               // Letterbox: the bars the output will add

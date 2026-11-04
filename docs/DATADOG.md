@@ -154,9 +154,9 @@ format, stall reason.
 per editing tool an export uses (`action: exported`): trim, rotate, speed,
 mute, volume, normalize_audio, text_overlay, image_overlay, background_music,
 color_adjustments, sharpen, denoise, stabilization, fill_framing,
-custom_size. Interactive features: `history` (undo, redo), `project_file`
+custom_size, crop. Interactive features: `history` (undo, redo), `project_file`
 (save, open), `preview_tool` (compare, grid, framing_guide, save_frame),
-`safe_area`, `export_profile`. Only these names are ever sent; never values,
+`safe_area`, `export_profile`, `crop_tool` (aspect, drag, reset). Only these names are ever sent; never values,
 names or text.
 
 **Synthetic check.** A Datadog Synthetic browser test opens production every
