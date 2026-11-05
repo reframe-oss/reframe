@@ -26,10 +26,39 @@ Netlify badge and brand logos are served from this site instead of hotlinked.
 Check a deployment with:
 
 ```bash
-curl -sI https://your-site.example | grep -i cross-origin
+node scripts/deploy/check-deploy.mjs https://your-site.example [--expect-commit <sha>]
 ```
 
-and, in the browser console on the site, `crossOriginIsolated` should be `true`.
+It requests the page, a hashed script, the preloaded font, the FFmpeg worker
+chunk, the engine's WASM on jsDelivr, the trailing-slash redirect and a 404,
+and checks the headers, MIME types and caching on each. With
+`--expect-commit`, it also checks that the site serves that commit (each
+build stamps it in `<meta name="reframe-build">`), which catches a stale
+deploy. It exits 0 when everything passes, 1 on a failure, 3 when the
+deployment needs a login and 4 when it can't be reached. In the browser
+console on the site, `crossOriginIsolated` should be `true`.
+
+`deploy-smoke.yml` runs this check on every pull request against a local
+build, and against each Netlify deploy preview once Netlify reports it
+ready.
+
+## The other headers
+
+Every host sends the same set (`netlify.toml`, `public/_headers` and
+`vercel.json`, kept identical by `src/lib/tests/deployConfig.test.ts`):
+
+- `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy` and `Permissions-Policy` (no camera, microphone or
+  location).
+- `Cross-Origin-Resource-Policy: same-origin`: other sites can't embed
+  Reframe's files.
+- `Content-Security-Policy: base-uri 'self'; object-src 'none';
+  frame-ancestors 'none'; form-action 'self'`. It has no fetch directives,
+  so it can't block the FFmpeg cores or analytics; it stops framing,
+  plugins, `<base>` hijacking and off-site form posts.
+- `Cache-Control: public, max-age=31536000, immutable` on `/_next/static/*`,
+  whose file names change with their content. Pages are revalidated on
+  every visit.
 
 ## Netlify (recommended)
 

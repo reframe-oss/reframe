@@ -24,6 +24,8 @@ const REQUIRED = {
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Content-Security-Policy": "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
 };
 
 /** "Key: value" / Key = "value" pairs from netlify.toml or public/_headers. */
@@ -50,8 +52,16 @@ describe("vercel.json", () => {
     expect(vercelHeaders["Strict-Transport-Security"]).toBeUndefined();
   });
 
-  it("does not add a CSP that could block the FFmpeg CDN or the RUM intake", () => {
-    expect(vercelHeaders["Content-Security-Policy"]).toBeUndefined();
+  it("has a CSP with no fetch directives, so it can't block the FFmpeg CDN or the RUM intake", () => {
+    const directives = (vercelHeaders["Content-Security-Policy"] ?? "").split(";").map((d) => d.trim().split(/\s+/)[0]);
+    expect(directives).toEqual(["base-uri", "object-src", "frame-ancestors", "form-action"]);
+  });
+
+  it.each([
+    ["netlify.toml", /for = "\/_next\/static\/\*"\s+\[headers\.values\]\s+Cache-Control = "public, max-age=31536000, immutable"/],
+    ["public/_headers", /\/_next\/static\/\*\s+Cache-Control: public, max-age=31536000, immutable/],
+  ])("%s marks hashed build assets immutable", (file, rule) => {
+    expect(read(file)).toMatch(rule);
   });
 });
 

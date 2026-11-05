@@ -66,6 +66,11 @@ export const metadata: Metadata = {
     shortcut: "/favicon.svg",
     apple: "/icons/apple-touch-icon.png",
   },
+  // The commit this build was made from (next.config.ts), so
+  // scripts/deploy/check-deploy.mjs --expect-commit can catch a stale deploy.
+  other: {
+    "reframe-build": process.env.NEXT_PUBLIC_RELEASE ?? "dev",
+  },
   manifest: "/manifest.webmanifest",
 };
 

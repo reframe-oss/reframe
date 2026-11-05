@@ -54,6 +54,19 @@
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     Cross-Origin-Opener-Policy = "same-origin"
     Cross-Origin-Embedder-Policy = "require-corp"
+    Cross-Origin-Resource-Policy = "same-origin"
+    # No fetch directives (script-src, connect-src …), so nothing the app
+    # loads (the FFmpeg cores, Datadog RUM) can be blocked; it only stops
+    # framing, plugins, <base> hijacking and off-site form posts.
+    Content-Security-Policy = "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'"
+
+# Hashed build assets never change, so browsers may keep them for a year.
+# Declared here rather than relying on @netlify/plugin-nextjs, which was what
+# set this before: a deploy without the plugin served them with max-age=0.
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
 
 # The service worker (public/sw.js) must always be re-checked, or browsers
 # keep running an old one after a deploy. Its content changes with every

@@ -1,0 +1,85 @@
+name: 🚦 Deploy smoke test
+
+# Checks that Reframe is served with the headers it depends on: COOP/COEP for
+# cross-origin isolation (multi-threaded FFmpeg) plus the security headers,
+# correct MIME types and immutable caching for hashed assets.
+#
+# No secrets, no tokens, read-only permissions:
+#   * static-export builds the site and serves out/ locally with the headers
+#     declared in vercel.json (kept identical to netlify.toml and
+#     public/_headers by deployConfig.test.ts), then runs the deploy check.
+#   * deployed runs the same check against a real Netlify deploy preview once
+#     Netlify reports it ready, or against any URL given by hand. Note that
+#     GitHub only runs `status`-triggered workflows from the default branch, so
+#     this job starts working once this file is on main.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Deployed URL to check (https://…)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  static-export:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      # No Datadog keys exist here, so RUM can't start in this build.
+      - run: bun run build
+
+      - name: Serve out/ with the declared headers
+        run: |
+          node scripts/serve-isolated.mjs 4300 &
+          for _ in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:4300/ && exit 0; sleep 1; done
+          echo "server did not start" && exit 1
+
+      # GITHUB_SHA is the commit next.config.ts stamped into the build.
+      - name: Check headers, MIME types, caching and the build commit
+        run: node scripts/deploy/check-deploy.mjs http://127.0.0.1:4300/ --expect-commit "$GITHUB_SHA"
+
+  deployed:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'status' &&
+       github.event.state == 'success' &&
+       startsWith(github.event.context, 'netlify/'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check the deployed URL
+        env:
+          # Passed through the environment, never interpolated into the script.
+          URL: ${{ github.event.inputs.url || github.event.target_url }}
+        run: |
+          case "$URL" in
+            https://*) ;;
+            *) echo "Not an https URL; nothing to check."; exit 0 ;;
+          esac
+          set +e
+          node scripts/deploy/check-deploy.mjs "$URL"
+          code=$?
+          if [ "$code" = 3 ]; then
+            echo "::notice::The deployment requires authentication, so its headers were not checked."
+            exit 0
+          fi
+          if [ "$code" = 4 ]; then
+            echo "::error::The deployment could not be reached, so nothing was checked."
+          fi
+          exit $code
