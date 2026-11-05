@@ -46,6 +46,7 @@ import {
   Bookmark,
   Crop,
   Files,
+  Combine,
 } from "lucide-react";
 import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -55,6 +56,8 @@ import CropControl, { aspectRatio } from "./CropControl";
 import { cropPixels, isFullFrame, type CropAspectId } from "@/lib/crop";
 import BatchExport from "./BatchExport";
 import { useBatchExport } from "@/hooks/useBatchExport";
+import JoinClips from "./JoinClips";
+import { useJoinClips } from "@/hooks/useJoinClips";
 
 /**
  * Collapsible tool section. The panel animates open and closed through grid
@@ -327,6 +330,7 @@ export default function VideoEditor() {
     text: false,
     audio: false,
     overlay: false,
+    join: false,
     batch: false,
     export: false,
   });
@@ -380,7 +384,8 @@ export default function VideoEditor() {
   }, []);
 
   const batch = useBatchExport();
-  const timelineFrames = useTimelineFrames(file, duration, isProcessing || batch.running);
+  const join = useJoinClips(file, videoMetadata, handleFileSelect);
+  const timelineFrames = useTimelineFrames(file, duration, isProcessing || batch.running || join.running);
 
   const outputRatio = useMemo(() => {
     const { width, height } = resolveOutputSize({
@@ -433,7 +438,7 @@ export default function VideoEditor() {
   const isTrimmed = recipe.trimStart > 0 || recipe.trimEnd !== null;
   const textCount = recipe.textOverlays?.length ?? 0;
   // A batch uses the same engine, so the editor's own export waits for it.
-  const exportDisabled = !file || isProcessing || batch.running;
+  const exportDisabled = !file || isProcessing || batch.running || join.running;
   const exportShortcut = isMac ? "⌘ Enter" : "Ctrl Enter";
 
   return (
@@ -579,6 +584,19 @@ export default function VideoEditor() {
                 </SectionHead>
                 <div className="divide-y divide-[var(--border)] border-b border-[var(--border)]">
                 <AccordionSection
+                  id="join"
+                  icon={<Combine size={15} />}
+                  title="Join clips"
+                  summary={
+                    join.running ? "Joining…" : join.clips.length > 1 ? `${join.clips.length} clips` : "One clip"
+                  }
+                  isOpen={openSections.join}
+                  onToggle={() => toggleSection("join")}
+                >
+                  <JoinClips join={join} engineBusy={isProcessing || batch.running} />
+                </AccordionSection>
+
+                <AccordionSection
                   id="trim"
                   icon={<Scissors size={15} />}
                   title="Trim"
@@ -653,6 +671,9 @@ export default function VideoEditor() {
                     onChange={updateRecipe}
                     selectedTextId={selectedTextId}
                     onSelectText={setSelectedTextId}
+                    duration={duration}
+                    videoRef={videoRef}
+                    outputHeight={resolveOutputSize(recipe).height}
                   />
                 </AccordionSection>
 
@@ -718,7 +739,7 @@ export default function VideoEditor() {
                 >
                   <BatchExport
                     batch={batch}
-                    editorBusy={isProcessing}
+                    editorBusy={isProcessing || join.running}
                     getSettings={() => ({
                       recipe,
                       music: { file: musicFile, musicVolume, originalAudioVolume, loopMusic, replaceAudio },

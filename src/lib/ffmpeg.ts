@@ -92,6 +92,14 @@ type WorkerExportRequest = {
   overlayOptions?: ImageOverlayOptions;
 };
 
+type WorkerJoinRequest = {
+  type: "join";
+  id: string;
+  clips: { file: File; duration: number }[];
+  width: number;
+  height: number;
+};
+
 type WorkerLoadResponse = { type: "ready"; mode: EngineMode };
 type WorkerHeartbeatResponse = { type: "heartbeat" };
 type WorkerProgressResponse = { type: "progress"; percent: number; outputSeconds?: number };
@@ -475,6 +483,39 @@ async function exportOnce(
     ? { ...overlayOptions, file: null }
     : undefined;
 
+  const videoDuration = isUsableDuration(knownDuration) ? knownDuration : await getVideoDuration(file);
+  return runEngineJob(
+    {
+      type: "export",
+      id: sessionId,
+      file: filePayload,
+      recipe,
+      videoDuration,
+      musicFile: musicFilePayload,
+      musicOptions: sanitizedMusicOptions,
+      overlayFile: overlayFilePayload,
+      overlayOptions: sanitizedOverlayOptions,
+    } satisfies WorkerExportRequest,
+    expectedOutputSeconds(recipe, videoDuration),
+    onProgress,
+    signal
+  );
+}
+
+/**
+ * Sends one export-like job (an export or a join) to the worker and waits
+ * for its result, with cancel and the stall watchdog: a job that stops
+ * reporting, stops advancing or runs far past `expectedSeconds` is stopped
+ * with an ExportStalledError and the worker discarded.
+ */
+async function runEngineJob(
+  message: WorkerExportRequest | WorkerJoinRequest,
+  expectedSeconds: number | null,
+  onProgress: (percent: number) => void,
+  signal?: AbortSignal
+): Promise<ExportResult> {
+  if (!ffmpegWorker) throw new Error("FFmpeg worker is not available.");
+  const sessionId = message.id;
   pendingProgress = dedupeProgress(onProgress) ?? null;
 
   const exportPromise = new Promise<ExportResult>((resolve, reject) => {
@@ -492,9 +533,6 @@ async function exportOnce(
     cancelPendingExport(new DOMException("Aborted", "AbortError"));
   };
   signal?.addEventListener("abort", onAbort, { once: true });
-
-  const videoDuration = isUsableDuration(knownDuration) ? knownDuration : await getVideoDuration(file);
-  const expectedSeconds = expectedOutputSeconds(recipe, videoDuration);
 
   const mode = engineMode ?? "single";
   let lastActivity = Date.now();
@@ -529,20 +567,7 @@ async function exportOnce(
     resetWorker();
   }, 5_000);
 
-
-  ffmpegWorker.postMessage(
-    {
-      type: "export",
-      id: sessionId,
-      file: filePayload,
-      recipe,
-      videoDuration,
-      musicFile: musicFilePayload,
-      musicOptions: sanitizedMusicOptions,
-      overlayFile: overlayFilePayload,
-      overlayOptions: sanitizedOverlayOptions,
-    } as WorkerExportRequest
-  );
+  ffmpegWorker.postMessage(message);
 
   try {
     return await exportPromise;
@@ -550,6 +575,49 @@ async function exportOnce(
     clearInterval(watchdog);
     pendingActivity = null;
     signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+/** A clip to join, with the length the editor read for it (0 when unknown). */
+export interface JoinClipSource {
+  file: File;
+  duration: number;
+}
+
+/**
+ * Joins `clips` end to end into one MP4 at `width` × `height` (the first
+ * clip's size), in the worker. Like an export, it can be cancelled, and a
+ * stall on the multi-threaded engine retries once on the single-threaded one.
+ */
+export async function joinClips(
+  clips: JoinClipSource[],
+  width: number,
+  height: number,
+  onProgress: (percent: number) => void,
+  signal?: AbortSignal,
+  onEngineFallback?: (reason: StallReason) => void
+): Promise<ExportResult> {
+  const once = async () => {
+    await loadFFmpeg(signal);
+    const message: WorkerJoinRequest = {
+      type: "join",
+      id: buildSessionId(),
+      clips: clips.map(({ file, duration }) => ({ file, duration: isUsableDuration(duration) ? duration : 0 })),
+      width,
+      height,
+    };
+    const total = message.clips.every((clip) => clip.duration > 0)
+      ? message.clips.reduce((sum, clip) => sum + clip.duration, 0)
+      : null;
+    return runEngineJob(message, total, onProgress, signal);
+  };
+  try {
+    return await once();
+  } catch (err) {
+    if (!(err instanceof ExportStalledError) || err.mode !== "multi" || signal?.aborted) throw err;
+    onEngineFallback?.(err.reason);
+    onProgress(0);
+    return once();
   }
 }
 
@@ -610,10 +678,13 @@ export async function extractFrames(
   onFrame: (frame: TimelineFrame) => void,
   signal?: AbortSignal
 ): Promise<number> {
-  await loadFFmpeg(signal);
+  // Not loadFFmpeg(signal): cancelling a load discards the worker, and an
+  // export or join that starts meanwhile (which is what pauses the frames)
+  // waits on that same load. Let it finish and stop afterwards.
+  await loadFFmpeg();
   if (!ffmpegWorker) throw new Error("FFmpeg worker is not available.");
-  if (pendingExport) throw new EngineBusyError("The engine is busy");
   if (signal?.aborted) throw new DOMException("Frames cancelled", "AbortError");
+  if (pendingExport) throw new EngineBusyError("The engine is busy");
   const id = buildSessionId();
   const worker = ffmpegWorker;
   const done = new Promise<number>((resolve, reject) => {

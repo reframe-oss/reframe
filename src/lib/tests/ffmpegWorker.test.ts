@@ -389,6 +389,52 @@ describe("ffmpeg.worker", () => {
     expect(seconds.every((s) => s === undefined || (s as number) < 1e6)).toBe(true);
   });
 
+  it("joins clips from a read-only mount, giving silence to a clip without sound", async () => {
+    await startWorker({ isolated: false });
+    send({ type: "load" });
+    await waitFor("ready");
+    h.FakeFFmpeg.execImpl = async (args) => {
+      const f = ffmpeg();
+      const input = args[args.indexOf("-i") + 1]!;
+      if (args.includes("0:a:0")) {
+        // The probe: the log describes the streams; only the first clip has audio.
+        f.listeners.log.forEach((fn) => fn({ message: "  Stream #0:0: Video: h264, yuv420p, 1280x720, 25 fps, 25 tbr" }));
+        return input.includes("clip0") ? 0 : 1;
+      }
+      f.files.set(args.at(-1)!, new Uint8Array([7, 7]));
+      return 0;
+    };
+    send({
+      type: "join",
+      id: "join1",
+      clips: [
+        { file: new File([new Uint8Array(4)], "Beach day.mp4", { type: "video/mp4" }), duration: 4 },
+        { file: new File([new Uint8Array(4)], "Sunset.MOV", { type: "video/quicktime" }), duration: 2.5 },
+      ],
+      width: 1281,
+      height: 720,
+    });
+    await waitFor("result");
+    const f = ffmpeg();
+    const mount = f.mounts.at(-1)!;
+    expect(mount.type).toBe("WORKERFS");
+    expect(mount.files.map((file) => file.name)).toEqual(["clip0.mp4", "clip1.MOV"]);
+    expect(f.unmounted).toContain(mount.dir);
+    const join = f.execCalls.at(-1)!;
+    const graph = join[join.indexOf("-filter_complex") + 1]!;
+    expect(graph).toContain("scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720");
+    expect(graph).toContain("fps=25,");
+    expect(graph).toContain("anullsrc=r=48000:cl=stereo,atrim=0:2.5");
+    expect(graph).toContain("concat=n=2:v=1:a=1[v][a]");
+    // The user's file names never reach FFmpeg.
+    expect(f.execCalls.flat().some((arg) => /Beach|Sunset/.test(arg))).toBe(false);
+    const result = posted.find((m) => m.type === "result")!;
+    expect(result).toMatchObject({ id: "join1", format: "mp4", width: 1280, height: 720 });
+    expect(result.blob).toBeInstanceOf(Blob);
+    expect(f.listeners.log.size).toBe(0);
+    expect(f.listeners.progress.size).toBe(0);
+  });
+
   it("exports sound only as MP3, with no video encoder", async () => {
     await startWorker({ isolated: false });
     send({ type: "load" });
