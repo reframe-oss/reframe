@@ -49,6 +49,8 @@ import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import HistoryControls from "./HistoryControls";
 import { RecoveryNotice } from "./RecoveryNotice";
+import BatchExport from "./BatchExport";
+import { useBatchExport } from "@/hooks/useBatchExport";
 
 /**
  * Collapsible tool section. The panel animates open and closed through grid
