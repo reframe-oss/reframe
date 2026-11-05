@@ -10,7 +10,8 @@ import { getPresetById } from "./presets";
 // all landed in the copy that never ran. Keep this module free of DOM/worker
 // APIs so it can be imported from both sides.
 
-export type OutputFormat = "mp4" | "webm" | "mkv" | "gif";
+export type { OutputFormat } from "./types";
+import type { AudioFormat, OutputFormat } from "./types";
 export type EngineMode = "multi" | "single";
 
 /**
@@ -203,8 +204,10 @@ export function buildVideoFilter(input: EditRecipe, targetW: number, targetH: nu
   }
 
   const textOverlays = recipe.textOverlays || [];
+  const timing = { trimStart: recipe.trimStart, trimEnd: recipe.trimEnd, speed: recipe.speed };
   textOverlays.forEach((overlay) => {
-    filters.push(buildTextFilter(overlay, targetW, targetH));
+    const text = buildTextFilter(overlay, targetW, targetH, timing);
+    if (text) filters.push(text);
   });
 
   return filters.join(",");
@@ -248,6 +251,91 @@ export function buildAudioTrimFilter(input: EditRecipe): string {
   return `${trimFilter},asetpts=PTS-STARTPTS`;
 }
 
+/**
+ * The audio part of a filter graph: the video's sound (`af` applied), a
+ * soundtrack mixed with it or in place of it, or the sound alone. `out` is
+ * the label to map, or "" when the video's sound needs no filter.
+ */
+function soundtrackGraph(
+  af: string,
+  hasOriginalAudio: boolean,
+  music: { options: BackgroundMusicOptions } | undefined,
+  musicIdx: number
+): { parts: string[]; out: string } {
+  if (music) {
+    const musicVol = (music.options.musicVolume / 100).toFixed(2);
+    if (hasOriginalAudio && !music.options.replaceAudio) {
+      const origVol = (music.options.originalAudioVolume / 100).toFixed(2);
+      return {
+        parts: [
+          af ? `[0:a]${af},volume=${origVol}[orig]` : `[0:a]volume=${origVol}[orig]`,
+          `[${musicIdx}:a]volume=${musicVol}[music]`,
+          `[orig][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+        ],
+        out: "[aout]",
+      };
+    }
+    // The track alone: no original sound, or it replaces it.
+    return { parts: [`[${musicIdx}:a]volume=${musicVol}[aout]`], out: "[aout]" };
+  }
+  if (hasOriginalAudio && af) return { parts: [`[0:a]${af}[aout]`], out: "[aout]" };
+  return { parts: [], out: "" };
+}
+
+/** Shown as is: an audio-only export with no sound to export. */
+export const NO_SOUND_MESSAGE = "This video has no sound to export. Add a soundtrack, or choose a video format.";
+
+export interface AudioArgsOptions {
+  recipe: EditRecipe;
+  format: AudioFormat;
+  inputName: string;
+  outputName: string;
+  videoDuration: number;
+  hasOriginalAudio: boolean;
+  music?: { inputName: string; options: BackgroundMusicOptions };
+  threads: number;
+}
+
+/**
+ * Sound only: the video's audio with the edit's trim, speed, volume and
+ * loudness, mixed with or replaced by the soundtrack, as MP3 (192 kb/s) or
+ * WAV (16-bit, 48 kHz). No video is decoded.
+ */
+export function buildAudioArguments({
+  recipe: input,
+  format,
+  inputName,
+  outputName,
+  videoDuration,
+  hasOriginalAudio,
+  music,
+  threads,
+}: AudioArgsOptions): string[] {
+  if (!hasOriginalAudio && !music) throw new Error(NO_SOUND_MESSAGE);
+  const recipe = withSafeTimes(input);
+  const af = hasOriginalAudio ? [buildAudioTrimFilter(recipe), buildAudioFilter(recipe)].filter(Boolean).join(",") : "";
+  const args: string[] = [...inputThreadArgs(threads), "-i", inputName];
+  if (music) {
+    if (music.options.loopMusic) args.push("-stream_loop", "-1");
+    args.push("-i", music.inputName);
+  }
+  const graph = soundtrackGraph(af, hasOriginalAudio, music, 1);
+  if (graph.parts.length > 0) {
+    args.push("-filter_complex", graph.parts.join(";"), "-map", graph.out);
+  } else {
+    args.push("-map", "0:a:0");
+  }
+  args.push("-vn");
+  if (format === "mp3") args.push("-c:a", "libmp3lame", "-b:a", "192k");
+  else args.push("-c:a", "pcm_s16le", "-ar", "48000");
+  args.push(...outputThreadArgs(threads, graph.parts.length > 0));
+  const durationArgs = outputDurationArgs(recipe, videoDuration);
+  args.push(...durationArgs);
+  if (durationArgs.length === 0 && music?.options.loopMusic) args.push("-shortest");
+  args.push(outputName);
+  return assertFiniteArgs(args);
+}
+
 const OVERLAY_POSITIONS: Record<OverlayPosition, string> = {
   "top-left": "20:20",
   "top-right": "W-w-20:20",
@@ -257,7 +345,7 @@ const OVERLAY_POSITIONS: Record<OverlayPosition, string> = {
 
 export interface ExportArgsOptions {
   recipe: EditRecipe;
-  format: Exclude<OutputFormat, "gif">;
+  format: Exclude<OutputFormat, "gif" | AudioFormat>;
   inputName: string;
   outputName: string;
   targetW: number;
@@ -326,25 +414,9 @@ export function buildArguments({
 
     let audioOut = "";
     if (shouldKeepAudio) {
-      if (music) {
-        const musicVol = (music.options.musicVolume / 100).toFixed(2);
-        if (hasOriginalAudio) {
-          const origVol = (music.options.originalAudioVolume / 100).toFixed(2);
-          const origChain = afParts.length > 0
-            ? `[0:a]${af},volume=${origVol}[orig]`
-            : `[0:a]volume=${origVol}[orig]`;
-          filterParts.push(origChain);
-          filterParts.push(`[${musicIdx}:a]volume=${musicVol}[music]`);
-          filterParts.push(`[orig][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
-          audioOut = "[aout]";
-        } else {
-          filterParts.push(`[${musicIdx}:a]volume=${musicVol}[aout]`);
-          audioOut = "[aout]";
-        }
-      } else if (hasOriginalAudio && af) {
-        filterParts.push(`[0:a]${af}[aout]`);
-        audioOut = "[aout]";
-      }
+      const graph = soundtrackGraph(af, hasOriginalAudio, music, musicIdx);
+      filterParts.push(...graph.parts);
+      audioOut = graph.out;
     }
 
     if (filterParts.length > 0) {
@@ -479,4 +551,66 @@ export function buildFrameArguments({
     ...outputThreadArgs(threads, false),
     "-y", outputName,
   ]);
+}
+
+/** One clip of a join, as mounted in FFmpeg's filesystem. */
+export interface JoinInput {
+  path: string;
+  /** Whether the clip has an audio stream (probed in the worker). */
+  hasAudio: boolean;
+  /** Length in seconds; 0 when unknown. */
+  duration: number;
+}
+
+export interface JoinArgsOptions {
+  inputs: JoinInput[];
+  /** Output size: the first clip's, rounded down to even numbers. */
+  width: number;
+  height: number;
+  /** Output frame rate: the first clip's. */
+  fps: number;
+  outputName: string;
+  threads: number;
+}
+
+/**
+ * Joins clips end to end with the concat filter. Every clip is fitted inside
+ * the first clip's size (letterboxed, never stretched) at its frame rate.
+ * When any clip has sound, a clip without it gets silence of its own length
+ * so the audio stays in step; when none has, the output has no audio.
+ * MP4 (H.264, CRF 18) so the export that follows loses almost nothing.
+ */
+export function buildJoinArguments({ inputs, width, height, fps, outputName, threads }: JoinArgsOptions): string[] {
+  const w = Math.max(2, Math.floor(width / 2) * 2);
+  const h = Math.max(2, Math.floor(height / 2) * 2);
+  const rate = Number(fps.toFixed(3));
+  const withAudio = inputs.some((input) => input.hasAudio);
+  const args: string[] = [];
+  for (const input of inputs) args.push(...inputThreadArgs(threads), "-i", input.path);
+
+  const parts: string[] = [];
+  const segments: string[] = [];
+  inputs.forEach((input, i) => {
+    parts.push(
+      `[${i}:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${rate},format=yuv420p,setpts=PTS-STARTPTS[v${i}]`
+    );
+    segments.push(`[v${i}]`);
+    if (!withAudio) return;
+    // Padded or cut to the clip's length, so a short audio track can't shift the clips after it.
+    const fit = input.duration > 0 ? `,apad,atrim=0:${Number(input.duration.toFixed(3))}` : "";
+    parts.push(
+      input.hasAudio
+        ? `[${i}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo${fit},asetpts=PTS-STARTPTS[a${i}]`
+        : `anullsrc=r=48000:cl=stereo,atrim=0:${Number(Math.max(0.1, input.duration).toFixed(3))},asetpts=PTS-STARTPTS[a${i}]`
+    );
+    segments.push(`[a${i}]`);
+  });
+  parts.push(`${segments.join("")}concat=n=${inputs.length}:v=1:a=${withAudio ? 1 : 0}${withAudio ? "[v][a]" : "[v]"}`);
+
+  args.push("-filter_complex", parts.join(";"), "-map", "[v]");
+  if (withAudio) args.push("-map", "[a]");
+  args.push("-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p");
+  if (withAudio) args.push("-c:a", "aac", "-b:a", "192k");
+  args.push("-movflags", "+faststart", ...outputThreadArgs(threads, true), outputName);
+  return assertFiniteArgs(args);
 }

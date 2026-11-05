@@ -13,7 +13,7 @@
 import { DEFAULT_RECIPE, SPEED_STEPS } from "./constants";
 import { PRESETS } from "./presets";
 import { clampCrop, isValidCrop } from "./crop";
-import { RECIPE_VERSION, type OverlayPosition, type TextOverlay } from "./types";
+import { OUTPUT_FORMATS, RECIPE_VERSION, type OverlayPosition, type TextOverlay } from "./types";
 import type { EditState, ImageOverlaySettings } from "./editHistory";
 
 export const PROJECT_FORMAT = "reframe-project";
@@ -21,7 +21,8 @@ export const PROJECT_SCHEMA_VERSION = 1;
 export const PROJECT_STORAGE_KEY = "reframe:project";
 /** Projects are a few KB; anything this large is not one of ours. */
 export const MAX_PROJECT_FILE_BYTES = 512 * 1024;
-export const MAX_TEXT_OVERLAYS = 50;
+/** Enough for an imported caption file; each overlay is one drawtext filter. */
+export const MAX_TEXT_OVERLAYS = 500;
 export const MAX_OVERLAY_TEXT_LENGTH = 500;
 
 export const DEFAULT_IMAGE_OVERLAY: ImageOverlaySettings = {
@@ -110,6 +111,12 @@ function parseTextOverlay(raw: unknown, index: number): TextOverlay {
   if (raw.fontFamily !== undefined && (typeof raw.fontFamily !== "string" || !SAFE_FONT_NAME.test(raw.fontFamily))) {
     fail(`The ${label} font name is not allowed.`);
   }
+  const timing: { start?: number; end?: number } = {};
+  if (raw.start !== undefined) timing.start = num(raw, "start", 0, Number.MAX_SAFE_INTEGER, `${label} start`);
+  if (raw.end !== undefined) {
+    timing.end = num(raw, "end", 0, Number.MAX_SAFE_INTEGER, `${label} end`);
+    if (timing.end <= (timing.start ?? 0)) fail(`The ${label} must end after it starts.`);
+  }
   // `fontPath` is deliberately never read: it is passed to FFmpeg as a file
   // path, so a project file must not be able to supply one.
   return {
@@ -121,6 +128,8 @@ function parseTextOverlay(raw: unknown, index: number): TextOverlay {
     color: raw.color,
     fontWeight: oneOf(raw, "fontWeight", ["normal", "bold", "900"] as const),
     ...(typeof raw.fontFamily === "string" ? { fontFamily: raw.fontFamily } : {}),
+    ...timing,
+    ...(raw.box !== undefined ? { box: bool(raw, "box") } : {}),
   };
 }
 
@@ -161,7 +170,7 @@ function parseRecipe(raw: unknown): EditState["recipe"] {
     speed: oneOf(raw, "speed", SPEED_STEPS),
     volume: num(raw, "volume", 0, 200),
     quality: num(raw, "quality", 18, 30),
-    format: oneOf(raw, "format", ["mp4", "webm", "mkv", "gif"] as const),
+    format: oneOf(raw, "format", OUTPUT_FORMATS),
     stabilization: bool(raw, "stabilization"),
     denoise: bool(raw, "denoise"),
     brightness: num(raw, "brightness", -1, 1),

@@ -19,6 +19,22 @@ processed on your device by FFmpeg running as WebAssembly.
 The first export downloads the video engine (about 30 MB), so it takes longer.
 Later exports reuse it.
 
+## Join clips
+
+**Join clips** at the top of the Edit panel puts several videos one after
+another. It starts with the video you opened; **Add clips** (or drop files
+on the panel) adds more, up to 10 and 1 GB in all (3 clips when any is
+larger than 1440p). Drag the rows, or use the up and down arrows, to set
+the order. Every clip is fitted inside the first clip's size and frame
+rate: a clip of another shape gets bars rather than being stretched, and a
+clip without sound gets silence so the rest stay in step.
+
+**Join N clips** makes the joined video on this device and opens it in the
+editor in place of the first one, so trim, crop, text, sizes and Export
+all work on it as usual. The trim and crop start over, since they belonged
+to the first video. **Undo join** goes back to that video and the list of
+clips. While a join runs, exports wait for it, and **Cancel join** stops it.
+
 ## Crop
 
 **Crop** in the Edit panel keeps part of the picture. While it's open, a box
@@ -41,6 +57,39 @@ browser, so the same video shows them at once next time. The parts outside
 the trim are dimmed. Click the strip to move the preview there, and drag the
 handles (or use the arrow keys on them) to set the start and end. While an
 export runs, making frames pauses and carries on afterwards.
+
+## Text and captions
+
+**Add Text** in the Text section puts a line of text on the video. Drag it
+in the preview to place it; the preview shows it where, and at the size,
+the export will draw it. By default text stays on for the whole video. To
+show it for part of it, set **From** and **Until** in seconds of the video,
+or play to a moment and press **Start at playhead** or **End at playhead**.
+**Whole video** clears the times. Times follow the source video, so they
+stay right when you trim or change the speed, and text outside the trim is
+left out. **Dark box behind the text** gives it a caption-style background.
+
+**Import captions** reads an `.srt` or `.vtt` subtitle file and adds each
+cue as a timed caption near the bottom of the frame, sized for the output.
+An edit holds up to 500 text items; a longer file adds its first 500 cues.
+**Remove all** clears them. Exported text uses the bundled Geist font
+whatever font the preview shows.
+
+## Sound
+
+**Audio and speed** turns the video's sound on or off, sets its volume (up
+to 200%) and can even out loudness. **Add a track** there adds a
+soundtrack (MP3, WAV, M4A, AAC, OGG or FLAC, up to 200 MB). By default it
+**replaces the video's sound**; choose **Mix with it** to keep both, with
+a volume for each. **Loop the track** repeats a short track until the
+video ends; a longer one is cut at the video's end. The track starts with
+the exported clip, after any trim.
+
+To keep only the sound, choose **MP3** or **WAV** under Format. The export
+is the sound with your trim, speed, volume, loudness and soundtrack;
+size, framing, crop and text don't apply. MP3 is 192 kb/s and plays
+anywhere; WAV is uncompressed (16-bit, 48 kHz), for editing elsewhere. A
+video without sound can only be exported as sound if it has a soundtrack.
 
 ## Batch export
 

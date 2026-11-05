@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ExportResult } from "@/lib/types";
+import { ExportResult, isAudioFormat } from "@/lib/types";
 import { formatBytes } from "@/lib/utils";
 import { Download, RotateCcw, Share2, AlertCircle, Volume2, VolumeX, Check, ArrowUp } from "lucide-react";
 import { NativeShareButton } from "./NativeShareButton";
@@ -28,7 +28,8 @@ interface Props {
 }
 
 export default function DownloadResult({ result, onReset, soundOnCompletion, onToggleSound }: Props) {
-  const defaultName = `reframe_${result.width}x${result.height}`;
+  const audioOnly = isAudioFormat(result.format);
+  const defaultName = audioOnly ? "reframe_audio" : `reframe_${result.width}x${result.height}`;
   const [name, setName] = useState(defaultName);
 
   const invalidCharRegex = /[<>:"/\\|?*]/;
@@ -77,7 +78,8 @@ export default function DownloadResult({ result, onReset, soundOnCompletion, onT
           <div>
             <p className="serif text-3xl leading-tight text-[var(--text)]">Export complete</p>
             <p className="tabular mt-1 text-xs text-[var(--muted)]">
-              {result.format.toUpperCase()} · {result.width} × {result.height} · {formatBytes(result.size)}
+              {result.format.toUpperCase()} · {audioOnly ? "sound only" : `${result.width} × ${result.height}`} ·{" "}
+              {formatBytes(result.size)}
               {typeof result.exportDurationMs === "number" &&
                 ` · exported in ${formatExportDuration(result.exportDurationMs)}`}
             </p>
@@ -97,6 +99,11 @@ export default function DownloadResult({ result, onReset, soundOnCompletion, onT
 
       {soundError && (
         <p className="hint">The completion sound couldn&apos;t play on this device.</p>
+      )}
+
+      {audioOnly && (
+        // eslint-disable-next-line jsx-a11y/media-has-caption -- the exported sound itself; there is nothing to caption
+        <audio controls src={result.blobUrl} className="w-full" aria-label="Play the exported sound" />
       )}
 
       <div className="space-y-1">
@@ -155,7 +162,7 @@ export default function DownloadResult({ result, onReset, soundOnCompletion, onT
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-secondary btn-lg"
-          title="Open the exported video in a new tab"
+          title={audioOnly ? "Open the exported sound in a new tab" : "Open the exported video in a new tab"}
         >
           Preview
         </a>

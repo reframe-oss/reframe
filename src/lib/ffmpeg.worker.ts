@@ -1,16 +1,20 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { toBlobURL } from "@ffmpeg/util";
-import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions } from "./types";
+import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions, isAudioFormat, type OutputFormat } from "./types";
 import { TEXT_FONT_FILE, TEXT_FONT_URL } from "./text-overlay";
 import {
   buildArguments,
+  buildAudioArguments,
   buildGifArguments,
   buildFrameArguments,
+  buildJoinArguments,
+  NO_SOUND_MESSAGE,
   expectedOutputSeconds,
   resolveOutputSize,
   resolveThreadCount,
   type EngineMode,
 } from "./ffmpegArgs";
+import { frameRateFromLog } from "./joinClips";
 
 import { CORE_BASE_URL, MT_CORE_BASE_URL } from "./engineUrls";
 
@@ -54,6 +58,15 @@ type LoadRequest = {
   singleThread?: boolean;
 };
 
+/** Clips joined end to end into one MP4, read from a read-only mount. */
+type JoinRequest = {
+  type: "join";
+  id: string;
+  clips: { file: File; duration: number }[];
+  width: number;
+  height: number;
+};
+
 type CancelRequest = { type: "cancel" };
 
 type TerminateRequest = { type: "terminate" };
@@ -65,6 +78,7 @@ type CancelFramesRequest = { type: "cancel-frames"; id: string };
 type WorkerCommand =
   | LoadRequest
   | ExportRequest
+  | JoinRequest
   | CancelRequest
   | TerminateRequest
   | FramesRequest
@@ -91,7 +105,7 @@ type ResultPayload = {
   size: number;
   width: number;
   height: number;
-  format: "mp4" | "webm" | "mkv" | "gif";
+  format: OutputFormat;
 };
 
 type ErrorPayload = { type: "error"; id?: string; message: string };
@@ -111,6 +125,7 @@ let activeExportId: string | null = null;
 
 /** Liveness signal for the client's stall watchdog (see ffmpeg.ts). */
 const HEARTBEAT_INTERVAL_MS = 2000;
+
 let lastHeartbeat = 0;
 function heartbeat() {
   const now = Date.now();
@@ -206,6 +221,10 @@ function getOutputConfig(format: string, sessionId: string) {
       return { filename: `output_${sessionId}.mkv`, mimeType: "video/x-matroska" };
     case "gif":
       return { filename: `output_${sessionId}.gif`, mimeType: "image/gif" };
+    case "mp3":
+      return { filename: `output_${sessionId}.mp3`, mimeType: "audio/mpeg" };
+    case "wav":
+      return { filename: `output_${sessionId}.wav`, mimeType: "audio/wav" };
     default:
       return { filename: `output_${sessionId}.mp4`, mimeType: "video/mp4" };
   }
@@ -327,6 +346,30 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   };
 
   try {
+    if (isAudioFormat(recipe.format)) {
+      const format = recipe.format;
+      const argsFor = (hasOriginalAudio: boolean) =>
+        buildAudioArguments({
+          recipe,
+          format,
+          inputName,
+          outputName,
+          videoDuration,
+          hasOriginalAudio,
+          music: hasMusicTrack ? { inputName: musicInputName, options: request.musicOptions! } : undefined,
+          threads,
+        });
+      let code = await ffmpeg.exec(argsFor(recipe.keepAudio), undefined, { signal });
+      if (code !== 0 && missingAudioDetected) {
+        // The video has no sound: the soundtrack alone, if there is one.
+        if (!hasMusicTrack) throw new Error(NO_SOUND_MESSAGE);
+        code = await ffmpeg.exec(argsFor(false), undefined, { signal });
+      }
+      if (code !== 0) throw new Error("Audio export failed");
+      const payload = await read(outputName);
+      return { type: "result", id: sessionId, data: payload, mimeType, size: payload.byteLength, width: 0, height: 0, format };
+    }
+
     if (recipe.format === "gif") {
       const gif = buildGifArguments({
         recipe,
@@ -422,6 +465,101 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   }
 }
 
+const JOIN_MOUNT = "/join-src";
+
+/** Joined output frame rate when the first clip's can't be read, and the most it may be. */
+const DEFAULT_JOIN_FPS = 30;
+const MAX_JOIN_FPS = 60;
+
+async function runJoin(request: JoinRequest): Promise<ResultPayload> {
+  if (!ffmpeg) throw new Error("FFmpeg engine is not loaded.");
+  const sessionId = request.id;
+  const signal = activeExportAbortController?.signal;
+  // New Files over the same bytes (no copy) with neutral names: the user's
+  // file names never enter FFmpeg's filesystem.
+  const sources = request.clips.map(({ file }, i) => {
+    const ext = (file.name.split(".").pop() ?? "mp4").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "mp4";
+    return new File([file], `clip${i}.${ext}`, { type: file.type });
+  });
+  const outputName = `joined_${sessionId}.mp4`;
+  const threads = resolveThreadCount(engineMode, self.navigator?.hardwareConcurrency);
+  const expectedSeconds = request.clips.every((clip) => clip.duration > 0)
+    ? request.clips.reduce((sum, clip) => sum + clip.duration, 0)
+    : null;
+
+  let log = "";
+  let lastPercent = -1;
+  let lastSecond = -1;
+  const handleLog = ({ message }: { message: string }) => {
+    heartbeat();
+    log += `${message}\n`;
+  };
+  const handleProgress = ({ progress, time }: { progress: number; time?: number }) => {
+    if (activeExportId !== sessionId) return;
+    heartbeat();
+    const outputSeconds =
+      typeof time === "number" && Number.isFinite(time) && time > 0 && time < MAX_PLAUSIBLE_TIME_US ? time / 1e6 : undefined;
+    const fraction =
+      expectedSeconds !== null && outputSeconds !== undefined ? outputSeconds / expectedSeconds : Number.isFinite(progress) ? progress : 0;
+    const percent = Math.max(0, Math.min(99, Math.round(fraction * 100)));
+    const second = outputSeconds === undefined ? -1 : Math.floor(outputSeconds);
+    if (percent === lastPercent && second === lastSecond) return;
+    lastPercent = percent;
+    lastSecond = second;
+    postMessage({ type: "progress", percent, outputSeconds });
+  };
+
+  await ffmpeg.createDir(JOIN_MOUNT).catch(() => {});
+  await ffmpeg.mount("WORKERFS" as never, { files: sources }, JOIN_MOUNT);
+  ffmpeg.on("log", handleLog);
+  lastHeartbeat = 0;
+  heartbeat();
+  try {
+    // Which clips have sound, and the first clip's frame rate: a quick read
+    // of each clip's first audio packet, whose log describes its streams.
+    const inputs = [];
+    let fps: number | null = null;
+    for (const [i, source] of sources.entries()) {
+      if (signal?.aborted) throw new DOMException("Export cancelled", "AbortError");
+      log = "";
+      const path = `${JOIN_MOUNT}/${source.name}`;
+      const code = await ffmpeg.exec(["-hide_banner", "-i", path, "-map", "0:a:0", "-frames:a", "1", "-f", "null", "-"]);
+      if (i === 0) fps = frameRateFromLog(log);
+      inputs.push({ path, hasAudio: code === 0, duration: request.clips[i]!.duration });
+    }
+
+    ffmpeg.on("progress", handleProgress);
+    const args = buildJoinArguments({
+      inputs,
+      width: request.width,
+      height: request.height,
+      fps: Math.min(MAX_JOIN_FPS, fps ?? DEFAULT_JOIN_FPS),
+      outputName,
+      threads,
+    });
+    const code = await ffmpeg.exec(args, undefined, { signal });
+    if (code !== 0) throw new Error("Join failed");
+    const data = (await ffmpeg.readFile(outputName, undefined, { signal })) as Uint8Array;
+    const payload = data.buffer as ArrayBuffer;
+    return {
+      type: "result",
+      id: sessionId,
+      data: payload,
+      mimeType: "video/mp4",
+      size: payload.byteLength,
+      width: Math.floor(request.width / 2) * 2,
+      height: Math.floor(request.height / 2) * 2,
+      format: "mp4",
+    };
+  } finally {
+    ffmpeg.off("progress", handleProgress);
+    ffmpeg.off("log", handleLog);
+    await removeFile(outputName);
+    await ffmpeg.unmount(JOIN_MOUNT).catch(() => {});
+    await ffmpeg.deleteDir(JOIN_MOUNT).catch(() => {});
+  }
+}
+
 function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
   const data = event.data;
   if (data.type === "progress") {
@@ -503,7 +641,8 @@ async function handleCommand(message: WorkerCommand) {
       }
       return;
     }
-    case "export": {
+    case "export":
+    case "join": {
       if (!ffmpeg) {
         postMessage({ type: "error", id: message.id, message: "FFmpeg engine is not loaded." });
         return;
@@ -523,7 +662,7 @@ async function handleCommand(message: WorkerCommand) {
       activeExportId = message.id;
 
       try {
-        const result = await runExport(message);
+        const result = message.type === "join" ? await runJoin(message) : await runExport(message);
         if (activeExportAbortController?.signal.aborted) {
           postMessage({ type: "cancelled", id: message.id });
           return;

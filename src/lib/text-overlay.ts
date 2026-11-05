@@ -63,16 +63,53 @@ export function getTextPercentPosition(
   };
 }
 
+/** Whether the text is on screen at `time` seconds of the source video. */
+export function isTextVisibleAt(overlay: Pick<TextOverlay, "start" | "end">, time: number): boolean {
+  return time >= (overlay.start ?? 0) && (overlay.end === undefined || time < overlay.end);
+}
+
+/** The part of the source video that the export keeps, and how fast it plays. */
+export interface TextTiming {
+  trimStart: number;
+  trimEnd: number | null;
+  speed: number;
+}
+
 /**
- * Generates a drawText FFmpeg filter for a single text overlay.
- * Escapes special characters and positions text on the output video.
- * Includes font family and custom font file support.
+ * The drawtext `enable` expression for an overlay's start and end, which are
+ * in source seconds. drawtext runs after trim and speed, so its `t` is the
+ * exported clip's time. Returns "" when the text is on for the whole export,
+ * and null when it falls outside the kept part and so never shows.
+ */
+export function textEnableExpression(overlay: Pick<TextOverlay, "start" | "end">, timing: TextTiming): string | null {
+  const { trimStart, trimEnd, speed } = timing;
+  const start = overlay.start ?? 0;
+  const end = overlay.end;
+  if (end !== undefined && end <= trimStart) return null;
+  if (trimEnd !== null && start >= trimEnd) return null;
+  const from = start > trimStart ? (start - trimStart) / speed : 0;
+  const until = end !== undefined && (trimEnd === null || end < trimEnd) ? (end - trimStart) / speed : null;
+  const s = (n: number) => String(Number(n.toFixed(3)));
+  if (from === 0 && until === null) return "";
+  if (until === null) return `gte(t,${s(from)})`;
+  if (from === 0) return `lt(t,${s(until)})`;
+  return `between(t,${s(from)},${s(until)})`;
+}
+
+/**
+ * Generates a drawText FFmpeg filter for a single text overlay, or null when
+ * its start and end put it outside the exported part of the video.
+ * The text is centred on its position, as in the preview.
  */
 export function buildTextFilter(
   overlay: TextOverlay,
   targetWidth: number,
-  targetHeight: number
-): string {
+  targetHeight: number,
+  timing: TextTiming = { trimStart: 0, trimEnd: null, speed: 1 }
+): string | null {
+  const enable = textEnableExpression(overlay, timing);
+  if (enable === null) return null;
+
   // Escape special characters for FFmpeg drawtext filter
   const escapedText = overlay.text
     .replace(/\\/g, "\\\\")
@@ -88,10 +125,14 @@ export function buildTextFilter(
   // resolve and drawtext needs a font file: the worker writes the bundled one
   // (public/fonts) into FFmpeg's filesystem as TEXT_FONT_FILE. drawtext has
   // no weight option either; bold is drawn as a thin outline in the text colour.
-  let filter = `drawtext=fontfile=${TEXT_FONT_FILE}:text='${escapedText}':x=${pixelX}:y=${pixelY}:fontsize=${overlay.fontSize}:fontcolor=${overlay.color}`;
+  let filter = `drawtext=fontfile=${TEXT_FONT_FILE}:text='${escapedText}':x=${pixelX}-text_w/2:y=${pixelY}-text_h/2:fontsize=${overlay.fontSize}:fontcolor=${overlay.color}`;
   if (overlay.fontWeight === "bold" || overlay.fontWeight === "900") {
     const width = Math.max(1, Math.round(overlay.fontSize / (overlay.fontWeight === "900" ? 18 : 28)));
     filter += `:borderw=${width}:bordercolor=${overlay.color}`;
   }
+  if (overlay.box) {
+    filter += `:box=1:boxcolor=black@0.55:boxborderw=${Math.max(2, Math.round(overlay.fontSize * 0.3))}`;
+  }
+  if (enable) filter += `:enable='${enable}'`;
   return filter;
 }
