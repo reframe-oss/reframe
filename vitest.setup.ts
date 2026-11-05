@@ -1,7 +1,8 @@
 // Vitest setup: polyfills and global mocks
 import '@testing-library/jest-dom/vitest'
 
-Object.defineProperty(window, 'matchMedia', {
+// Node-environment tests (e.g. deployCheck.test.ts) have no window.
+if (typeof window !== 'undefined') Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({
     matches: false,
