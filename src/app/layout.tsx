@@ -65,6 +65,11 @@ export const metadata: Metadata = {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     shortcut: "/favicon.svg",
   },
+  // The commit this build was made from (next.config.ts), so
+  // scripts/deploy/check-deploy.mjs --expect-commit can catch a stale deploy.
+  other: {
+    "reframe-build": process.env.NEXT_PUBLIC_RELEASE ?? "dev",
+  },
 };
 
 export default function RootLayout({

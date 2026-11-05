@@ -1,13 +1,19 @@
 #!/usr/bin/env node
-// Serves the static export (out/) with the same cross-origin isolation headers
-// as production (netlify.toml), so the multi-threaded FFmpeg core loads exactly
-// as it does on the live site. Used by the Playwright tests.
+// Serves the static export (out/) with the same headers as production: the
+// security and cross-origin isolation headers declared for every host
+// (vercel.json, kept identical to netlify.toml and public/_headers by
+// deployConfig.test.ts), immutable caching for hashed assets and the hosts'
+// trailing-slash redirect. So the multi-threaded FFmpeg core loads exactly as
+// on the live site, and scripts/deploy/check-deploy.mjs can check a local
+// build. Used by the Playwright tests and deploy-smoke.yml.
 //
 //   node scripts/serve-isolated.mjs [port]      (default 4173)
 //   ISOLATED=0 node scripts/serve-isolated.mjs  (no COOP/COEP: single-threaded)
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { extname, join, normalize, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, extname, join, normalize, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const root = resolve(process.cwd(), "out");
 const port = Number(process.argv[2] ?? process.env.PORT ?? 4173);
@@ -44,12 +50,25 @@ async function resolveFile(urlPath) {
   return null;
 }
 
+const vercelJson = resolve(dirname(fileURLToPath(import.meta.url)), "../vercel.json");
+const declared = JSON.parse(readFileSync(vercelJson, "utf8")).headers.find((rule) => rule.source === "/(.*)").headers;
+
 createServer(async (req, res) => {
-  const headers = { "X-Content-Type-Options": "nosniff" };
-  if (isolated) {
-    headers["Cross-Origin-Opener-Policy"] = "same-origin";
-    headers["Cross-Origin-Embedder-Policy"] = "require-corp";
+  const headers = Object.fromEntries(declared.map(({ key, value }) => [key, value]));
+  if (!isolated) {
+    delete headers["Cross-Origin-Opener-Policy"];
+    delete headers["Cross-Origin-Embedder-Policy"];
   }
+  const path = (req.url ?? "/").split("?")[0];
+  // Netlify and Vercel both drop a trailing slash on pages.
+  if (path.length > 1 && path.endsWith("/")) {
+    res.writeHead(301, { Location: path.slice(0, -1) });
+    res.end();
+    return;
+  }
+  headers["Cache-Control"] = path.startsWith("/_next/static/")
+    ? "public, max-age=31536000, immutable"
+    : "public, max-age=0, must-revalidate";
   const file = await resolveFile(req.url ?? "/");
   if (!file) {
     const notFound = await resolveFile("/404");
