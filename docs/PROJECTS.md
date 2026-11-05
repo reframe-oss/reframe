@@ -65,16 +65,11 @@ Then the stored video copy is read from IndexedDB:
   - A different file keeps the other settings but resets the trim points, like any new video.
   - "Discard saved edits" forgets the project.
 
-**Failures are reported in the "Saved on this device" panel:**
-
-- If the video copy can't be stored, the user is told they'll need to choose the file again after a refresh.
-- If the edit record can't be written, they're told to use "Save project file".
-
-**Delete saved data** asks for confirmation. It then removes the project record, the recipe and overlay records, the stored video copy and the cached timeline frames, closes the video and resets the editor. Project files the user saved are not affected.
+The editor no longer has a "Saved on this device" panel, so it has no buttons to save or open project files or to delete saved data. Saving fails quietly: after a refresh the user is asked to choose the video again. Clearing the site's data in the browser removes everything stored. `useVideoEditor` still has `buildProjectFile`, `importProjectFile` and `deleteSavedData` (which also clears the cached timeline frames), ready for a future UI.
 
 ## Project file format
 
-"Save project file" downloads `<video name>.reframe.json`:
+`buildProjectFile` produces `<video name>.reframe.json`:
 
 ```json
 {

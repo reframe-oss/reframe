@@ -53,14 +53,12 @@ your trims and overlays. **Safe area** in the preview toolbar shows the 90%
 and 80% safe zones; it's preview-only and never exported. More in
 [EXPORT_PROFILES.md](EXPORT_PROFILES.md).
 
-## Undo, recovery and project files
+## Undo and recovery
 
 - Every edit can be undone and redone. A slider drag counts as one step.
 - Your edits and a copy of the open video are kept in this browser, so a
-  refresh doesn't lose work. **Delete saved data** in the editor removes them,
-  along with the cached timeline frames.
-- **Save project file** writes your edits (not the video) to a
-  `.reframe.json` file you can reopen later. See [PROJECTS.md](PROJECTS.md).
+  refresh doesn't lose work. Clearing this site's data in your browser
+  settings removes them, along with the cached timeline frames. See [PROJECTS.md](PROJECTS.md).
 
 ## Keyboard shortcuts
 
