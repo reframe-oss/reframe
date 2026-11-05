@@ -49,6 +49,8 @@ import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import HistoryControls from "./HistoryControls";
 import { RecoveryNotice } from "./RecoveryNotice";
+import CropControl, { aspectRatio } from "./CropControl";
+import { cropPixels, isFullFrame, type CropAspectId } from "@/lib/crop";
 
 /**
  * Collapsible tool section. The panel animates open and closed through grid
@@ -274,6 +276,7 @@ export default function VideoEditor() {
     redo,
     recovery,
     discardRecovery,
+    videoMetadata,
   } = useVideoEditor();
 
   const exportProfiles = useExportProfiles();
