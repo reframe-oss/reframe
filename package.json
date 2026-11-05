@@ -11,6 +11,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "chromatic": "chromatic --exit-zero-on-changes",
+    "audit": "bun audit --json | node scripts/security/audit-policy.mjs security/audit-exceptions.json",
     "security": "npm install --package-lock-only --ignore-scripts --legacy-peer-deps && snyk test --severity-threshold=high --file=package-lock.json"
   },
   "dependencies": {
@@ -32,10 +33,10 @@
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
-    "@storybook/addon-a11y": "^10.5.10",
-    "@storybook/addon-docs": "^10.5.10",
-    "@storybook/addon-themes": "^10.5.10",
-    "@storybook/nextjs": "^10.5.10",
+    "@storybook/addon-a11y": "^10.6.6",
+    "@storybook/addon-docs": "^10.6.6",
+    "@storybook/addon-themes": "^10.6.6",
+    "@storybook/nextjs": "^10.6.6",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.4.3",
@@ -50,13 +51,17 @@
     "jsdom": "^29.1.1",
     "postcss": "^8",
     "snyk": "^1.1307.0",
-    "storybook": "^10.5.10",
+    "storybook": "^10.6.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "@types/react": "19.2.18",
-    "@types/react-dom": "19.2.5"
+    "@types/react-dom": "19.2.5",
+    "undici": "^7.30.1",
+    "vite": "^8.2.4",
+    "zod": "^4.6.6",
+    "source-map-js": "^1.2.2"
   }
 }
