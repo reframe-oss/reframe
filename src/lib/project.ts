@@ -12,6 +12,7 @@
  */
 import { DEFAULT_RECIPE, SPEED_STEPS } from "./constants";
 import { PRESETS } from "./presets";
+import { clampCrop, isValidCrop } from "./crop";
 import { RECIPE_VERSION, type OverlayPosition, type TextOverlay } from "./types";
 import type { EditState, ImageOverlaySettings } from "./editHistory";
 
@@ -144,6 +145,9 @@ function parseRecipe(raw: unknown): EditState["recipe"] {
     fail("Two text overlays share the same id.");
   }
 
+  if (!isValidCrop(raw.crop)) fail("“crop” must be a rectangle inside the frame.");
+  const crop = raw.crop ? clampCrop(raw.crop) : null;
+
   return {
     preset: raw.preset,
     customWidth: Math.round(num(raw, "customWidth", 16, 7680)),
@@ -165,6 +169,7 @@ function parseRecipe(raw: unknown): EditState["recipe"] {
     saturation: num(raw, "saturation", 0, 3),
     sharpness: num(raw, "sharpness", 0, 3),
     textOverlays,
+    ...(crop ? { crop } : {}),
     version: RECIPE_VERSION,
   };
 }

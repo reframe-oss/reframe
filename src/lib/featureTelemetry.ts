@@ -1,6 +1,7 @@
 import { trackAction } from "./telemetry";
 import { DEFAULT_RECIPE } from "./constants";
 import type { EditRecipe } from "./types";
+import { isFullFrame } from "./crop";
 
 // Anonymous feature-usage counts: which editing tools people use, never what
 // they do with them. Every property is from a closed list below, so a user's
@@ -15,6 +16,7 @@ export const FEATURE_ACTIONS = {
   history: ["undo", "redo"],
   project_file: ["save", "open"],
   preview_tool: ["compare", "grid", "framing_guide", "save_frame"],
+  crop_tool: ["aspect", "drag", "reset"],
   batch_export: ["start", "done", "done_with_failures", "cancel", "save_folder"],
   trim_timeline: ["seek", "drag_handle"],
   // One event per editing tool an export used (see toolsUsed).
@@ -33,6 +35,7 @@ export const FEATURE_ACTIONS = {
   stabilization: ["exported"],
   fill_framing: ["exported"],
   custom_size: ["exported"],
+  crop: ["exported"],
 } as const;
 
 export type Feature = keyof typeof FEATURE_ACTIONS;
@@ -86,6 +89,7 @@ export function toolsUsed(recipe: EditRecipe, extras: { music?: boolean; imageOv
   if (recipe.stabilization) tools.push("stabilization");
   if (recipe.framing === "fill") tools.push("fill_framing");
   if (recipe.preset === "custom") tools.push("custom_size");
+  if (!isFullFrame(recipe.crop)) tools.push("crop");
   return tools;
 }
 

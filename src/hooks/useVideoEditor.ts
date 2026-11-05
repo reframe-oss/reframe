@@ -76,6 +76,7 @@ import { saveSessionFile, loadSessionFile, clearSessionFile } from "@/lib/sessio
 import { resolveDuration } from "@/lib/mediaDuration";
 import { clearFrameCache } from "@/lib/frameCache";
 import { trackExportTools, trackFeature } from "@/lib/featureTelemetry";
+import { clampCrop, isFullFrame, isValidCrop } from "@/lib/crop";
 
 const DEFAULT_TITLE = "Reframe — Resize, trim, and export videos in your browser";
 const PROJECT_SAVE_DELAY_MS = 500;
@@ -116,6 +117,7 @@ function withNewSource(edit: EditState, width: number, height: number): EditStat
       ...edit.recipe,
       trimStart: 0,
       trimEnd: null,
+      crop: null,
       ...(edit.recipe.preset === DEFAULT_RECIPE.preset ? { preset: suggested } : {}),
     },
   };
@@ -322,6 +324,8 @@ function isValidValue(key: keyof EditRecipe, val: any): boolean {
       return typeof val === "number" && !isNaN(val) && val >= 0 && val <= 2;
     case "saturation":
       return typeof val === "number" && !isNaN(val) && val >= 0 && val <= 3;
+    case "crop":
+      return isValidCrop(val);
     default:
       return true;
   }
@@ -441,6 +445,8 @@ export function useVideoEditor() {
         }
       }
       if (Object.keys(validated).length === 0) return;
+      // A crop that keeps the whole frame is stored as no crop.
+      if (validated.crop) validated.crop = isFullFrame(validated.crop) ? null : clampCrop(validated.crop);
 
       updateEdit((prev) => {
         const next = { ...prev.recipe, ...validated };
@@ -1211,6 +1217,7 @@ export function useVideoEditor() {
   }, []);
 
   return {
+    videoMetadata,
     file,
     duration,
     recipe,

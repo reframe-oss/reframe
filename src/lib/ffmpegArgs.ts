@@ -1,5 +1,6 @@
 import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions, OverlayPosition } from "./types";
 import { buildTextFilter } from "./text-overlay";
+import { cropFilter } from "./crop";
 import { getPresetById } from "./presets";
 
 // The FFmpeg command line for every export is built here and only here.
@@ -143,6 +144,10 @@ export function buildVideoFilter(input: EditRecipe, targetW: number, targetH: nu
       filters.push(`trim=start=${recipe.trimStart}`);
     }
   }
+
+  // The crop is drawn on the unrotated preview, so it applies before rotation.
+  const crop = cropFilter(recipe.crop);
+  if (crop) filters.push(crop);
 
   if (recipe.stabilization) {
     filters.push("deshake");
