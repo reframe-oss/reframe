@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   loadFFmpeg,
   exportVideo,
+  extractFrames,
+  joinClips,
   terminateFFmpeg,
   dedupeProgress,
   getFFmpegClientState,
@@ -38,7 +40,7 @@ class FakeWorker {
   postMessage(msg: { type: string; id?: string; singleThread?: boolean }) {
     this.posted.push(msg);
     if (msg.type === "load") queueMicrotask(() => (script.onLoad ?? ((w) => w.emit({ type: "ready", mode: "single" })))(this));
-    if (msg.type === "export") queueMicrotask(() => script.onExport?.(this, msg.id!));
+    if (msg.type === "export" || msg.type === "join") queueMicrotask(() => script.onExport?.(this, msg.id!));
   }
   terminate() {
     this.terminated = true;
@@ -367,3 +369,41 @@ describe("overrunLimitSeconds", () => {
   });
 });
 
+describe("sharing the engine load", () => {
+  it("a filmstrip cancelled during the load doesn't take the engine from an export waiting on it", async () => {
+    let worker: FakeWorker | null = null;
+    script.onLoad = (w) => (worker = w); // the load is still in progress
+    script.onExport = (w, id) => w.emit(result(id));
+    const frames = new AbortController();
+    const framesDone = extractFrames(file(), [1], 160, vi.fn(), frames.signal).catch((e) => e);
+    await vi.waitFor(() => expect(worker).not.toBeNull());
+    const exported = run();
+    // Starting the export pauses the filmstrip.
+    frames.abort();
+    worker!.emit({ type: "ready", mode: "single" });
+    await expect(exported).resolves.toMatchObject({ size: 8 });
+    expect((await framesDone).name).toBe("AbortError");
+    expect(workers).toHaveLength(1);
+    expect(workers[0]!.terminated).toBe(false);
+  });
+});
+
+describe("joinClips", () => {
+  it("sends the clips to the worker as a join and resolves with the joined video", async () => {
+    script.onExport = (w, id) => w.emit(result(id));
+    const clips = [
+      { file: file(), duration: 4 },
+      { file: file(), duration: Infinity },
+    ];
+    const joined = await joinClips(clips, 1280, 720, vi.fn());
+    expect(joined.size).toBe(8);
+    const message = workers[0]!.posted.find((m) => m.type === "join") as unknown as {
+      clips: { duration: number }[];
+      width: number;
+      height: number;
+    };
+    // An unusable length goes as 0 ("unknown"), never Infinity.
+    expect(message.clips.map((c) => c.duration)).toEqual([4, 0]);
+    expect([message.width, message.height]).toEqual([1280, 720]);
+  });
+});

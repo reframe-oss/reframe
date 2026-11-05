@@ -20,6 +20,7 @@ export const FEATURE_ACTIONS = {
   batch_export: ["start", "done", "done_with_failures", "cancel", "save_folder"],
   trim_timeline: ["seek", "drag_handle"],
   text_tool: ["import_captions", "set_timing", "caption_box"],
+  join_clips: ["add", "reorder", "start", "done", "cancel", "undo"],
   // One event per editing tool an export used (see toolsUsed).
   trim: ["exported"],
   rotate: ["exported"],

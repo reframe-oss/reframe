@@ -19,6 +19,22 @@ processed on your device by FFmpeg running as WebAssembly.
 The first export downloads the video engine (about 30 MB), so it takes longer.
 Later exports reuse it.
 
+## Join clips
+
+**Join clips** at the top of the Edit panel puts several videos one after
+another. It starts with the video you opened; **Add clips** (or drop files
+on the panel) adds more, up to 10 and 1 GB in all (3 clips when any is
+larger than 1440p). Drag the rows, or use the up and down arrows, to set
+the order. Every clip is fitted inside the first clip's size and frame
+rate: a clip of another shape gets bars rather than being stretched, and a
+clip without sound gets silence so the rest stay in step.
+
+**Join N clips** makes the joined video on this device and opens it in the
+editor in place of the first one, so trim, crop, text, sizes and Export
+all work on it as usual. The trim and crop start over, since they belonged
+to the first video. **Undo join** goes back to that video and the list of
+clips. While a join runs, exports wait for it, and **Cancel join** stops it.
+
 ## Crop
 
 **Crop** in the Edit panel keeps part of the picture. While it's open, a box
