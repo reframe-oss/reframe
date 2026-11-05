@@ -19,6 +19,19 @@ processed on your device by FFmpeg running as WebAssembly.
 The first export downloads the video engine (about 30 MB), so it takes longer.
 Later exports reuse it.
 
+## Crop
+
+**Crop** in the Edit panel keeps part of the picture. While it's open, a box
+appears on the preview: drag inside it to move it, drag an edge or corner to
+resize it, or focus it and use the arrow keys (Shift moves further). Pick a
+shape (Free, 1 : 1, 4 : 5, 9 : 16, 16 : 9, or the output's shape), or type
+the position and size in percent. The section shows the size kept in pixels.
+**Reset crop** keeps the whole frame again.
+
+The crop is applied first, then rotation, then the output size and framing,
+so with **Fill** the framing guide shows what's kept inside the crop. Opening
+a different video starts uncropped.
+
 ## Trim timeline
 
 Once a video is open, the trim timeline fills with frames from the video,

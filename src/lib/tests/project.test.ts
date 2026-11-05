@@ -266,3 +266,20 @@ describe("source matching and fitting", () => {
     expect(projectFileName(null)).toBe("untitled.reframe.json");
   });
 });
+
+describe("crop in project files", () => {
+  it("round-trips a crop, and reads older files without one", () => {
+    const crop = { x: 0.1, y: 0.2, width: 0.5, height: 0.6 };
+    const withCrop = parseProject(sampleJson((doc) => (doc.edit.recipe.crop = crop)));
+    expect(withCrop.ok && withCrop.project.edit.recipe.crop).toEqual(crop);
+    const old = parseProject(sampleJson((doc) => delete doc.edit.recipe.crop));
+    expect(old.ok).toBe(true);
+    expect(old.ok && old.project.edit.recipe.crop).toBeFalsy();
+  });
+
+  it("rejects a crop outside the frame", () => {
+    const parsed = parseProject(sampleJson((doc) => (doc.edit.recipe.crop = { x: 0.8, y: 0, width: 0.5, height: 1 })));
+    expect(parsed.ok).toBe(false);
+    expect(!parsed.ok && parsed.error).toMatch(/crop/);
+  });
+});
