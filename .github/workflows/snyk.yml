@@ -68,8 +68,14 @@ jobs:
       # installing anything or running scripts. It is generated fresh here and
       # never committed — package-lock.json is in .gitignore, and CLAUDE.md
       # forbids committing it, since bun.lock remains the source of truth.
+      #
+      # `--legacy-peer-deps` skips npm's peer-dependency resolution, which
+      # crashes on this tree ("Cannot read properties of null (reading
+      # 'edgesOut')", npm 10.9, via the vitest browser peers). The cost: a
+      # peer dependency that isn't also a direct dependency is left out of
+      # the generated lockfile, so the scan doesn't see it.
       - name: Generate a lockfile Snyk can parse
-        run: npm install --package-lock-only --ignore-scripts
+        run: npm install --package-lock-only --ignore-scripts --legacy-peer-deps
 
       - name: Run Snyk
         id: snyk

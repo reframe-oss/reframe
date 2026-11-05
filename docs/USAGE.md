@@ -42,6 +42,21 @@ the trim are dimmed. Click the strip to move the preview there, and drag the
 handles (or use the arrow keys on them) to set the start and end. While an
 export runs, making frames pauses and carries on afterwards.
 
+## Batch export
+
+**Batch export** in the Edit panel applies this edit to other videos. Add
+them with **Add videos** or drop them on the panel (up to 50), then press
+**Export N videos**. They export one at a time, each with its own progress,
+and use everything you've set except the trim, which belongs to the video it
+was set on: each video in the batch keeps its full length. Output files are
+named after their source (`clip.mov` becomes `clip-reframe.mp4`).
+
+Download each video from its row, or, in Chrome and Edge, **Save all to a
+folder** writes them into a folder you pick. **Cancel batch** stops the
+current export and keeps the finished ones; pressing Export again carries on
+with the rest and retries any that failed. The editor's own Export waits
+while a batch runs, since they share the video engine.
+
 ## Export profiles
 
 The **Profile** section at the top of the output panel applies a whole set of

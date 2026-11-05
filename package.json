@@ -11,7 +11,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "chromatic": "chromatic --exit-zero-on-changes",
-    "security": "npm install --package-lock-only --ignore-scripts && snyk test --severity-threshold=high --file=package-lock.json"
+    "security": "npm install --package-lock-only --ignore-scripts --legacy-peer-deps && snyk test --severity-threshold=high --file=package-lock.json"
   },
   "dependencies": {
     "@datadog/browser-rum": "^7.10.0",
