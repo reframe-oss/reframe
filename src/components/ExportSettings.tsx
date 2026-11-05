@@ -114,6 +114,12 @@ export default function ExportSettings({
               GIF files can be very large. Keep clips under 10 s for best results.
             </p>
           )}
+
+          {(recipe.format === "mp3" || recipe.format === "wav") && (
+            <p className="text-xs text-[var(--muted)]">
+              Quality applies to video. MP3 is saved at 192 kb/s; WAV is uncompressed.
+            </p>
+          )}
         </div>
 
         {!isGif && (

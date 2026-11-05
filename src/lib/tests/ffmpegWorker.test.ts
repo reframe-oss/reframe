@@ -434,4 +434,33 @@ describe("ffmpeg.worker", () => {
     expect(f.listeners.log.size).toBe(0);
     expect(f.listeners.progress.size).toBe(0);
   });
+
+  it("exports sound only as MP3, with no video encoder", async () => {
+    await startWorker({ isolated: false });
+    send({ type: "load" });
+    await waitFor("ready");
+    send(exportRequest({ format: "mp3" }));
+    await waitFor("result");
+    const args = ffmpeg().execCalls.at(-1)!;
+    expect(args).toContain("-vn");
+    expect(args).toContain("libmp3lame");
+    expect(args.at(-1)).toBe("output_job1.mp3");
+    expect(posted.find((m) => m.type === "result")).toMatchObject({ format: "mp3", mimeType: "audio/mpeg" });
+  });
+
+  it("says plainly when an audio-only export has no sound to export", async () => {
+    await startWorker({ isolated: false });
+    send({ type: "load" });
+    await waitFor("ready");
+    h.FakeFFmpeg.execImpl = async () => {
+      ffmpeg().listeners.log.forEach((fn) => fn({ message: "Stream map '0:a:0' matches no streams." }));
+      return 1;
+    };
+    send(exportRequest({ format: "wav" }));
+    await waitFor("error");
+    expect(posted.find((m) => m.type === "error")?.message).toBe(
+      "This video has no sound to export. Add a soundtrack, or choose a video format."
+    );
+    expect(ffmpeg().execCalls).toHaveLength(1);
+  });
 });

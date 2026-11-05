@@ -75,6 +75,22 @@ An edit holds up to 500 text items; a longer file adds its first 500 cues.
 **Remove all** clears them. Exported text uses the bundled Geist font
 whatever font the preview shows.
 
+## Sound
+
+**Audio and speed** turns the video's sound on or off, sets its volume (up
+to 200%) and can even out loudness. **Add a track** there adds a
+soundtrack (MP3, WAV, M4A, AAC, OGG or FLAC, up to 200 MB). By default it
+**replaces the video's sound**; choose **Mix with it** to keep both, with
+a volume for each. **Loop the track** repeats a short track until the
+video ends; a longer one is cut at the video's end. The track starts with
+the exported clip, after any trim.
+
+To keep only the sound, choose **MP3** or **WAV** under Format. The export
+is the sound with your trim, speed, volume, loudness and soundtrack;
+size, framing, crop and text don't apply. MP3 is 192 kb/s and plays
+anywhere; WAV is uncompressed (16-bit, 48 kHz), for editing elsewhere. A
+video without sound can only be exported as sound if it has a soundtrack.
+
 ## Batch export
 
 **Batch export** in the Edit panel applies this edit to other videos. Add

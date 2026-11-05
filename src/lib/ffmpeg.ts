@@ -1,4 +1,4 @@
-import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, MAX_FILE_SIZE } from "./types";
+import { EditRecipe, ExportResult, BackgroundMusicOptions, ImageOverlayOptions, MAX_FILE_SIZE, type OutputFormat } from "./types";
 import { trackTiming } from "./telemetry";
 import { startEngineLoad, type StallReason } from "./exportTelemetry";
 import { expectedOutputSeconds, isUsableDuration, type EngineMode } from "./ffmpegArgs";
@@ -114,7 +114,7 @@ type WorkerResultResponse = {
   size: number;
   width: number;
   height: number;
-  format: "mp4" | "webm" | "mkv" | "gif";
+  format: OutputFormat;
 };
 type WorkerErrorResponse = { type: "error"; id?: string; message: string };
 type WorkerCancelledResponse = { type: "cancelled"; id?: string };

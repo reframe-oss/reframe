@@ -1,12 +1,14 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { toBlobURL } from "@ffmpeg/util";
-import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions } from "./types";
+import { EditRecipe, BackgroundMusicOptions, ImageOverlayOptions, isAudioFormat, type OutputFormat } from "./types";
 import { TEXT_FONT_FILE, TEXT_FONT_URL } from "./text-overlay";
 import {
   buildArguments,
+  buildAudioArguments,
   buildGifArguments,
   buildFrameArguments,
   buildJoinArguments,
+  NO_SOUND_MESSAGE,
   expectedOutputSeconds,
   resolveOutputSize,
   resolveThreadCount,
@@ -111,7 +113,7 @@ type ResultPayload = {
   size: number;
   width: number;
   height: number;
-  format: "mp4" | "webm" | "mkv" | "gif";
+  format: OutputFormat;
 };
 
 type ErrorPayload = { type: "error"; id?: string; message: string };
@@ -131,6 +133,7 @@ let activeExportId: string | null = null;
 
 /** Liveness signal for the client's stall watchdog (see ffmpeg.ts). */
 const HEARTBEAT_INTERVAL_MS = 2000;
+
 let lastHeartbeat = 0;
 function heartbeat() {
   const now = Date.now();
@@ -226,6 +229,10 @@ function getOutputConfig(format: string, sessionId: string) {
       return { filename: `output_${sessionId}.mkv`, mimeType: "video/x-matroska" };
     case "gif":
       return { filename: `output_${sessionId}.gif`, mimeType: "image/gif" };
+    case "mp3":
+      return { filename: `output_${sessionId}.mp3`, mimeType: "audio/mpeg" };
+    case "wav":
+      return { filename: `output_${sessionId}.wav`, mimeType: "audio/wav" };
     default:
       return { filename: `output_${sessionId}.mp4`, mimeType: "video/mp4" };
   }
@@ -347,6 +354,30 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   };
 
   try {
+    if (isAudioFormat(recipe.format)) {
+      const format = recipe.format;
+      const argsFor = (hasOriginalAudio: boolean) =>
+        buildAudioArguments({
+          recipe,
+          format,
+          inputName,
+          outputName,
+          videoDuration,
+          hasOriginalAudio,
+          music: hasMusicTrack ? { inputName: musicInputName, options: request.musicOptions! } : undefined,
+          threads,
+        });
+      let code = await ffmpeg.exec(argsFor(recipe.keepAudio), undefined, { signal });
+      if (code !== 0 && missingAudioDetected) {
+        // The video has no sound: the soundtrack alone, if there is one.
+        if (!hasMusicTrack) throw new Error(NO_SOUND_MESSAGE);
+        code = await ffmpeg.exec(argsFor(false), undefined, { signal });
+      }
+      if (code !== 0) throw new Error("Audio export failed");
+      const payload = await read(outputName);
+      return { type: "result", id: sessionId, data: payload, mimeType, size: payload.byteLength, width: 0, height: 0, format };
+    }
+
     if (recipe.format === "gif") {
       const gif = buildGifArguments({
         recipe,
