@@ -257,7 +257,7 @@ describe("project recovery", () => {
     act(() => {
       window.dispatchEvent(new Event("pagehide"));
     });
-    expect(result.current.storageStatus.error).toContain("Save project file");
+    expect(result.current.storageStatus.error).toContain("a refresh will lose them");
     setItem.mockRestore();
   });
 

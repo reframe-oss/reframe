@@ -27,7 +27,7 @@
 - Trim, rotate, change speed (0.25× to 4×), mute or adjust audio, add background music
 - Text and image overlays; brightness, contrast, saturation and sharpness
 - Export to MP4, WebM, MKV or GIF with a quality slider
-- Undo and redo, recovery after a refresh, and project files you can reopen
+- Undo and redo, and recovery after a refresh
 - Export profiles: built-in and saved output settings in one click, with safe-area guides ([docs/EXPORT_PROFILES.md](docs/EXPORT_PROFILES.md))
 - Keyboard shortcuts for everything common: see [docs/USAGE.md](docs/USAGE.md)
 

@@ -48,9 +48,7 @@ import {
 import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import HistoryControls from "./HistoryControls";
-import ProjectPanel, { RecoveryNotice } from "./ProjectPanel";
-import BatchExport from "./BatchExport";
-import { useBatchExport } from "@/hooks/useBatchExport";
+import { RecoveryNotice } from "./RecoveryNotice";
 
 /**
  * Collapsible tool section. The panel animates open and closed through grid
@@ -67,6 +65,7 @@ function AccordionSection({
   children,
   isOpen,
   onToggle,
+  revealOnOpen = false,
 }: {
   id: string;
   icon: React.ReactNode;
@@ -75,16 +74,36 @@ function AccordionSection({
   children: React.ReactNode;
   isOpen: boolean;
   onToggle: () => void;
+  /** Scroll the section to the top of its scroll area when opened (the output panel), so its content shows instead of opening below the fold. */
+  revealOnOpen?: boolean;
 }) {
+  const sectionRef = useRef<HTMLDivElement>(null);
   return (
-    <div>
+    <div ref={sectionRef}>
       <h3>
         <button
           type="button"
           id={`${id}-header`}
           aria-expanded={isOpen}
           aria-controls={`${id}-panel`}
-          onClick={onToggle}
+          onClick={() => {
+            onToggle();
+            if (!revealOnOpen || isOpen) return;
+            // Once it has expanded, scroll only the panel's own scroll area
+            // (never the page behind it) so the section starts at its top.
+            const section = sectionRef.current;
+            const area = section?.closest<HTMLElement>("[data-scroll-area]");
+            if (!section || !area) return;
+            const reveal = () => {
+              if (area.scrollHeight <= area.clientHeight) return;
+              const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+              area.scrollTo({
+                top: area.scrollTop + section.getBoundingClientRect().top - area.getBoundingClientRect().top,
+                behavior: reduce ? "auto" : "smooth",
+              });
+            };
+            window.setTimeout(reveal, 320);
+          }}
           className="group flex min-h-[50px] w-full items-center gap-3 px-1 py-2.5 text-left"
         >
           <span
@@ -259,10 +278,6 @@ export default function VideoEditor() {
     redo,
     recovery,
     discardRecovery,
-    storageStatus,
-    buildProjectFile,
-    importProjectFile,
-    deleteSavedData,
   } = useVideoEditor();
 
   const exportProfiles = useExportProfiles();
@@ -642,15 +657,6 @@ export default function VideoEditor() {
               </section>
             )}
 
-            <ProjectPanel
-              hasFile={!!file}
-              storageStatus={storageStatus}
-              disabled={isProcessing}
-              onBuildProjectFile={buildProjectFile}
-              onImportProject={importProjectFile}
-              onDeleteSavedData={deleteSavedData}
-            />
-
             <KeyboardShortcutsPanel open={shortcutsOpen} onToggle={toggleShortcuts} />
           </div>
 
@@ -666,7 +672,7 @@ export default function VideoEditor() {
             <section
               inert={exportDisabled}
               className={cn(
-                "panel flex flex-col overflow-hidden transition-opacity duration-base lg:max-h-[calc(100vh-100px)]",
+                "panel flex flex-col overflow-hidden transition-opacity duration-base lg:max-h-[calc(100dvh-100px)]",
                 exportDisabled && "opacity-60"
               )}
             >
@@ -700,9 +706,10 @@ export default function VideoEditor() {
                 </p>
               )}
 
-              <div className="min-h-0 flex-1 divide-y divide-[var(--border)] overflow-y-auto overscroll-contain px-3">
+              <div data-scroll-area className="min-h-0 flex-1 divide-y divide-[var(--border)] overflow-y-auto overscroll-contain px-3">
                 <AccordionSection
                   id="profile"
+                  revealOnOpen
                   icon={<Bookmark size={15} />}
                   title="Profile"
                   summary={
@@ -742,6 +749,7 @@ export default function VideoEditor() {
 
                 <AccordionSection
                   id="resize"
+                  revealOnOpen
                   icon={<Layers size={15} />}
                   title="Size and framing"
                   summary={`${output.presetLabel} · ${output.framing}`}
@@ -749,10 +757,9 @@ export default function VideoEditor() {
                   onToggle={() => toggleSection("resize")}
                 >
                   {recommendedPreset && (
-                    <p className="callout callout-info mb-3 text-xs">
-                      This video is {recommendedPreset.label.replace(/\s/g, "")}. Suggested preset:{" "}
-                      {(recommendedPreset.platform.split("·")[0] ?? "").trim()} (
-                      {recommendedPreset.label.replace(/\s/g, "")}).
+                    <p className="callout callout-info mb-3 px-3 py-2 text-xs">
+                      Suggested for this {recommendedPreset.label.replace(/\s/g, "")} video:{" "}
+                      {(recommendedPreset.platform.split("·")[0] ?? "").trim()}
                     </p>
                   )}
                   <div className="space-y-3">
@@ -767,6 +774,7 @@ export default function VideoEditor() {
 
                 <AccordionSection
                   id="export"
+                  revealOnOpen
                   icon={<SlidersHorizontal size={15} />}
                   title="Quality and processing"
                   summary={qualityLabel(recipe.quality)}
@@ -781,7 +789,7 @@ export default function VideoEditor() {
 
               <div className="shrink-0 space-y-4 border-t border-[var(--border)] px-4 py-4">
                 {file && (
-                  <dl className="grid grid-cols-3 divide-x divide-[var(--border)] text-xs">
+                  <dl className="grid grid-cols-3 divide-x divide-[var(--border)] text-xs lg:[@media(max-height:820px)]:hidden">
                     <div className="pr-3">
                       <dt className="text-[var(--muted)]">Format</dt>
                       <dd className="mt-0.5 font-medium">{output.summary.format}</dd>
