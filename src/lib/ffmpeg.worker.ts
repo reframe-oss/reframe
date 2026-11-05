@@ -12,15 +12,7 @@ import {
   type EngineMode,
 } from "./ffmpegArgs";
 
-const CORE_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
-// MT core aligned to the same version and distribution format as CORE_BASE_URL.
-// Previously used @0.12.6/dist/esm which caused two problems:
-//   1. The version mismatch meant SRI hashes computed for @0.12.10 were applied
-//      to different file contents, causing all MT fetches to fail with an integrity
-//      error instead of falling back gracefully.
-//   2. The ESM distribution is not consumed the same way as UMD by ffmpeg.js and
-//      produced subtle runtime failures in crossOriginIsolated contexts.
-const MT_CORE_BASE_URL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.10/dist/umd";
+import { CORE_BASE_URL, MT_CORE_BASE_URL } from "./engineUrls";
 
 // Keys are full URLs so hashes for the non-MT and MT packages never collide.
 // Every engine file is integrity-checked, so a tampered CDN response fails to
