@@ -1,0 +1,26 @@
+{
+  "$comment": "Reviewed exceptions for scripts/security/audit-policy.mjs. Each needs a reason, the reviewer's date and an expiry no more than 90 days out. An expired exception blocks CI again, forcing a re-review. See docs/SECURITY-PIPELINE.md.",
+  "exceptions": [
+    {
+      "advisory": "GHSA-g84c-rxfj-3j2c",
+      "package": "webpack-dev-middleware",
+      "reason": "Dev-only: Storybook's local dev server, never deployed. The fix is v7, but @storybook/builder-webpack5 10.6.x requires ^6.1.2. Revisit with the next Storybook minor.",
+      "reviewed": "2026-11-06",
+      "expires": "2027-02-03"
+    },
+    {
+      "advisory": "GHSA-6j4f-fj2g-mc7p",
+      "package": "brace-expansion",
+      "reason": "Dev-only: ESLint's glob matching (minimatch), which only expands patterns written in the repo's own config, so the recursion DoS needs a hostile pattern in our code. Fixed versions exist in both majors in use (1.x via minimatch 3, 5.x via typescript-estree), but bun has no nested overrides to pin both. Revisit when eslint and typescript-eslint update minimatch.",
+      "reviewed": "2026-11-06",
+      "expires": "2027-02-03"
+    },
+    {
+      "advisory": "GHSA-qhr7-859c-m2p7",
+      "package": "brace-expansion",
+      "reason": "Same as GHSA-6j4f-fj2g-mc7p: dev-only ESLint glob matching of repo-written patterns; both majors in use, no nested overrides in bun.",
+      "reviewed": "2026-11-06",
+      "expires": "2027-02-03"
+    }
+  ]
+}

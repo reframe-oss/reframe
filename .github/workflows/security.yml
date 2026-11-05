@@ -1,0 +1,90 @@
+name: 🔒 Security
+
+# Security checks for every pull request, main and a weekly run (new
+# advisories appear without any code change). Policy, exception process and
+# maintainer setup: docs/SECURITY-PIPELINE.md.
+#
+#   dependency-policy  bun audit on bun.lock + security/audit-exceptions.json.
+#                      BLOCKING for unexcepted high/critical. No secrets.
+#   secrets            gitleaks over the new commits (full history on main).
+#                      BLOCKING. Values are redacted. No secrets.
+#   workflow-lint      actionlint over .github/workflows. BLOCKING. No secrets.
+#
+# Snyk runs separately (snyk.yml). Deployment configuration is checked by
+# src/lib/tests/deployConfig.test.ts and deploy-smoke.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1" # Mondays 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-policy:
+    name: Dependency policy (bun.lock)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      # bun audit reads bun.lock directly, so it checks exactly the versions
+      # the app is built with. Its own exit code only says "something was
+      # found"; the policy script decides what blocks.
+      - name: Audit and apply policy
+        run: |
+          bun audit --json > audit.json || true
+          node scripts/security/audit-policy.mjs security/audit-exceptions.json < audit.json
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks (pinned, checksum-verified)
+        env:
+          VERSION: 8.21.2
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}"
+          file="gitleaks_${VERSION}_linux_x64.tar.gz"
+          curl -fsSLO "$base/$file"
+          curl -fsSLO "$base/gitleaks_${VERSION}_checksums.txt"
+          grep " ${file}\$" "gitleaks_${VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "$file" gitleaks
+
+      # --redact keeps secret values out of the log; findings name the rule,
+      # file, line and commit.
+      - name: Scan
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE" ]; then
+            ./gitleaks git . --redact --no-banner --log-opts="$BASE..$HEAD"
+          else
+            ./gitleaks git . --redact --no-banner
+          fi
+
+  workflow-lint:
+    name: Workflow lint (actionlint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
