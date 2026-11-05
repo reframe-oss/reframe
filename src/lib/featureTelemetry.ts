@@ -1,6 +1,6 @@
 import { trackAction } from "./telemetry";
 import { DEFAULT_RECIPE } from "./constants";
-import type { EditRecipe } from "./types";
+import { isAudioFormat, type EditRecipe } from "./types";
 import { isFullFrame } from "./crop";
 
 // Anonymous feature-usage counts: which editing tools people use, never what
@@ -20,6 +20,9 @@ export const FEATURE_ACTIONS = {
   batch_export: ["start", "done", "done_with_failures", "cancel", "save_folder"],
   trim_timeline: ["seek", "drag_handle"],
   text_tool: ["import_captions", "set_timing", "caption_box"],
+  join_clips: ["add", "reorder", "start", "done", "cancel", "undo"],
+  soundtrack: ["add", "remove", "replace", "mix", "loop"],
+  pwa: ["installed", "offline_ready", "update"],
   // One event per editing tool an export used (see toolsUsed).
   trim: ["exported"],
   rotate: ["exported"],
@@ -31,6 +34,7 @@ export const FEATURE_ACTIONS = {
   timed_text: ["exported"],
   image_overlay: ["exported"],
   background_music: ["exported"],
+  audio_only: ["exported"],
   color_adjustments: ["exported"],
   sharpen: ["exported"],
   denoise: ["exported"],
@@ -84,6 +88,7 @@ export function toolsUsed(recipe: EditRecipe, extras: { music?: boolean; imageOv
   if (recipe.textOverlays?.some((o) => o.start !== undefined || o.end !== undefined)) tools.push("timed_text");
   if (extras.imageOverlay) tools.push("image_overlay");
   if (extras.music) tools.push("background_music");
+  if (isAudioFormat(recipe.format)) tools.push("audio_only");
   if (recipe.brightness !== d.brightness || recipe.contrast !== d.contrast || recipe.saturation !== d.saturation) {
     tools.push("color_adjustments");
   }

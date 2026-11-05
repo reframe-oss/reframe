@@ -10,6 +10,8 @@ import {
   TimelineTrack,
   MultiTrackEditorState,
   isValidRecipe,
+  OUTPUT_FORMATS,
+  isAudioFormat,
 } from "@/lib/types";
 import { createHistory, deepEqual, historyReducer, type EditState } from "@/lib/editHistory";
 import {
@@ -48,7 +50,7 @@ import {
   trackVital,
 } from "@/lib/telemetry";
 import { ExportAttempt, type ExportFailureCategory } from "@/lib/exportTelemetry";
-import { resolveOutputSize } from "@/lib/ffmpegArgs";
+import { NO_SOUND_MESSAGE, resolveOutputSize } from "@/lib/ffmpegArgs";
 import { applyProfile, type ProfileSettings } from "@/lib/exportProfiles";
 import { suggestPreset } from "@/lib/presetSuggestion";
 import { validateDimensions, getDownscaledDimensions } from "@/utils/video-validation";
@@ -143,6 +145,7 @@ const URL_SYNC_DEBOUNCE_MS = 250;
 export function describeExportError(err: unknown): string {
   // Both already say what happened and what to do next.
   if (err instanceof ExportStalledError || err instanceof FFmpegLoadError) return err.message;
+  if (err instanceof Error && err.message === NO_SOUND_MESSAGE) return err.message;
   switch (failureCategory(err)) {
     case "network":
       return "Network error while loading the video engine. Check your connection and try again.";
@@ -251,6 +254,10 @@ function validateRecipe(recipe: EditRecipe, duration: number): string | null {
       "Please select a valid playback speed.",
     ],
     [recipe.quality < 18 || recipe.quality > 30, "Quality must be between 18 and 30."],
+    [
+      isAudioFormat(recipe.format) && !recipe.keepAudio,
+      "The sound is off. Turn it on in Audio and speed to export audio only.",
+    ],
     [recipe.brightness < -1 || recipe.brightness > 1, "Brightness must be between -1 and 1."],
 
     [recipe.contrast < 0 || recipe.contrast > 2, "Contrast must be between 0 and 2."],
@@ -317,7 +324,7 @@ function isValidValue(key: keyof EditRecipe, val: any): boolean {
     case "quality":
       return typeof val === "number" && !isNaN(val) && val >= 18 && val <= 30;
     case "format":
-      return val === "mp4" || val === "webm" || val === "mkv" || val === "gif";
+      return typeof val === "string" && (OUTPUT_FORMATS as readonly string[]).includes(val);
     case "brightness":
       return typeof val === "number" && !isNaN(val) && val >= -1 && val <= 1;
     case "contrast":
@@ -385,9 +392,11 @@ export function useVideoEditor() {
   const fileChosenAtRef = useRef<number | null>(null);
 
   const [musicFile, setMusicFile] = useState<File | null>(null);
-  const [musicVolume, setMusicVolume] = useState(70);
+  const [musicVolume, setMusicVolume] = useState(100);
   const [originalAudioVolume, setOriginalAudioVolume] = useState(40);
   const [loopMusic, setLoopMusic] = useState(false);
+  // A soundtrack replaces the video's sound unless the user picks a mix.
+  const [replaceAudio, setReplaceAudio] = useState(true);
 
   const [overlayFile, setOverlayFile] = useState<File | null>(null);
   const overlayPosition = edit.imageOverlay.position;
@@ -453,6 +462,10 @@ export function useVideoEditor() {
         // GIF has no audio — force keepAudio off
         if (next.format === "gif") {
           next.keepAudio = false;
+        }
+        // Choosing an audio-only format turns the sound back on.
+        if (validated.format && isAudioFormat(validated.format) && !isAudioFormat(prev.recipe.format)) {
+          next.keepAudio = true;
         }
         return { ...prev, recipe: next };
       });
@@ -841,6 +854,7 @@ export function useVideoEditor() {
           musicVolume,
           originalAudioVolume,
           loopMusic,
+          replaceAudio,
         },
         {
           file: overlayFile,
@@ -894,6 +908,7 @@ export function useVideoEditor() {
     duration,
     file,
     loopMusic,
+    replaceAudio,
     musicFile,
     musicVolume,
     originalAudioVolume,
@@ -1255,6 +1270,8 @@ export function useVideoEditor() {
     setOriginalAudioVolume,
     loopMusic,
     setLoopMusic,
+    replaceAudio,
+    setReplaceAudio,
     overlayFile,
     setOverlayFile,
     overlayPosition,

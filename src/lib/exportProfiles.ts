@@ -8,6 +8,7 @@
 import { PRESETS } from "./presets";
 import { resolveOutputSize } from "./ffmpegArgs";
 import type { EditState } from "./editHistory";
+import { OUTPUT_FORMATS, type OutputFormat } from "./types";
 
 export const PROFILE_STORAGE_KEY = "reframe:export-profiles";
 export const PROFILE_SCHEMA_VERSION = 1;
@@ -16,7 +17,7 @@ export const MAX_PROFILE_NAME = 60;
 /** Above this many pixels on either side a GIF gets very large (≈130 MB for 6 s at 1080p). */
 export const GIF_LARGE_SIDE = 1080;
 
-export type ProfileFormat = "mp4" | "webm" | "mkv" | "gif";
+export type ProfileFormat = OutputFormat;
 
 export interface ProfileSettings {
   preset: string;
@@ -113,7 +114,7 @@ export function profileNotes(settings: ProfileSettings): string[] {
 
 // ── Validation ───────────────────────────────────────────────────────────────
 
-const FORMATS: readonly ProfileFormat[] = ["mp4", "webm", "mkv", "gif"];
+const FORMATS: readonly ProfileFormat[] = OUTPUT_FORMATS;
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const int = (v: unknown, min: number, max: number) => typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 
