@@ -19,6 +19,7 @@ export const FEATURE_ACTIONS = {
   crop_tool: ["aspect", "drag", "reset"],
   batch_export: ["start", "done", "done_with_failures", "cancel", "save_folder"],
   trim_timeline: ["seek", "drag_handle"],
+  join_clips: ["add", "reorder", "start", "done", "cancel", "undo"],
   // One event per editing tool an export used (see toolsUsed).
   trim: ["exported"],
   rotate: ["exported"],

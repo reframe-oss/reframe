@@ -480,3 +480,65 @@ export function buildFrameArguments({
     "-y", outputName,
   ]);
 }
+
+/** One clip of a join, as mounted in FFmpeg's filesystem. */
+export interface JoinInput {
+  path: string;
+  /** Whether the clip has an audio stream (probed in the worker). */
+  hasAudio: boolean;
+  /** Length in seconds; 0 when unknown. */
+  duration: number;
+}
+
+export interface JoinArgsOptions {
+  inputs: JoinInput[];
+  /** Output size: the first clip's, rounded down to even numbers. */
+  width: number;
+  height: number;
+  /** Output frame rate: the first clip's. */
+  fps: number;
+  outputName: string;
+  threads: number;
+}
+
+/**
+ * Joins clips end to end with the concat filter. Every clip is fitted inside
+ * the first clip's size (letterboxed, never stretched) at its frame rate.
+ * When any clip has sound, a clip without it gets silence of its own length
+ * so the audio stays in step; when none has, the output has no audio.
+ * MP4 (H.264, CRF 18) so the export that follows loses almost nothing.
+ */
+export function buildJoinArguments({ inputs, width, height, fps, outputName, threads }: JoinArgsOptions): string[] {
+  const w = Math.max(2, Math.floor(width / 2) * 2);
+  const h = Math.max(2, Math.floor(height / 2) * 2);
+  const rate = Number(fps.toFixed(3));
+  const withAudio = inputs.some((input) => input.hasAudio);
+  const args: string[] = [];
+  for (const input of inputs) args.push(...inputThreadArgs(threads), "-i", input.path);
+
+  const parts: string[] = [];
+  const segments: string[] = [];
+  inputs.forEach((input, i) => {
+    parts.push(
+      `[${i}:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${rate},format=yuv420p,setpts=PTS-STARTPTS[v${i}]`
+    );
+    segments.push(`[v${i}]`);
+    if (!withAudio) return;
+    // Padded or cut to the clip's length, so a short audio track can't shift the clips after it.
+    const fit = input.duration > 0 ? `,apad,atrim=0:${Number(input.duration.toFixed(3))}` : "";
+    parts.push(
+      input.hasAudio
+        ? `[${i}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo${fit},asetpts=PTS-STARTPTS[a${i}]`
+        : `anullsrc=r=48000:cl=stereo,atrim=0:${Number(Math.max(0.1, input.duration).toFixed(3))},asetpts=PTS-STARTPTS[a${i}]`
+    );
+    segments.push(`[a${i}]`);
+  });
+  parts.push(`${segments.join("")}concat=n=${inputs.length}:v=1:a=${withAudio ? 1 : 0}${withAudio ? "[v][a]" : "[v]"}`);
+
+  args.push("-filter_complex", parts.join(";"), "-map", "[v]");
+  if (withAudio) args.push("-map", "[a]");
+  args.push("-c:v", "libx264", "-crf", "18", "-preset", "ultrafast", "-pix_fmt", "yuv420p");
+  if (withAudio) args.push("-c:a", "aac", "-b:a", "192k");
+  args.push("-movflags", "+faststart", ...outputThreadArgs(threads, true), outputName);
+  return assertFiniteArgs(args);
+}
