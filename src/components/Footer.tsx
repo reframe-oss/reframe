@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import OfflineStatus from "./OfflineStatus";
 import {
   Github,
   Twitter,
@@ -51,6 +52,7 @@ export default function Footer() {
               </span>
             ))}
           </div>
+          <OfflineStatus />
         </div>
 
         {/* Navigation */}

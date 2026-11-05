@@ -21,3 +21,7 @@
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
+
+# The service worker must always be re-checked (see netlify.toml).
+/sw.js
+  Cache-Control: no-cache

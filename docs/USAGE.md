@@ -159,6 +159,18 @@ field.
   Reframe works it out when the file loads; this can take a moment for long
   recordings.
 
+## Offline and installing
+
+After you've opened a video once with a connection, Reframe also works
+offline: the editor and its video engine are saved in your browser, and
+the footer says **Works offline** once both are. With the network off you
+can open the site, load videos and export as usual. Browsers can install it
+as an app (the install button in the address bar, or **Add to Home
+Screen** on phones). When a new version is out, a small notice offers
+**Reload**; nothing reloads by itself, so an export is never interrupted.
+The saved copy takes about 35 MB, and the browser may clear it when space
+runs low, in which case it's saved again next time you're online.
+
 ## Privacy
 
 Your videos never leave your device. Reframe collects anonymous performance

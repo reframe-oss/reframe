@@ -22,6 +22,7 @@ export const FEATURE_ACTIONS = {
   text_tool: ["import_captions", "set_timing", "caption_box"],
   join_clips: ["add", "reorder", "start", "done", "cancel", "undo"],
   soundtrack: ["add", "remove", "replace", "mix", "loop"],
+  pwa: ["installed", "offline_ready", "update"],
   // One event per editing tool an export used (see toolsUsed).
   trim: ["exported"],
   rotate: ["exported"],

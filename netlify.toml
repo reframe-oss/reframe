@@ -54,3 +54,11 @@
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     Cross-Origin-Opener-Policy = "same-origin"
     Cross-Origin-Embedder-Policy = "require-corp"
+
+# The service worker (public/sw.js) must always be re-checked, or browsers
+# keep running an old one after a deploy. Its content changes with every
+# build (scripts/build-sw-manifest.mjs), which is how updates are noticed.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"

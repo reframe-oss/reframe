@@ -158,7 +158,7 @@ audio_only,
 color_adjustments, sharpen, denoise, stabilization, fill_framing,
 custom_size, crop. Interactive features: `history` (undo, redo), `project_file`
 (save, open), `preview_tool` (compare, grid, framing_guide, save_frame),
-`safe_area`, `export_profile`, `trim_timeline` (seek, drag_handle), `crop_tool` (aspect, drag, reset), `batch_export` (start, done, done_with_failures, cancel, save_folder), `text_tool` (import_captions, set_timing, caption_box), `join_clips` (add, reorder, start, done, cancel, undo), `soundtrack` (add, remove, replace, mix, loop). Only these names are ever sent; never values,
+`safe_area`, `export_profile`, `trim_timeline` (seek, drag_handle), `crop_tool` (aspect, drag, reset), `batch_export` (start, done, done_with_failures, cancel, save_folder), `text_tool` (import_captions, set_timing, caption_box), `join_clips` (add, reorder, start, done, cancel, undo), `soundtrack` (add, remove, replace, mix, loop), `pwa` (installed, offline_ready, update). Only these names are ever sent; never values,
 names or text.
 
 **Synthetic check.** A Datadog Synthetic browser test opens production every
