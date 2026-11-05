@@ -659,6 +659,9 @@ export default function VideoEditor() {
                     onChange={updateRecipe}
                     selectedTextId={selectedTextId}
                     onSelectText={setSelectedTextId}
+                    duration={duration}
+                    videoRef={videoRef}
+                    outputHeight={resolveOutputSize(recipe).height}
                   />
                 </AccordionSection>
 
