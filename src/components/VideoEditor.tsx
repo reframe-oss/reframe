@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useVideoEditor } from "@/hooks/useVideoEditor";
-import { TextOverlay } from "@/lib/types";
+import { TextOverlay, isAudioFormat } from "@/lib/types";
 import FileUpload from "./FileUpload";
 import PrivacyBanner from "./PrivacyBanner";
 import VideoPreview from "./VideoPreview";
@@ -12,6 +12,7 @@ import TrimControl from "./TrimControl";
 import RotateControl from "./RotateControl";
 import TextControls from "./TextControls";
 import AudioSpeedControl from "./AudioSpeedControl";
+import SoundtrackControl from "./SoundtrackControl";
 import FormatSelector from "./FormatSelector";
 import ExportSettings from "./ExportSettings";
 import ExportOverlay, { type ExportSummary } from "./ExportOverlay";
@@ -45,6 +46,7 @@ import {
   Bookmark,
   Crop,
   Files,
+  Combine,
 } from "lucide-react";
 import OnboardingTour from "./OnboardingTour";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -54,6 +56,8 @@ import CropControl, { aspectRatio } from "./CropControl";
 import { cropPixels, isFullFrame, type CropAspectId } from "@/lib/crop";
 import BatchExport from "./BatchExport";
 import { useBatchExport } from "@/hooks/useBatchExport";
+import JoinClips from "./JoinClips";
+import { useJoinClips } from "@/hooks/useJoinClips";
 
 /**
  * Collapsible tool section. The panel animates open and closed through grid
@@ -262,9 +266,15 @@ export default function VideoEditor() {
     videoRef,
     seekTo,
     musicFile,
+    setMusicFile,
     musicVolume,
+    setMusicVolume,
     originalAudioVolume,
+    setOriginalAudioVolume,
     loopMusic,
+    setLoopMusic,
+    replaceAudio,
+    setReplaceAudio,
     overlayFile,
     setOverlayFile,
     overlayPosition,
@@ -320,6 +330,7 @@ export default function VideoEditor() {
     text: false,
     audio: false,
     overlay: false,
+    join: false,
     batch: false,
     export: false,
   });
@@ -373,7 +384,8 @@ export default function VideoEditor() {
   }, []);
 
   const batch = useBatchExport();
-  const timelineFrames = useTimelineFrames(file, duration, isProcessing || batch.running);
+  const join = useJoinClips(file, videoMetadata, handleFileSelect);
+  const timelineFrames = useTimelineFrames(file, duration, isProcessing || batch.running || join.running);
 
   const outputRatio = useMemo(() => {
     const { width, height } = resolveOutputSize({
@@ -398,10 +410,15 @@ export default function VideoEditor() {
       customWidth: recipe.customWidth,
       customHeight: recipe.customHeight,
     });
+    const audioOnly = isAudioFormat(recipe.format);
     const summary: ExportSummary = {
       format: recipe.format.toUpperCase(),
-      resolution: `${width} × ${height}`,
-      quality: `${qualityLabel(recipe.quality)} (CRF ${recipe.quality})`,
+      resolution: audioOnly ? "Sound only" : `${width} × ${height}`,
+      quality: audioOnly
+        ? recipe.format === "mp3"
+          ? "192 kb/s"
+          : "Uncompressed"
+        : `${qualityLabel(recipe.quality)} (CRF ${recipe.quality})`,
     };
     return {
       summary,
@@ -421,7 +438,7 @@ export default function VideoEditor() {
   const isTrimmed = recipe.trimStart > 0 || recipe.trimEnd !== null;
   const textCount = recipe.textOverlays?.length ?? 0;
   // A batch uses the same engine, so the editor's own export waits for it.
-  const exportDisabled = !file || isProcessing || batch.running;
+  const exportDisabled = !file || isProcessing || batch.running || join.running;
   const exportShortcut = isMac ? "⌘ Enter" : "Ctrl Enter";
 
   return (
@@ -567,6 +584,19 @@ export default function VideoEditor() {
                 </SectionHead>
                 <div className="divide-y divide-[var(--border)] border-b border-[var(--border)]">
                 <AccordionSection
+                  id="join"
+                  icon={<Combine size={15} />}
+                  title="Join clips"
+                  summary={
+                    join.running ? "Joining…" : join.clips.length > 1 ? `${join.clips.length} clips` : "One clip"
+                  }
+                  isOpen={openSections.join}
+                  onToggle={() => toggleSection("join")}
+                >
+                  <JoinClips join={join} engineBusy={isProcessing || batch.running} />
+                </AccordionSection>
+
+                <AccordionSection
                   id="trim"
                   icon={<Scissors size={15} />}
                   title="Trim"
@@ -651,11 +681,26 @@ export default function VideoEditor() {
                   id="audio"
                   icon={<Volume2 size={15} />}
                   title="Audio and speed"
-                  summary={`${recipe.speed}× · ${recipe.keepAudio ? "Audio on" : "Muted"}`}
+                  summary={`${recipe.speed}× · ${recipe.keepAudio ? (musicFile ? (replaceAudio ? "Soundtrack" : "Audio + track") : "Audio on") : "Muted"}`}
                   isOpen={openSections.audio}
                   onToggle={() => toggleSection("audio")}
                 >
                   <AudioSpeedControl recipe={recipe} onChange={updateRecipe} />
+                  <div className="mt-4">
+                    <SoundtrackControl
+                      file={musicFile}
+                      onFileChange={setMusicFile}
+                      replace={replaceAudio}
+                      onReplaceChange={setReplaceAudio}
+                      trackVolume={musicVolume}
+                      onTrackVolumeChange={setMusicVolume}
+                      videoVolume={originalAudioVolume}
+                      onVideoVolumeChange={setOriginalAudioVolume}
+                      loop={loopMusic}
+                      onLoopChange={setLoopMusic}
+                      muted={!recipe.keepAudio}
+                    />
+                  </div>
                 </AccordionSection>
 
                 <AccordionSection
@@ -694,10 +739,10 @@ export default function VideoEditor() {
                 >
                   <BatchExport
                     batch={batch}
-                    editorBusy={isProcessing}
+                    editorBusy={isProcessing || join.running}
                     getSettings={() => ({
                       recipe,
-                      music: { file: musicFile, musicVolume, originalAudioVolume, loopMusic },
+                      music: { file: musicFile, musicVolume, originalAudioVolume, loopMusic, replaceAudio },
                       overlay: { file: overlayFile, position: overlayPosition, size: overlaySize, opacity: overlayOpacity },
                     })}
                   />
@@ -849,7 +894,7 @@ export default function VideoEditor() {
                     </div>
                     <div className="pl-3">
                       <dt className="text-[var(--muted)]">Quality</dt>
-                      <dd className="mt-0.5 font-medium">{qualityLabel(recipe.quality)}</dd>
+                      <dd className="mt-0.5 font-medium">{isAudioFormat(recipe.format) ? output.summary.quality : qualityLabel(recipe.quality)}</dd>
                     </div>
                   </dl>
                 )}
@@ -898,7 +943,9 @@ export default function VideoEditor() {
               <p className="truncate font-medium">
                 {output.summary.format} · {output.summary.resolution}
               </p>
-              <p className="truncate text-[var(--muted)]">{qualityLabel(recipe.quality)} quality</p>
+              <p className="truncate text-[var(--muted)]">
+                {isAudioFormat(recipe.format) ? output.summary.quality : `${qualityLabel(recipe.quality)} quality`}
+              </p>
             </div>
             <button
               type="button"

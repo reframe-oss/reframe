@@ -27,3 +27,7 @@
 # Hashed build assets never change (same rule as netlify.toml).
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable
+
+# The service worker must always be re-checked (see netlify.toml).
+/sw.js
+  Cache-Control: no-cache

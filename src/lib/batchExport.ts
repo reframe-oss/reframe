@@ -18,7 +18,7 @@ export function batchRecipe(recipe: EditRecipe): EditRecipe {
   return { ...recipe, trimStart: 0, trimEnd: null };
 }
 
-const EXTENSIONS: Record<EditRecipe["format"], string> = { mp4: "mp4", webm: "webm", mkv: "mkv", gif: "gif" };
+const EXTENSIONS: Record<EditRecipe["format"], string> = { mp4: "mp4", webm: "webm", mkv: "mkv", gif: "gif", mp3: "mp3", wav: "wav" };
 
 /** "Holiday clip.mov" → "Holiday clip-reframe.mp4". */
 export function batchOutputName(inputName: string, format: EditRecipe["format"]): string {

@@ -67,3 +67,11 @@
   for = "/_next/static/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# The service worker (public/sw.js) must always be re-checked, or browsers
+# keep running an old one after a deploy. Its content changes with every
+# build (scripts/build-sw-manifest.mjs), which is how updates are noticed.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"

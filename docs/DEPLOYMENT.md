@@ -93,6 +93,26 @@ npx netlify-cli deploy --dir out          # draft URL
 npx netlify-cli deploy --dir out --prod   # production (maintainers only)
 ```
 
+## Offline support (service worker)
+
+`public/sw.js` lets the editor open and export without a connection once it
+has been used online. `bun run build` ends with
+`scripts/build-sw-manifest.mjs`, which writes the list of files to
+precache, and a version hash of their contents, into `out/sw.js`. Every
+deploy that changes the site therefore changes `sw.js`, which is how
+browsers notice the update. Visitors get a "Reload" notice; the page
+never reloads by itself.
+
+- Serve `/sw.js` with `Cache-Control: no-cache`, so browsers always check
+  it for updates. `netlify.toml`, `public/_headers` and `vercel.json` all
+  do this.
+- Cached pages keep the headers they were served with, COOP/COEP included,
+  so offline behaves like online. Fix isolation on the host, not in the
+  worker.
+- The FFmpeg cores (jsDelivr) are cached the first time they download and
+  still pass their SRI checks. User videos and exports are never cached.
+- Development builds (`bun run dev`) don't register the worker.
+
 ## Other static hosts
 
 | Host | Headers | Notes |

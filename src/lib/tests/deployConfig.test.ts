@@ -77,9 +77,11 @@ describe("cross-origin isolation compatibility", () => {
     // Under COEP require-corp, cross-origin loads need CORS (or CORP).
     // fetch() defaults to mode "cors"; jsdelivr answers with
     // Access-Control-Allow-Origin: *. The cores are then used as blob: URLs,
-    // which are same-origin.
-    expect(worker).toContain("https://cdn.jsdelivr.net/npm/@ffmpeg/core@");
-    expect(worker).toContain("https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@");
+    // which are same-origin. The URLs live in engineUrls.ts.
+    const urls = read("src/lib/engineUrls.ts");
+    expect(worker).toContain('from "./engineUrls"');
+    expect(urls).toContain("https://cdn.jsdelivr.net/npm/@ffmpeg/core@");
+    expect(urls).toContain("https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@");
     expect(worker).not.toMatch(/mode:\s*["']no-cors["']/);
   });
 
