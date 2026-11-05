@@ -47,8 +47,21 @@ jobs:
       - run: bun install --frozen-lockfile
 
       # ffmpeg makes the input fixtures and ffprobe checks the exported files.
+      # The runner's apt mirror sometimes stalls mid-install, which used to
+      # hold the job until its 45-minute timeout without running a test.
+      # Each attempt is time-limited and retried instead.
       - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+        timeout-minutes: 12
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 120 sudo apt-get update && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg; then
+              exit 0
+            fi
+            echo "::warning::ffmpeg install attempt $attempt failed or stalled; retrying"
+            sudo dpkg --configure -a || true
+            sleep 5
+          done
+          exit 1
 
       - name: Make video fixtures
         run: scripts/make-fixtures.sh --small
