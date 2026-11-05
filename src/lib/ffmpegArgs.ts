@@ -198,8 +198,10 @@ export function buildVideoFilter(input: EditRecipe, targetW: number, targetH: nu
   }
 
   const textOverlays = recipe.textOverlays || [];
+  const timing = { trimStart: recipe.trimStart, trimEnd: recipe.trimEnd, speed: recipe.speed };
   textOverlays.forEach((overlay) => {
-    filters.push(buildTextFilter(overlay, targetW, targetH));
+    const text = buildTextFilter(overlay, targetW, targetH, timing);
+    if (text) filters.push(text);
   });
 
   return filters.join(",");

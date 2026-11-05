@@ -117,12 +117,21 @@ describe("project documents", () => {
     ["an unsafe overlay id", sampleJson((d) => (d.edit.recipe.textOverlays[0].id = "<img>")), "invalid id"],
     ["overlay text too long", sampleJson((d) => (d.edit.recipe.textOverlays[0].text = "x".repeat(501))), "at most 500"],
     ["duplicate overlay ids", sampleJson((d) => d.edit.recipe.textOverlays.push(d.edit.recipe.textOverlays[0])), "same id"],
+    ["text that ends before it starts", sampleJson((d) => Object.assign(d.edit.recipe.textOverlays[0], { start: 4, end: 2 })), "must end after it starts"],
+    ["a negative text start", sampleJson((d) => (d.edit.recipe.textOverlays[0].start = -1)), "start"],
+    ["a non-boolean caption box", sampleJson((d) => (d.edit.recipe.textOverlays[0].box = "yes")), "box"],
     ["a bad overlay position", sampleJson((d) => (d.edit.imageOverlay.position = "middle")), "position"],
     ["a bad source", sampleJson((d) => (d.source = { name: "" })), "source video name"],
   ])("rejects %s", (_label, input, message) => {
     const parsed = parseProject(input);
     expect(parsed.ok).toBe(false);
     if (!parsed.ok) expect(parsed.error).toContain(message);
+  });
+
+  it("keeps text timing and the caption box", () => {
+    const parsed = parseProject(sampleJson((d) => Object.assign(d.edit.recipe.textOverlays[0], { start: 1.5, end: 4, box: true })));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.project.edit.recipe.textOverlays[0]).toMatchObject({ start: 1.5, end: 4, box: true });
   });
 
   it("rejects too many text overlays", () => {

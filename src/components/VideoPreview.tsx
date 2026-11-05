@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, RefObject } from "react";
 import { EditRecipe, TextOverlay, TimelineTrack, MultiTrackEditorState } from "@/lib/types";
 import { outputFrame, SAFE_AREAS } from "@/lib/framing";
 import { cn } from "@/lib/utils";
+import { resolveOutputSize } from "@/lib/ffmpegArgs";
 import { Camera, Columns2, Grid3x3, Frame, SquareDashed } from "lucide-react";
 import ComparisonPreview from "./ComparisonPreview";
 import DraggableTextOverlays from "./DraggableTextOverlays";
@@ -384,17 +385,29 @@ export default function VideoPreview({
           </div>
         )}
 
-        {/* Draggable Text Overlays */}
-        {recipe && !isLoading && containerDimensions.width > 0 && (
-          <DraggableTextOverlays
-            recipe={recipe}
-            containerWidth={containerDimensions.width}
-            containerHeight={containerDimensions.height}
-            selectedTextId={selectedTextId ?? null}
-            onSelectText={onSelectText || (() => {})}
-            onUpdateText={onUpdateText || (() => {})}
-          />
-        )}
+        {/* Draggable Text Overlays, placed and sized within the output frame as the export draws them */}
+        {recipe && frame && !isLoading && containerDimensions.width > 0 && (() => {
+          const inset = (v: string) => parseFloat(v) / 100;
+          const width = containerDimensions.width * (1 - inset(frame.left) - inset(frame.right));
+          const height = containerDimensions.height * (1 - inset(frame.top) - inset(frame.bottom));
+          return (
+            <div
+              className="pointer-events-none absolute"
+              style={{ top: frame.top, bottom: frame.bottom, left: frame.left, right: frame.right }}
+            >
+              <DraggableTextOverlays
+                recipe={recipe}
+                containerWidth={width}
+                containerHeight={height}
+                scale={width / resolveOutputSize(recipe).width}
+                videoRef={videoRef}
+                selectedTextId={selectedTextId ?? null}
+                onSelectText={onSelectText || (() => {})}
+                onUpdateText={onUpdateText || (() => {})}
+              />
+            </div>
+          );
+        })()}
       </div>
 
       {/* Viewer toolbar: below the picture so controls never cover the video. */}

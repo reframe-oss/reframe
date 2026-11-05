@@ -17,6 +17,7 @@ export const FEATURE_ACTIONS = {
   preview_tool: ["compare", "grid", "framing_guide", "save_frame"],
   batch_export: ["start", "done", "done_with_failures", "cancel", "save_folder"],
   trim_timeline: ["seek", "drag_handle"],
+  text_tool: ["import_captions", "set_timing", "caption_box"],
   // One event per editing tool an export used (see toolsUsed).
   trim: ["exported"],
   rotate: ["exported"],
@@ -25,6 +26,7 @@ export const FEATURE_ACTIONS = {
   volume: ["exported"],
   normalize_audio: ["exported"],
   text_overlay: ["exported"],
+  timed_text: ["exported"],
   image_overlay: ["exported"],
   background_music: ["exported"],
   color_adjustments: ["exported"],
@@ -76,6 +78,7 @@ export function toolsUsed(recipe: EditRecipe, extras: { music?: boolean; imageOv
   if (recipe.volume !== d.volume) tools.push("volume");
   if (recipe.normalizeAudio) tools.push("normalize_audio");
   if ((recipe.textOverlays?.length ?? 0) > 0) tools.push("text_overlay");
+  if (recipe.textOverlays?.some((o) => o.start !== undefined || o.end !== undefined)) tools.push("timed_text");
   if (extras.imageOverlay) tools.push("image_overlay");
   if (extras.music) tools.push("background_music");
   if (recipe.brightness !== d.brightness || recipe.contrast !== d.contrast || recipe.saturation !== d.saturation) {
