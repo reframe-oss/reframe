@@ -13,7 +13,7 @@
 import { DEFAULT_RECIPE, SPEED_STEPS } from "./constants";
 import { PRESETS } from "./presets";
 import { clampCrop, isValidCrop } from "./crop";
-import { RECIPE_VERSION, type OverlayPosition, type TextOverlay } from "./types";
+import { OUTPUT_FORMATS, RECIPE_VERSION, type OverlayPosition, type TextOverlay } from "./types";
 import type { EditState, ImageOverlaySettings } from "./editHistory";
 
 export const PROJECT_FORMAT = "reframe-project";
@@ -161,7 +161,7 @@ function parseRecipe(raw: unknown): EditState["recipe"] {
     speed: oneOf(raw, "speed", SPEED_STEPS),
     volume: num(raw, "volume", 0, 200),
     quality: num(raw, "quality", 18, 30),
-    format: oneOf(raw, "format", ["mp4", "webm", "mkv", "gif"] as const),
+    format: oneOf(raw, "format", OUTPUT_FORMATS),
     stabilization: bool(raw, "stabilization"),
     denoise: bool(raw, "denoise"),
     brightness: num(raw, "brightness", -1, 1),

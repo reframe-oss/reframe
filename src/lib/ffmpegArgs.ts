@@ -10,7 +10,8 @@ import { getPresetById } from "./presets";
 // all landed in the copy that never ran. Keep this module free of DOM/worker
 // APIs so it can be imported from both sides.
 
-export type OutputFormat = "mp4" | "webm" | "mkv" | "gif";
+export type { OutputFormat } from "./types";
+import type { AudioFormat, OutputFormat } from "./types";
 export type EngineMode = "multi" | "single";
 
 /**
@@ -248,6 +249,91 @@ export function buildAudioTrimFilter(input: EditRecipe): string {
   return `${trimFilter},asetpts=PTS-STARTPTS`;
 }
 
+/**
+ * The audio part of a filter graph: the video's sound (`af` applied), a
+ * soundtrack mixed with it or in place of it, or the sound alone. `out` is
+ * the label to map, or "" when the video's sound needs no filter.
+ */
+function soundtrackGraph(
+  af: string,
+  hasOriginalAudio: boolean,
+  music: { options: BackgroundMusicOptions } | undefined,
+  musicIdx: number
+): { parts: string[]; out: string } {
+  if (music) {
+    const musicVol = (music.options.musicVolume / 100).toFixed(2);
+    if (hasOriginalAudio && !music.options.replaceAudio) {
+      const origVol = (music.options.originalAudioVolume / 100).toFixed(2);
+      return {
+        parts: [
+          af ? `[0:a]${af},volume=${origVol}[orig]` : `[0:a]volume=${origVol}[orig]`,
+          `[${musicIdx}:a]volume=${musicVol}[music]`,
+          `[orig][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+        ],
+        out: "[aout]",
+      };
+    }
+    // The track alone: no original sound, or it replaces it.
+    return { parts: [`[${musicIdx}:a]volume=${musicVol}[aout]`], out: "[aout]" };
+  }
+  if (hasOriginalAudio && af) return { parts: [`[0:a]${af}[aout]`], out: "[aout]" };
+  return { parts: [], out: "" };
+}
+
+/** Shown as is: an audio-only export with no sound to export. */
+export const NO_SOUND_MESSAGE = "This video has no sound to export. Add a soundtrack, or choose a video format.";
+
+export interface AudioArgsOptions {
+  recipe: EditRecipe;
+  format: AudioFormat;
+  inputName: string;
+  outputName: string;
+  videoDuration: number;
+  hasOriginalAudio: boolean;
+  music?: { inputName: string; options: BackgroundMusicOptions };
+  threads: number;
+}
+
+/**
+ * Sound only: the video's audio with the edit's trim, speed, volume and
+ * loudness, mixed with or replaced by the soundtrack, as MP3 (192 kb/s) or
+ * WAV (16-bit, 48 kHz). No video is decoded.
+ */
+export function buildAudioArguments({
+  recipe: input,
+  format,
+  inputName,
+  outputName,
+  videoDuration,
+  hasOriginalAudio,
+  music,
+  threads,
+}: AudioArgsOptions): string[] {
+  if (!hasOriginalAudio && !music) throw new Error(NO_SOUND_MESSAGE);
+  const recipe = withSafeTimes(input);
+  const af = hasOriginalAudio ? [buildAudioTrimFilter(recipe), buildAudioFilter(recipe)].filter(Boolean).join(",") : "";
+  const args: string[] = [...inputThreadArgs(threads), "-i", inputName];
+  if (music) {
+    if (music.options.loopMusic) args.push("-stream_loop", "-1");
+    args.push("-i", music.inputName);
+  }
+  const graph = soundtrackGraph(af, hasOriginalAudio, music, 1);
+  if (graph.parts.length > 0) {
+    args.push("-filter_complex", graph.parts.join(";"), "-map", graph.out);
+  } else {
+    args.push("-map", "0:a:0");
+  }
+  args.push("-vn");
+  if (format === "mp3") args.push("-c:a", "libmp3lame", "-b:a", "192k");
+  else args.push("-c:a", "pcm_s16le", "-ar", "48000");
+  args.push(...outputThreadArgs(threads, graph.parts.length > 0));
+  const durationArgs = outputDurationArgs(recipe, videoDuration);
+  args.push(...durationArgs);
+  if (durationArgs.length === 0 && music?.options.loopMusic) args.push("-shortest");
+  args.push(outputName);
+  return assertFiniteArgs(args);
+}
+
 const OVERLAY_POSITIONS: Record<OverlayPosition, string> = {
   "top-left": "20:20",
   "top-right": "W-w-20:20",
@@ -257,7 +343,7 @@ const OVERLAY_POSITIONS: Record<OverlayPosition, string> = {
 
 export interface ExportArgsOptions {
   recipe: EditRecipe;
-  format: Exclude<OutputFormat, "gif">;
+  format: Exclude<OutputFormat, "gif" | AudioFormat>;
   inputName: string;
   outputName: string;
   targetW: number;
@@ -326,25 +412,9 @@ export function buildArguments({
 
     let audioOut = "";
     if (shouldKeepAudio) {
-      if (music) {
-        const musicVol = (music.options.musicVolume / 100).toFixed(2);
-        if (hasOriginalAudio) {
-          const origVol = (music.options.originalAudioVolume / 100).toFixed(2);
-          const origChain = afParts.length > 0
-            ? `[0:a]${af},volume=${origVol}[orig]`
-            : `[0:a]volume=${origVol}[orig]`;
-          filterParts.push(origChain);
-          filterParts.push(`[${musicIdx}:a]volume=${musicVol}[music]`);
-          filterParts.push(`[orig][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
-          audioOut = "[aout]";
-        } else {
-          filterParts.push(`[${musicIdx}:a]volume=${musicVol}[aout]`);
-          audioOut = "[aout]";
-        }
-      } else if (hasOriginalAudio && af) {
-        filterParts.push(`[0:a]${af}[aout]`);
-        audioOut = "[aout]";
-      }
+      const graph = soundtrackGraph(af, hasOriginalAudio, music, musicIdx);
+      filterParts.push(...graph.parts);
+      audioOut = graph.out;
     }
 
     if (filterParts.length > 0) {

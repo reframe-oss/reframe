@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useVideoEditor } from "@/hooks/useVideoEditor";
-import { TextOverlay } from "@/lib/types";
+import { TextOverlay, isAudioFormat } from "@/lib/types";
 import FileUpload from "./FileUpload";
 import PrivacyBanner from "./PrivacyBanner";
 import VideoPreview from "./VideoPreview";
@@ -12,6 +12,7 @@ import TrimControl from "./TrimControl";
 import RotateControl from "./RotateControl";
 import TextControls from "./TextControls";
 import AudioSpeedControl from "./AudioSpeedControl";
+import SoundtrackControl from "./SoundtrackControl";
 import FormatSelector from "./FormatSelector";
 import ExportSettings from "./ExportSettings";
 import ExportOverlay, { type ExportSummary } from "./ExportOverlay";
@@ -262,9 +263,15 @@ export default function VideoEditor() {
     videoRef,
     seekTo,
     musicFile,
+    setMusicFile,
     musicVolume,
+    setMusicVolume,
     originalAudioVolume,
+    setOriginalAudioVolume,
     loopMusic,
+    setLoopMusic,
+    replaceAudio,
+    setReplaceAudio,
     overlayFile,
     setOverlayFile,
     overlayPosition,
@@ -398,10 +405,15 @@ export default function VideoEditor() {
       customWidth: recipe.customWidth,
       customHeight: recipe.customHeight,
     });
+    const audioOnly = isAudioFormat(recipe.format);
     const summary: ExportSummary = {
       format: recipe.format.toUpperCase(),
-      resolution: `${width} × ${height}`,
-      quality: `${qualityLabel(recipe.quality)} (CRF ${recipe.quality})`,
+      resolution: audioOnly ? "Sound only" : `${width} × ${height}`,
+      quality: audioOnly
+        ? recipe.format === "mp3"
+          ? "192 kb/s"
+          : "Uncompressed"
+        : `${qualityLabel(recipe.quality)} (CRF ${recipe.quality})`,
     };
     return {
       summary,
@@ -648,11 +660,26 @@ export default function VideoEditor() {
                   id="audio"
                   icon={<Volume2 size={15} />}
                   title="Audio and speed"
-                  summary={`${recipe.speed}× · ${recipe.keepAudio ? "Audio on" : "Muted"}`}
+                  summary={`${recipe.speed}× · ${recipe.keepAudio ? (musicFile ? (replaceAudio ? "Soundtrack" : "Audio + track") : "Audio on") : "Muted"}`}
                   isOpen={openSections.audio}
                   onToggle={() => toggleSection("audio")}
                 >
                   <AudioSpeedControl recipe={recipe} onChange={updateRecipe} />
+                  <div className="mt-4">
+                    <SoundtrackControl
+                      file={musicFile}
+                      onFileChange={setMusicFile}
+                      replace={replaceAudio}
+                      onReplaceChange={setReplaceAudio}
+                      trackVolume={musicVolume}
+                      onTrackVolumeChange={setMusicVolume}
+                      videoVolume={originalAudioVolume}
+                      onVideoVolumeChange={setOriginalAudioVolume}
+                      loop={loopMusic}
+                      onLoopChange={setLoopMusic}
+                      muted={!recipe.keepAudio}
+                    />
+                  </div>
                 </AccordionSection>
 
                 <AccordionSection
@@ -694,7 +721,7 @@ export default function VideoEditor() {
                     editorBusy={isProcessing}
                     getSettings={() => ({
                       recipe,
-                      music: { file: musicFile, musicVolume, originalAudioVolume, loopMusic },
+                      music: { file: musicFile, musicVolume, originalAudioVolume, loopMusic, replaceAudio },
                       overlay: { file: overlayFile, position: overlayPosition, size: overlaySize, opacity: overlayOpacity },
                     })}
                   />
@@ -846,7 +873,7 @@ export default function VideoEditor() {
                     </div>
                     <div className="pl-3">
                       <dt className="text-[var(--muted)]">Quality</dt>
-                      <dd className="mt-0.5 font-medium">{qualityLabel(recipe.quality)}</dd>
+                      <dd className="mt-0.5 font-medium">{isAudioFormat(recipe.format) ? output.summary.quality : qualityLabel(recipe.quality)}</dd>
                     </div>
                   </dl>
                 )}
@@ -895,7 +922,9 @@ export default function VideoEditor() {
               <p className="truncate font-medium">
                 {output.summary.format} · {output.summary.resolution}
               </p>
-              <p className="truncate text-[var(--muted)]">{qualityLabel(recipe.quality)} quality</p>
+              <p className="truncate text-[var(--muted)]">
+                {isAudioFormat(recipe.format) ? output.summary.quality : `${qualityLabel(recipe.quality)} quality`}
+              </p>
             </div>
             <button
               type="button"

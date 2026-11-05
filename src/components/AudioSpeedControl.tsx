@@ -158,7 +158,7 @@ export default function AudioSpeedControl({ recipe, onChange }: Props) {
             htmlFor="volume-control"
             className="label flex items-center gap-1.5"
           >
-            <Volume2 size={13} aria-hidden="true" /> Volume
+            <Volume2 size={13} aria-hidden="true" /> Video sound volume
           </label>
 
           <span className="tabular block text-sm font-medium text-[var(--text)]">

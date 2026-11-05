@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   buildArguments,
+  buildAudioArguments,
+  NO_SOUND_MESSAGE,
   buildGifArguments,
   buildFrameArguments,
   outputDurationArgs,
@@ -132,6 +134,80 @@ describe("buildArguments", () => {
     expect(args).not.toContain("libvpx-vp9");
     expect(args).not.toContain("libopus");
     expect(valuesOf(args, "-b:v")).toEqual(["8M"]);
+  });
+});
+
+describe("soundtrack", () => {
+  const track = (o: Partial<{ musicVolume: number; originalAudioVolume: number; loopMusic: boolean; replaceAudio: boolean }> = {}) => ({
+    inputName: "music.mp3",
+    options: { file: null, musicVolume: 80, originalAudioVolume: 40, loopMusic: false, replaceAudio: true, ...o },
+  });
+
+  it("replaces the video's sound with the track at its volume", () => {
+    const args = buildArguments(opts({ music: track() }));
+    const graph = valuesOf(args, "-filter_complex")[0]!;
+    expect(graph).toContain("[1:a]volume=0.80[aout]");
+    expect(graph).not.toContain("[0:a]");
+    expect(graph).not.toContain("amix");
+    expect(valuesOf(args, "-map")).toEqual(["[vbase]", "[aout]"]);
+  });
+
+  it("mixes when not replacing, with both volumes", () => {
+    const graph = valuesOf(buildArguments(opts({ music: track({ replaceAudio: false }) })), "-filter_complex")[0]!;
+    expect(graph).toContain("[0:a]volume=0.40[orig]");
+    expect(graph).toContain("[1:a]volume=0.80[music]");
+    expect(graph).toContain("amix=inputs=2:duration=first");
+  });
+});
+
+describe("buildAudioArguments (sound only)", () => {
+  const audio = (o: Partial<Parameters<typeof buildAudioArguments>[0]> = {}) =>
+    buildAudioArguments({
+      recipe: recipe(),
+      format: "mp3",
+      inputName: "input.mp4",
+      outputName: "out.mp3",
+      videoDuration: 6,
+      hasOriginalAudio: true,
+      threads: 0,
+      ...o,
+    });
+
+  it("exports MP3 at 192 kb/s with no video", () => {
+    const args = audio();
+    expect(args).toContain("-vn");
+    expect(valuesOf(args, "-c:a")).toEqual(["libmp3lame"]);
+    expect(valuesOf(args, "-b:a")).toEqual(["192k"]);
+    expect(valuesOf(args, "-map")).toEqual(["0:a:0"]);
+    expect(args).not.toContain("-c:v");
+    expect(args.at(-1)).toBe("out.mp3");
+  });
+
+  it("exports WAV as 16-bit 48 kHz", () => {
+    const args = audio({ format: "wav", outputName: "out.wav" });
+    expect(valuesOf(args, "-c:a")).toEqual(["pcm_s16le"]);
+    expect(valuesOf(args, "-ar")).toEqual(["48000"]);
+  });
+
+  it("applies the trim, speed, volume and loudness, and stops at the edit's length", () => {
+    const args = audio({ recipe: recipe({ trimStart: 1, trimEnd: 5, speed: 2, volume: 150, normalizeAudio: true }) });
+    const graph = valuesOf(args, "-filter_complex")[0]!;
+    expect(graph).toBe("[0:a]atrim=start=1:end=5,asetpts=PTS-STARTPTS,atempo=2,volume=1.50,loudnorm=I=-14:TP=-1.5:LRA=11[aout]");
+    expect(valuesOf(args, "-map")).toEqual(["[aout]"]);
+    expect(valuesOf(args, "-t")).toEqual(["2.000000"]);
+  });
+
+  it("uses the soundtrack, looped and cut to the video's length", () => {
+    const args = audio({
+      music: { inputName: "music.mp3", options: { file: null, musicVolume: 100, originalAudioVolume: 40, loopMusic: true, replaceAudio: true } },
+    });
+    expect(args.slice(0, 6)).toEqual(["-i", "input.mp4", "-stream_loop", "-1", "-i", "music.mp3"]);
+    expect(valuesOf(args, "-filter_complex")[0]).toBe("[1:a]volume=1.00[aout]");
+    expect(valuesOf(args, "-t")).toEqual(["6.000000"]);
+  });
+
+  it("refuses when there is no sound at all", () => {
+    expect(() => audio({ hasOriginalAudio: false })).toThrow(NO_SOUND_MESSAGE);
   });
 });
 
