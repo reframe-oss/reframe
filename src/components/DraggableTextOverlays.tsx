@@ -1,14 +1,18 @@
 "use client";
 
 import { TextOverlay, EditRecipe } from "@/lib/types";
-import { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import { getTextPixelPosition, getTextPercentPosition } from "@/lib/text-overlay";
+import { useRef, useState, useCallback, useEffect, useMemo, type RefObject } from "react";
+import { getTextPixelPosition, getTextPercentPosition, isTextVisibleAt } from "@/lib/text-overlay";
 import { getFontFamily, ensureFontLoaded } from "@/utils/fontLoader";
 
 interface DraggableTextOverlaysProps {
   recipe?: EditRecipe;
   containerWidth: number;
   containerHeight: number;
+  /** Preview pixels per output pixel, so text is the size it will be in the export. */
+  scale?: number;
+  /** The preview video, to show timed text only while it is on. */
+  videoRef?: RefObject<HTMLVideoElement | null>;
   selectedTextId: string | null;
   onUpdateText: (id: string, updates: Partial<TextOverlay>) => void;
   onSelectText: (id: string | null) => void;
@@ -22,6 +26,8 @@ export default function DraggableTextOverlays({
   recipe,
   containerWidth,
   containerHeight,
+  scale = 1,
+  videoRef,
   selectedTextId,
   onUpdateText,
   onSelectText,
@@ -42,6 +48,50 @@ export default function DraggableTextOverlays({
     const overlays = recipe?.textOverlays;
     return Array.isArray(overlays) ? overlays : [];
   }, [recipe?.textOverlays]);
+
+  // The preview's playhead, followed only while some text is timed.
+  const [currentTime, setCurrentTime] = useState(0);
+  const hasTimedText = textOverlays.some((o) => o.start !== undefined || o.end !== undefined);
+  useEffect(() => {
+    const video = videoRef?.current;
+    if (!video || !hasTimedText) return;
+    let frame = 0;
+    // Re-render only when which text is on changes, not on every frame.
+    let shown = "";
+    const update = () => {
+      const t = video.currentTime;
+      const next = textOverlays.map((o) => (isTextVisibleAt(o, t) ? "1" : "0")).join("");
+      if (next === shown) return;
+      shown = next;
+      setCurrentTime(t);
+    };
+    // timeupdate fires only about 4 times a second; follow frames while playing.
+    const tick = () => {
+      update();
+      frame = requestAnimationFrame(tick);
+    };
+    const play = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(tick);
+    };
+    const stop = () => {
+      cancelAnimationFrame(frame);
+      update();
+    };
+    update();
+    if (!video.paused) play();
+    video.addEventListener("play", play);
+    video.addEventListener("pause", stop);
+    video.addEventListener("seeked", update);
+    video.addEventListener("timeupdate", update);
+    return () => {
+      cancelAnimationFrame(frame);
+      video.removeEventListener("play", play);
+      video.removeEventListener("pause", stop);
+      video.removeEventListener("seeked", update);
+      video.removeEventListener("timeupdate", update);
+    };
+  }, [videoRef, hasTimedText, textOverlays]);
 
   /**
    * Handles the start of a drag operation.
@@ -229,6 +279,10 @@ export default function DraggableTextOverlays({
 
         const isSelected = selectedTextId === overlay.id;
         const isDragging = draggingId === overlay.id;
+        // Text outside its time is hidden, except the one being edited, which stays faint.
+        const visible = !hasTimedText || isTextVisibleAt(overlay, currentTime);
+        if (!visible && !isSelected) return null;
+        const fontSize = overlay.fontSize * scale;
 
         return (
           <div
@@ -258,7 +312,8 @@ export default function DraggableTextOverlays({
               left: `${left}px`,
               top: `${top}px`,
               transform: "translate(-50%, -50%)",
-              fontSize: `${overlay.fontSize}px`,
+              fontSize: `${fontSize}px`,
+              opacity: visible ? 1 : 0.4,
               color: overlay.color,
               fontFamily: getFontFamily(overlay.fontFamily),
               fontWeight:
@@ -267,9 +322,15 @@ export default function DraggableTextOverlays({
                   : overlay.fontWeight === "bold"
                   ? 700
                   : 400,
-              textShadow: "0 2px 8px rgba(0, 0, 0, 0.8)",
-              whiteSpace: "nowrap",
+              textShadow: overlay.box ? undefined : "0 2px 8px rgba(0, 0, 0, 0.8)",
+              background: overlay.box ? "rgba(0, 0, 0, 0.55)" : undefined,
+              padding: overlay.box ? `${Math.max(2, fontSize * 0.3)}px` : undefined,
+              lineHeight: 1.2,
+              textAlign: "center",
+              whiteSpace: "pre",
             }}
+            data-testid="text-overlay"
+            data-visible={visible}
             aria-label={`Text overlay: ${overlay.text}`}
             aria-pressed={isSelected}
           >
@@ -283,7 +344,7 @@ export default function DraggableTextOverlays({
                 className="outline-none bg-black/30 px-1 py-0.5 rounded"
                 style={{
                   color: overlay.color,
-                  fontSize: `${overlay.fontSize}px`,
+                  fontSize: `${fontSize}px`,
                   fontFamily: getFontFamily(overlay.fontFamily),
                   fontWeight:
                     overlay.fontWeight === "900"

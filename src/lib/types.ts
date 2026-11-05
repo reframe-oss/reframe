@@ -15,6 +15,12 @@ export interface TextOverlay {
   fontWeight: "normal" | "bold" | "900";
   fontFamily?: string; // Font family name (e.g., "Arial", "Inter", "CustomFont")
   fontPath?: string; // Path/URL to custom font file for export
+  /** When the text appears, in seconds of the source video. Absent: from the start. */
+  start?: number;
+  /** When the text disappears, in seconds of the source video. Absent: until the end. */
+  end?: number;
+  /** Draw a translucent box behind the text, for captions. */
+  box?: boolean;
 }
 
 export interface EditRecipe {
@@ -162,6 +168,9 @@ export function isValidRecipe(value: unknown): value is EditRecipe {
     if (typeof overlay.fontSize !== "number" || !isFinite(overlay.fontSize) || overlay.fontSize < 12 || overlay.fontSize > 120) return false;
     if (typeof overlay.color !== "string") return false;
     if (!["normal", "bold", "900"].includes(overlay.fontWeight)) return false;
+    if (overlay.start !== undefined && (typeof overlay.start !== "number" || !isFinite(overlay.start) || overlay.start < 0)) return false;
+    if (overlay.end !== undefined && (typeof overlay.end !== "number" || !isFinite(overlay.end) || overlay.end <= (overlay.start ?? 0))) return false;
+    if (overlay.box !== undefined && typeof overlay.box !== "boolean") return false;
   }
 
   return true;

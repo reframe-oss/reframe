@@ -42,6 +42,23 @@ the trim are dimmed. Click the strip to move the preview there, and drag the
 handles (or use the arrow keys on them) to set the start and end. While an
 export runs, making frames pauses and carries on afterwards.
 
+## Text and captions
+
+**Add Text** in the Text section puts a line of text on the video. Drag it
+in the preview to place it; the preview shows it where, and at the size,
+the export will draw it. By default text stays on for the whole video. To
+show it for part of it, set **From** and **Until** in seconds of the video,
+or play to a moment and press **Start at playhead** or **End at playhead**.
+**Whole video** clears the times. Times follow the source video, so they
+stay right when you trim or change the speed, and text outside the trim is
+left out. **Dark box behind the text** gives it a caption-style background.
+
+**Import captions** reads an `.srt` or `.vtt` subtitle file and adds each
+cue as a timed caption near the bottom of the frame, sized for the output.
+An edit holds up to 500 text items; a longer file adds its first 500 cues.
+**Remove all** clears them. Exported text uses the bundled Geist font
+whatever font the preview shows.
+
 ## Batch export
 
 **Batch export** in the Edit panel applies this edit to other videos. Add
