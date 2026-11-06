@@ -64,23 +64,29 @@ moderate or low.
 
 ## Snyk
 
-Snyk is connected through its GitHub integration (a webhook on the repo)
-to the `akankshatrehun` Snyk organisation, where `reframe-oss/reframe` has
-two projects: **package.json** (open-source dependencies) and **Code
-analysis** (Snyk Code). It adds two checks to pull requests from this
-repository, `security/snyk` and `license/snyk`, and `snyk.yml` runs the CLI
-(`snyk test`, high and critical only) on pushes to main, on same-repo pull
-requests and weekly. Snyk can't read `bun.lock`, so that job tests a
-`package-lock.json` generated from `package.json`; the bun.lock policy above
-is the exact check. On main and the weekly run it also records what it
-tested (`snyk monitor`) as the Snyk project `reframe-oss/reframe-ci`, so the
-dashboard tracks those versions and Snyk alerts when a new advisory affects
-them.
+Snyk runs in `snyk.yml` as the `Dependency scan` job: the Snyk CLI image
+(`snyk/snyk:node`, pinned by digest so that only a reviewed image runs with
+`SNYK_TOKEN`) runs `snyk test`, high and critical only, on pushes to main, on
+same-repo pull requests and weekly. Snyk can't read `bun.lock`, so the job
+tests a `package-lock.json` generated from `package.json`; the bun.lock policy
+above is the exact check. It tests production dependencies only, and
+`bun audit` covers the development ones. On main and the weekly run it also
+records what it tested (`snyk monitor`) as the Snyk project
+`reframe-oss/reframe-ci`, so the dashboard tracks those versions and Snyk
+alerts when a new advisory affects them. To update the image, take the
+current digest of `snyk/snyk:node` from Docker Hub and change both steps.
+
+The repo is also connected to the `akankshatrehun` Snyk organisation through
+Snyk's GitHub integration, which runs Snyk Code on `reframe-oss/reframe`. Its
+open-source project (**package.json**) was deactivated on 2026-11-06 because
+it duplicated `reframe-ci`, so pull requests no longer get the
+`security/snyk` and `license/snyk` checks.
 
 Required on `main` (the `main-protection` ruleset): `build`, `Dependency
-scan`, `Dependency policy (bun.lock)`, `Secret scan (gitleaks)`, `Workflow
-lint (actionlint)` and `security/snyk`. `Dependency scan` is skipped on pull
-requests from forks (no secrets there), which counts as passing.
+scan`, `Dependency policy (bun.lock)`, `Secret scan (gitleaks)` and
+`Workflow lint (actionlint)`. `Dependency scan` is skipped on pull requests
+from forks (no secrets there), which counts as passing; the bun.lock policy
+still runs on them.
 
 `.snyk` holds the policy: open-source ignores (none) and the paths Snyk Code
 skips (test-only code).
