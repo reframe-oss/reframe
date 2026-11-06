@@ -72,7 +72,15 @@ repository, `security/snyk` and `license/snyk`, and `snyk.yml` runs the CLI
 (`snyk test`, high and critical only) on pushes to main, on same-repo pull
 requests and weekly. Snyk can't read `bun.lock`, so that job tests a
 `package-lock.json` generated from `package.json`; the bun.lock policy above
-is the exact check.
+is the exact check. On main and the weekly run it also records what it
+tested (`snyk monitor`) as the Snyk project `reframe-oss/reframe-ci`, so the
+dashboard tracks those versions and Snyk alerts when a new advisory affects
+them.
+
+Required on `main` (the `main-protection` ruleset): `build`, `Dependency
+scan`, `Dependency policy (bun.lock)`, `Secret scan (gitleaks)`, `Workflow
+lint (actionlint)` and `security/snyk`. `Dependency scan` is skipped on pull
+requests from forks (no secrets there), which counts as passing.
 
 `.snyk` holds the policy: open-source ignores (none) and the paths Snyk Code
 skips (test-only code).

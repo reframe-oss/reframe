@@ -88,6 +88,19 @@ jobs:
           # is clean.
           args: --severity-threshold=high --file=package-lock.json
 
+      # Records what was just tested as a Snyk project, so the Snyk dashboard
+      # tracks the versions CI tests (the GitHub integration's own project
+      # reads package.json ranges) and alerts when a new advisory affects
+      # them. main only: pull requests are tested, never recorded.
+      - name: Record the tested dependencies in Snyk (main)
+        if: (success() || failure()) && github.event_name != 'pull_request'
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: monitor
+          args: --file=package-lock.json --project-name=reframe-oss/reframe-ci
+
       - name: Alert on High/Critical Snyk Findings
         if: failure() && steps.snyk.outcome == 'failure' && (github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: actions/github-script@v9
