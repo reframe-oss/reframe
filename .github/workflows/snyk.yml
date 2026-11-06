@@ -77,16 +77,25 @@ jobs:
       - name: Generate a lockfile Snyk can parse
         run: npm install --package-lock-only --ignore-scripts --legacy-peer-deps
 
+      # The Snyk CLI image, pinned by digest. snyk/actions/node is only a
+      # wrapper that runs the floating snyk/snyk:node tag, so pinning the
+      # action's commit would still run whatever image was pushed last, with
+      # SNYK_TOKEN. These steps pass what that action passes (its v1.0.0
+      # action.yml). To update: take the digest of snyk/snyk:node from Docker
+      # Hub, check the release notes, and change both steps together.
       - name: Run Snyk
         id: snyk
-        uses: snyk/actions/node@master
+        uses: docker://snyk/snyk:node@sha256:71629f3cc12e98b9693cd59f60e81ce880745ced646e2f7cb784fa00281d0b71
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          FORCE_COLOR: 2
+          SNYK_INTEGRATION_NAME: GITHUB_ACTIONS
+          SNYK_INTEGRATION_VERSION: node
         with:
           # High and critical only, so the first run is actionable rather than
           # a wall of low-severity transitive noise. Lower it once the backlog
           # is clean.
-          args: --severity-threshold=high --file=package-lock.json
+          args: snyk test --severity-threshold=high --file=package-lock.json
 
       # Records what was just tested as a Snyk project, so the Snyk dashboard
       # tracks the versions CI tests (the GitHub integration's own project
@@ -94,12 +103,14 @@ jobs:
       # them. main only: pull requests are tested, never recorded.
       - name: Record the tested dependencies in Snyk (main)
         if: (success() || failure()) && github.event_name != 'pull_request'
-        uses: snyk/actions/node@master
+        uses: docker://snyk/snyk:node@sha256:71629f3cc12e98b9693cd59f60e81ce880745ced646e2f7cb784fa00281d0b71
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          FORCE_COLOR: 2
+          SNYK_INTEGRATION_NAME: GITHUB_ACTIONS
+          SNYK_INTEGRATION_VERSION: node
         with:
-          command: monitor
-          args: --file=package-lock.json --project-name=reframe-oss/reframe-ci
+          args: snyk monitor --file=package-lock.json --project-name=reframe-oss/reframe-ci
 
       - name: Alert on High/Critical Snyk Findings
         if: failure() && steps.snyk.outcome == 'failure' && (github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'workflow_dispatch')
