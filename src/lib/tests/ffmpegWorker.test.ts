@@ -463,4 +463,21 @@ describe("ffmpeg.worker", () => {
     );
     expect(ffmpeg().execCalls).toHaveLength(1);
   });
+
+  it("never uses the user's file name as a path in FFmpeg's filesystem", async () => {
+    await startWorker({ isolated: false });
+    send({ type: "load" });
+    await waitFor("ready");
+    send({
+      ...exportRequest(),
+      file: { name: "../../etc/holiday.mp4/..", type: "video/mp4", data: new ArrayBuffer(16) },
+      overlayFile: { name: "logo.p/ng", type: "image/png", data: new ArrayBuffer(4) },
+      overlayOptions: { file: null, position: "bottom-right", size: 100, opacity: 100 },
+    });
+    await waitFor("result");
+    const written = [...ffmpeg().writes.keys()];
+    expect(written).toContain("input_job1.mp4");
+    expect(written).toContain("overlay_job1.png");
+    expect(written.some((name) => name.includes("/") || name.includes(".."))).toBe(false);
+  });
 });

@@ -94,8 +94,10 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// The page asks for this when the user chooses to load an update.
+// The page asks for this when the user chooses to load an update. Only this
+// site's own pages can control the worker.
 self.addEventListener("message", (event) => {
+  if (event.origin !== self.location.origin) return;
   if (event.data && event.data.type === "skip-waiting") self.skipWaiting();
 });
 

@@ -207,6 +207,15 @@ function loadTextFont(): Promise<Uint8Array> {
   return textFontBytes;
 }
 
+/**
+ * The extension of a user's file name, reduced to letters and digits, for the
+ * neutral names files get in FFmpeg's filesystem: the user's file name
+ * (which could hold "/" or "..") is never used as a path.
+ */
+function safeExtension(name: string, fallback: string): string {
+  return (name.split(".").pop() ?? "").replace(/[^a-z0-9]/gi, "").slice(0, 8) || fallback;
+}
+
 async function readFileBytes(file: SerializedFile): Promise<Uint8Array> {
   if (file.data) return new Uint8Array(file.data);
   if (file.blob) return new Uint8Array(await file.blob.arrayBuffer());
@@ -249,7 +258,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   const recipe = request.recipe;
   const { width: targetW, height: targetH } = resolveOutputSize(recipe);
 
-  const ext = request.file.name.split(".").pop() ?? "mp4";
+  const ext = safeExtension(request.file.name, "mp4");
   const inputName = `input_${sessionId}.${ext}`;
 
   const { filename: outputName, mimeType } = getOutputConfig(recipe.format, sessionId);
@@ -276,7 +285,7 @@ async function runExport(request: ExportRequest): Promise<ResultPayload> {
   }
 
   const hasOverlay = !!request.overlayFile;
-  const overlayExt = request.overlayFile?.name.split(".").pop() ?? "png";
+  const overlayExt = safeExtension(request.overlayFile?.name ?? "", "png");
   const overlayInputName = `overlay_${sessionId}.${overlayExt}`;
   if (hasOverlay) {
     cleanupFiles.add(overlayInputName);
@@ -478,7 +487,7 @@ async function runJoin(request: JoinRequest): Promise<ResultPayload> {
   // New Files over the same bytes (no copy) with neutral names: the user's
   // file names never enter FFmpeg's filesystem.
   const sources = request.clips.map(({ file }, i) => {
-    const ext = (file.name.split(".").pop() ?? "mp4").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "mp4";
+    const ext = safeExtension(file.name, "mp4");
     return new File([file], `clip${i}.${ext}`, { type: file.type });
   });
   const outputName = `joined_${sessionId}.mp4`;
@@ -590,7 +599,7 @@ async function runFrames(request: FramesRequest, signal: AbortSignal): Promise<v
   if (!ffmpeg) throw new Error("FFmpeg engine is not loaded.");
   // A new File over the same bytes (no copy) with a neutral name: the user's
   // file name never enters FFmpeg's filesystem.
-  const ext = (request.file.name.split(".").pop() ?? "mp4").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "mp4";
+  const ext = safeExtension(request.file.name, "mp4");
   const source = new File([request.file], `source.${ext}`, { type: request.file.type });
   // One thread on the multi-threaded core: never FFmpeg's automatic count,
   // which deadlocks core-mt (see MT_THREAD_CAP).

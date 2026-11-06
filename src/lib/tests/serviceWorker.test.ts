@@ -11,13 +11,26 @@ type Route = (url: URL, request: { method: string; mode: string }) => string;
 /** Runs sw.js against a stand-in `self`, as the browser would, and returns its test hooks. */
 function loadWorker(precache: unknown) {
   const listeners: string[] = [];
+  const handlers: Record<string, (event: unknown) => void> = {};
+  let skipped = 0;
   const self = {
     location: { origin: "https://reframe.test" },
-    addEventListener: (type: string) => listeners.push(type),
+    addEventListener: (type: string, handler: (event: unknown) => void) => {
+      listeners.push(type);
+      handlers[type] = handler;
+    },
+    skipWaiting: () => {
+      skipped++;
+    },
   } as Record<string, unknown>;
   const source = precache ? injectManifest(SOURCE, precache) : SOURCE;
   new Function("self", "caches", source)(self, {});
-  return { ...(self.__reframeSw as { route: Route; pageKey: (path: string) => string }), listeners };
+  return {
+    ...(self.__reframeSw as { route: Route; pageKey: (path: string) => string }),
+    listeners,
+    handlers,
+    skipped: () => skipped,
+  };
 }
 
 const PRECACHE = { version: "abc", pages: ["/", "/contact", "/privacy"], assets: ["/_next/static/chunks/app.js"] };
@@ -56,6 +69,14 @@ describe("service worker routing (public/sw.js)", () => {
 
   it("handles install, activate, fetch and update messages", () => {
     expect(sw.listeners).toEqual(expect.arrayContaining(["install", "activate", "fetch", "message"]));
+  });
+
+  it("loads an update only when this site's own page asks", () => {
+    const worker = loadWorker(PRECACHE);
+    worker.handlers.message!({ origin: "https://evil.example", data: { type: "skip-waiting" } });
+    expect(worker.skipped()).toBe(0);
+    worker.handlers.message!({ origin: "https://reframe.test", data: { type: "skip-waiting" } });
+    expect(worker.skipped()).toBe(1);
   });
 
   it("keeps every engine file the page loads, in either mode", () => {
