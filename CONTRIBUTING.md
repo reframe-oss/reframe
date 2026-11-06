@@ -54,6 +54,21 @@ bunx playwright test
 
 Keep your fork current with `git fetch upstream && git merge upstream/main`.
 
+### Work on a component in Storybook
+
+Run `bun run storybook` and open http://localhost:6006. Pick a story from the
+sidebar to work on a component without opening the full editor. Use Controls to
+try its props, and check the light and dark themes and accessibility panel.
+
+Stories live beside components as `src/components/<Component>.stories.tsx`.
+Use an existing story as a starting point and cover the states your change
+affects, including loading, empty and disabled states where they apply.
+
+Run `bun run build-storybook` to check the static build. It writes to
+`storybook-static/`; do not commit that generated folder. Storybook checks
+components in isolation, so test the full upload, edit and export flow separately
+when your change affects it.
+
 ## Claim an issue
 
 Pick an issue from
