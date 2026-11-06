@@ -8,9 +8,14 @@
 //
 //   node scripts/strip-sourcemaps.mjs [dir]   (default: out)
 import { readdir, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 
-const root = process.argv[2] ?? "out";
+// It deletes files, so it only works inside the repository it is run from.
+const root = resolve(process.argv[2] ?? "out");
+if (!root.startsWith(process.cwd() + sep)) {
+  console.error(`strip-sourcemaps: ${root} is outside ${process.cwd()}; refusing.`);
+  process.exit(2);
+}
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {

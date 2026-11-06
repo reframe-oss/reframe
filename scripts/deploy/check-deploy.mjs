@@ -121,10 +121,10 @@ if (page.outcome.status && page.outcome.status >= 500) results.push(RESULT.UNAVA
 const overall = overallResult(results);
 
 const summary = {
-  pass: "All checks passed.",
-  fail: "Some checks failed.",
-  protected: "Not checked: the deployment requires authentication (set VERCEL_AUTOMATION_BYPASS_SECRET for Vercel previews).",
-  unavailable: "Not checked: the deployment could not be reached.",
+  [RESULT.PASS]: "All checks passed.",
+  [RESULT.FAIL]: "Some checks failed.",
+  [RESULT.PROTECTED]: "Not checked: the deployment requires authentication (set VERCEL_AUTOMATION_BYPASS_SECRET for Vercel previews).",
+  [RESULT.UNAVAILABLE]: "Not checked: the deployment could not be reached.",
 }[overall];
 
 if (json) console.log(JSON.stringify({ url: base.href, result: overall, commit, checks }, null, 2));

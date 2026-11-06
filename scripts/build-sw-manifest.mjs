@@ -11,7 +11,7 @@
 // Source maps, the headers file and sw.js itself are left out.
 import { createHash } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SKIP = [/\.map$/, /^_headers$/, /^sw\.js$/, /(^|\/)\.DS_Store$/];
@@ -68,7 +68,12 @@ export function injectManifest(source, manifest) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const root = process.argv[2] ?? "out";
+  // It rewrites out/sw.js, so it only works inside the repository it runs in.
+  const root = resolve(process.argv[2] ?? "out");
+  if (!root.startsWith(process.cwd() + sep)) {
+    console.error(`build-sw-manifest: ${root} is outside ${process.cwd()}; refusing.`);
+    process.exit(2);
+  }
   const manifest = await buildManifest(root);
   const swPath = join(root, "sw.js");
   await writeFile(swPath, injectManifest(await readFile(swPath, "utf8"), manifest));

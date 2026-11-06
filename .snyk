@@ -17,3 +17,12 @@
 version: v1.25.0
 ignore: {}
 patch: {}
+# Snyk Code skips test-only code: unit and browser tests (which start plain
+# HTTP servers on 127.0.0.1 as fixtures) and the local server the tests and
+# the deploy smoke check use. None of it ships to users.
+exclude:
+  code:
+    - "tests/**"
+    - "__tests__/**"
+    - "test/**"
+    - scripts/serve-isolated.mjs

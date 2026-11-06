@@ -62,6 +62,36 @@ versions: none has a high or critical advisory.
 After the fixes: 0 blocking, 5 excepted (the two packages above), 14
 moderate or low.
 
+## Snyk
+
+Snyk is connected through its GitHub integration (a webhook on the repo)
+to the `akankshatrehun` Snyk organisation, where `reframe-oss/reframe` has
+two projects: **package.json** (open-source dependencies) and **Code
+analysis** (Snyk Code). It adds two checks to pull requests from this
+repository, `security/snyk` and `license/snyk`, and `snyk.yml` runs the CLI
+(`snyk test`, high and critical only) on pushes to main, on same-repo pull
+requests and weekly. Snyk can't read `bun.lock`, so that job tests a
+`package-lock.json` generated from `package.json`; the bun.lock policy above
+is the exact check.
+
+`.snyk` holds the policy: open-source ignores (none) and the paths Snyk Code
+skips (test-only code).
+
+### Snyk Code triage, 2026-11-06
+
+14 findings on `d1ff303`:
+
+| Finding | Where | Outcome |
+|---|---|---|
+| Path traversal (high) | `ffmpeg.worker.ts`: the engine's input file name took its extension from the user's file name | **Fixed**: every engine file name uses a letters-and-digits extension (`safeExtension`); a test feeds `../` names |
+| ReDoS (high) | `sw.js`: `cache.match(request.url)` | **False positive**: Cache Storage matching compares URLs, it builds no regular expression. Ignored in Snyk with this reason |
+| Hardcoded password (medium) | `check-deploy.mjs`: an object key named `pass` | **Fixed**: keys are the `RESULT` constants |
+| postMessage origin (low) | `sw.js` message handler | **Fixed**: messages from other origins are ignored |
+| postMessage origin (low) | `ffmpeg.worker.ts` message handler | **False positive**: a dedicated worker only receives messages from the page that created it. Ignored in Snyk |
+| Path traversal ×6 (low) | `build-sw-manifest.mjs`, `strip-sourcemaps.mjs`: a directory from the command line | **Fixed**: both refuse a directory outside the repository (one deletes files) |
+| Cleartext HTTP, no rate limit (medium ×2) | `scripts/serve-isolated.mjs`: the local test server on 127.0.0.1 | **Excluded** from Snyk Code (test-only) |
+| Cleartext HTTP (low) | `deployCheck.test.ts`: a fixture server | **Excluded** (test-only) |
+
 ## Secrets
 
 On 2026-11-06, gitleaks 8.21.2 (redacted) found no secrets in the full
