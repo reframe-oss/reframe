@@ -16,8 +16,11 @@
 
 ### [Open Reframe → reframe-os.netlify.app](https://reframe-os.netlify.app)
 
-<!-- TODO: replace with a short screen recording of an export (docs/assets/demo.gif, under 5 MB). -->
-<img src="docs/assets/demo-placeholder.svg" alt="Demo coming soon" width="640">
+<a href="docs/assets/demo.mp4">
+  <img src="docs/assets/demo.gif" alt="Opening a landscape clip in Reframe, choosing the 9:16 preset with Fill, trimming it to 4 seconds, exporting a 1080×1920 MP4 and downloading it" width="800">
+</a>
+
+<sub>Opening a clip, resizing it to 9:16, trimming, exporting and downloading. Watch it as <a href="docs/assets/demo.mp4">MP4</a>.</sub>
 
 </div>
 
@@ -69,10 +72,7 @@ to set up, claim an issue with `/assign`, and open a pull request.
 ## Part of GirlScript Summer of Code 2026
 
 <a href="https://gssoc.girlscript.tech">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/gssoc-dark.svg">
-    <img src="docs/assets/brand/gssoc-light.svg" alt="GirlScript Summer of Code 2026" height="48">
-  </picture>
+  <img src="docs/assets/brand/gssoc.png" alt="GirlScript Summer of Code 2026" height="48">
 </a>
 
 Reframe was an official GSSoC'26 project. Pick one of the
@@ -99,8 +99,8 @@ Maintainers add the labels.
   &nbsp;&nbsp;
   <a href="https://www.datadoghq.com">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/datadog-dark.png">
-      <img src="docs/assets/brand/datadog-light.png" alt="Datadog" height="40">
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/datadog-dark.svg">
+      <img src="docs/assets/brand/datadog-light.svg" alt="Datadog" height="40">
     </picture>
   </a>
   &nbsp;&nbsp;
