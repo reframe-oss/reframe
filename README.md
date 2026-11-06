@@ -83,13 +83,13 @@ Maintainers add the labels.
 ## Supported by
 
 <p>
-  <a href="https://www.netlify.com"><img src="docs/assets/brand/netlify-light.svg#gh-light-mode-only" alt="Deploys by Netlify" height="40"><img src="docs/assets/brand/netlify-dark.svg#gh-dark-mode-only" alt="Deploys by Netlify" height="40"></a>
-  &nbsp;&nbsp;
-  <a href="https://snyk.io"><img src="docs/assets/brand/snyk-light.svg#gh-light-mode-only" alt="Snyk" height="48"><img src="docs/assets/brand/snyk-dark.svg#gh-dark-mode-only" alt="Snyk" height="48"></a>
-  &nbsp;&nbsp;
-  <a href="https://www.datadoghq.com"><img src="docs/assets/brand/datadog-light.png#gh-light-mode-only" alt="Datadog" height="40"><img src="docs/assets/brand/datadog-dark.png#gh-dark-mode-only" alt="Datadog" height="40"></a>
-  &nbsp;&nbsp;
-  <a href="https://www.chromatic.com"><img src="docs/assets/brand/chromatic-light.svg#gh-light-mode-only" alt="Chromatic" height="40"><img src="docs/assets/brand/chromatic-dark.svg#gh-dark-mode-only" alt="Chromatic" height="40"></a>
+  <a href="https://www.netlify.com"><img src="docs/assets/brand/netlify.svg" alt="Deploys by Netlify" height="48"></a>
+  &nbsp;
+  <a href="https://snyk.io"><img src="docs/assets/brand/snyk.svg" alt="Snyk" height="48"></a>
+  &nbsp;
+  <a href="https://www.datadoghq.com"><img src="docs/assets/brand/datadog.svg" alt="Datadog" height="48"></a>
+  &nbsp;
+  <a href="https://www.chromatic.com"><img src="docs/assets/brand/chromatic.svg" alt="Chromatic" height="48"></a>
 </p>
 
 [Netlify](https://www.netlify.com) hosts the site and its deploy previews.
