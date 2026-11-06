@@ -124,7 +124,7 @@ merged until it's added.
 1. Push your branch and open a pull request against `main`. Fill in the
    template: what changed, why, and `Closes #<issue>`.
 2. Automated checks run: lint, type check, tests, the build, a Netlify deploy
-   preview, Snyk, and Chromatic visual review.
+   preview, dependency and secret scans, and Chromatic visual review.
 3. A maintainer reviews, usually within a few days. Reply to comments and push
    fixes to the same branch; don't open a new PR.
 4. **A maintainer reviews, labels and merges every PR by hand.** No bot
