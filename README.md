@@ -93,14 +93,14 @@ Maintainers add the labels.
   <a href="https://snyk.io">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/snyk-dark.svg">
-      <img src="docs/assets/brand/snyk-light.svg" alt="Snyk" height="40">
+      <img src="docs/assets/brand/snyk-light.svg" alt="Snyk" height="48">
     </picture>
   </a>
   &nbsp;&nbsp;
   <a href="https://www.datadoghq.com">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/datadog-dark.svg">
-      <img src="docs/assets/brand/datadog-light.svg" alt="Datadog" height="40">
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/datadog-dark.png">
+      <img src="docs/assets/brand/datadog-light.png" alt="Datadog" height="40">
     </picture>
   </a>
   &nbsp;&nbsp;
